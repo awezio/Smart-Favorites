@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Favorites</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body data-theme="dark">
+  <div class="container">
+    <!-- Header with Toolbar -->
+    <header class="header">
+      <!-- Left: Logo + User Info -->
+      <div class="header-left">
+        <div class="app-logo" title="Smart Favorites">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00f0ff"/>
+                <stop offset="50%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#a855f7"/>
+              </linearGradient>
+            </defs>
+            <!-- Bookmark shape with sparkle -->
+            <path d="M5 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17l-7-4-7 4V4z" 
+                  fill="url(#logo-grad)" opacity="0.9"/>
+            <circle cx="18" cy="6" r="2" fill="#00f0ff"/>
+            <circle cx="18" cy="6" r="1" fill="#fff"/>
+          </svg>
+        </div>
+        <div class="user-area" id="user-area" title="点击登录">
+          <div class="user-avatar" id="user-avatar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M20 21a8 8 0 1 0-16 0"/>
+            </svg>
+          </div>
+          <span class="user-name" id="user-name">未登录</span>
+        </div>
+      </div>
+      
+      <!-- Center: Status Indicator -->
+      <div class="header-status">
+        <span id="status-indicator" class="status-dot-mini disconnected"></span>
+        <span id="status-text" class="status-text-mini">未连接</span>
+        <span id="model-info" class="model-badge-mini">--</span>
+      </div>
+      
+      <!-- Right: Toolbar -->
+      <div class="toolbar">
+        <button id="refresh-btn" class="toolbar-btn" title="刷新连接状态">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 16h5v5"/>
+          </svg>
+        </button>
+        <button id="popout-btn" class="toolbar-btn" title="在独立窗口打开">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h6v6"/>
+            <path d="M10 14 21 3"/>
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          </svg>
+        </button>
+        <div class="theme-dropdown">
+          <button id="theme-btn" class="toolbar-btn" title="切换主题">
+            <svg id="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            </svg>
+            <svg id="theme-icon-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2"/>
+              <path d="M12 20v2"/>
+              <path d="m4.93 4.93 1.41 1.41"/>
+              <path d="m17.66 17.66 1.41 1.41"/>
+              <path d="M2 12h2"/>
+              <path d="M20 12h2"/>
+              <path d="m6.34 17.66-1.41 1.41"/>
+              <path d="m19.07 4.93-1.41 1.41"/>
+            </svg>
+            <svg id="theme-icon-auto" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 2a10 10 0 0 1 0 20z"/>
+            </svg>
+          </button>
+          <div id="theme-menu" class="dropdown-menu">
+            <button class="dropdown-item" data-theme="dark">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+              </svg>
+              深色模式
+            </button>
+            <button class="dropdown-item" data-theme="light">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2"/>
+                <path d="M12 20v2"/>
+                <path d="m4.93 4.93 1.41 1.41"/>
+                <path d="m17.66 17.66 1.41 1.41"/>
+                <path d="M2 12h2"/>
+                <path d="M20 12h2"/>
+                <path d="m6.34 17.66-1.41 1.41"/>
+                <path d="m19.07 4.93-1.41 1.41"/>
+              </svg>
+              浅色模式
+            </button>
+            <button class="dropdown-item" data-theme="auto">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 2a10 10 0 0 1 0 20z"/>
+              </svg>
+              跟随系统
+            </button>
+          </div>
+        </div>
+        <button id="settings-btn" class="toolbar-btn" title="设置">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="search" role="tab" aria-selected="true">
+        <span>🔍 搜索</span>
+      </button>
+      <button class="tab-btn" data-tab="chat" role="tab" aria-selected="false">
+        <span>💬 问答</span>
+      </button>
+      <button class="tab-btn" data-tab="sync" role="tab" aria-selected="false">
+        <span>🔄 同步</span>
+      </button>
+      <button class="tab-btn" data-tab="ai-tools" role="tab" aria-selected="false">
+        <span>✨ AI</span>
+      </button>
+    </nav>
+
+    <!-- Search Tab -->
+    <section id="search-tab" class="tab-content active" role="tabpanel">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="输入关键词或问题搜索收藏夹..." autocomplete="off">
+        <button id="search-btn" class="primary-btn"><span>搜索</span></button>
+      </div>
+      <div id="search-results" class="results-container">
+        <p class="placeholder-text">输入关键词开始搜索您的收藏夹<br><small>支持语义搜索，可以用自然语言描述您要找的内容</small></p>
+      </div>
+    </section>
+
+    <!-- Chat Tab -->
+    <section id="chat-tab" class="tab-content" role="tabpanel">
+      <!-- Chat Session Sidebar -->
+      <div class="chat-layout">
+        <div class="chat-sidebar" id="chat-sidebar">
+          <div class="chat-sidebar-header">
+            <span>会话记录</span>
+            <button id="new-chat-btn" class="icon-btn-small" title="新建会话">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>
+          </div>
+          <div class="chat-sessions-list" id="chat-sessions-list">
+            <!-- Sessions will be loaded here -->
+          </div>
+          <button id="toggle-sidebar-btn" class="toggle-sidebar-btn" title="收起会话列表">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="chat-main">
+          <button id="expand-sidebar-btn" class="expand-sidebar-btn" title="展开会话列表" style="display: none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </button>
+          <div id="chat-messages" class="chat-container">
+            <div class="message assistant">
+              <p>👋 你好！我是您的智能收藏夹助手。您可以问我关于收藏夹内容的任何问题：</p>
+              <ul>
+                <li>「我收藏过哪些关于机器学习的网站？」</li>
+                <li>「帮我找一下编程相关的教程」</li>
+                <li>「整理一下我的技术类书签」</li>
+              </ul>
+            </div>
+          </div>
+          <div class="chat-input-box">
+            <input type="text" id="chat-input" placeholder="输入您的问题..." autocomplete="off">
+            <button id="chat-btn" class="primary-btn"><span>发送</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sync Tab -->
+    <section id="sync-tab" class="tab-content" role="tabpanel">
+      <div class="sync-status">
+        <div id="sync-info" class="info-box">
+          <p>收藏夹状态</p>
+          <p id="bookmark-count">📚 书签数量: <strong>--</strong></p>
+          <p id="last-sync">⏱️ 上次同步: <strong>--</strong></p>
+          <p id="sync-mode">🔄 同步模式: <strong>手动</strong></p>
+        </div>
+        
+        <div class="sync-options">
+          <label class="option-label">同步模式</label>
+          <select id="sync-mode-select" class="full-width">
+            <option value="manual">手动同步</option>
+            <option value="auto">自动同步 (收藏夹变更时)</option>
+            <option value="scheduled">定时同步</option>
+          </select>
+        </div>
+        
+        <div id="schedule-options" class="sync-options" style="display: none;">
+          <label class="option-label">同步间隔</label>
+          <select id="sync-interval" class="full-width">
+            <option value="15">每 15 分钟</option>
+            <option value="30">每 30 分钟</option>
+            <option value="60" selected>每 1 小时</option>
+            <option value="360">每 6 小时</option>
+            <option value="1440">每天</option>
+          </select>
+        </div>
+        
+        <button id="sync-btn" class="primary-btn full-width"><span>🔄 立即同步收藏夹</span></button>
+        <button id="export-btn" class="secondary-btn full-width">📤 导出收藏夹</button>
+        <button id="import-btn" class="secondary-btn full-width">📥 从 HTML 导入</button>
+        <input type="file" id="import-file" accept=".html" style="display: none;">
+      </div>
+    </section>
+
+    <!-- AI Tools Tab -->
+    <section id="ai-tools-tab" class="tab-content" role="tabpanel">
+      <div class="ai-tools-container">
+        <div class="tool-card stagger-1">
+          <h3>🏷️ 智能分类</h3>
+          <p>使用 AI 分析书签内容，自动识别类别并提供整理建议</p>
+          <button id="categorize-btn" class="primary-btn full-width"><span>开始分析</span></button>
+        </div>
+        
+        <div class="tool-card stagger-2">
+          <h3>🔍 重复检测</h3>
+          <p>智能检测重复或相似的书签，帮助清理冗余收藏</p>
+          <button id="duplicate-btn" class="primary-btn full-width"><span>检测重复</span></button>
+        </div>
+        
+        <div id="ai-results" class="results-container" style="display: none;">
+          <div class="results-header">
+            <h4 id="results-title">分析结果</h4>
+            <button id="close-results" class="icon-btn" title="关闭">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div id="results-content"></div>
+          <div class="results-actions">
+            <button id="apply-suggestions" class="primary-btn"><span>应用建议</span></button>
+            <button id="cancel-suggestions" class="secondary-btn">取消</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal" style="display: none;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>⚙️ 设置</h3>
+        <button id="close-settings-modal" class="icon-btn" title="关闭">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Backend Error Alert -->
+        <div id="settings-error-alert" class="settings-error" style="display: none;">
+          <div class="settings-error-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v4M12 16h.01"/>
+            </svg>
+            <span>无法连接后端</span>
+          </div>
+          <p class="settings-error-message">后端服务未响应，设置可能无法正确加载或保存。请检查后端是否运行在正确的地址。</p>
+        </div>
+        
+        <!-- Backend URL -->
+        <div class="settings-section">
+          <label class="settings-label">后端服务地址</label>
+          <div class="settings-row">
+            <input type="text" id="settings-backend-url" class="settings-input" value="http://localhost:8000" placeholder="http://localhost:8000">
+            <button id="test-connection-btn" class="secondary-btn">测试</button>
+          </div>
+          <p class="settings-hint" id="connection-status">点击测试检查后端连接</p>
+        </div>
+        
+        <!-- Default Provider -->
+        <div class="settings-section">
+          <label class="settings-label">默认 AI 服务商</label>
+          <select id="settings-default-provider" class="settings-select">
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="kimi">Kimi (Moonshot)</option>
+            <option value="qwen">Qwen (通义千问)</option>
+            <option value="claude">Claude</option>
+            <option value="gemini">Gemini</option>
+            <option value="glm">GLM (智谱)</option>
+            <option value="ollama">Ollama (本地)</option>
+          </select>
+        </div>
+        
+        <!-- API Keys -->
+        <div class="settings-section">
+          <label class="settings-label">API 密钥配置</label>
+          <p class="settings-hint">密钥安全存储在后端，前端不保存</p>
+          
+          <div class="api-keys-grid" id="api-keys-grid">
+            <!-- Will be populated by JS -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button id="save-settings-btn" class="primary-btn"><span>保存设置</span></button>
+        <button id="cancel-settings-btn" class="secondary-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="sidepanel.js" type="module"></script>
+</body>
+</html>

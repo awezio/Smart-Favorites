@@ -67,8 +67,11 @@ class OpenAIProvider(BaseLLMProvider):
     async def chat(self, messages: List[Message], model: Optional[str] = None, 
                    temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
         from openai import AsyncOpenAI
+        import httpx
         
-        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        # Create httpx client explicitly to avoid proxies parameter issue
+        http_client = httpx.AsyncClient()
+        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
         response = await client.chat.completions.create(
@@ -105,8 +108,11 @@ class DeepSeekProvider(BaseLLMProvider):
     async def chat(self, messages: List[Message], model: Optional[str] = None,
                    temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
         from openai import AsyncOpenAI
+        import httpx
         
-        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        # Create httpx client explicitly to avoid proxies parameter issue
+        http_client = httpx.AsyncClient()
+        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
         response = await client.chat.completions.create(
@@ -143,8 +149,11 @@ class KimiProvider(BaseLLMProvider):
     async def chat(self, messages: List[Message], model: Optional[str] = None,
                    temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
         from openai import AsyncOpenAI
+        import httpx
         
-        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        # Create httpx client explicitly to avoid proxies parameter issue
+        http_client = httpx.AsyncClient()
+        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
         response = await client.chat.completions.create(
@@ -309,8 +318,11 @@ class GLMProvider(BaseLLMProvider):
     async def chat(self, messages: List[Message], model: Optional[str] = None,
                    temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
         from openai import AsyncOpenAI
+        import httpx
         
-        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        # Create httpx client explicitly to avoid proxies parameter issue
+        http_client = httpx.AsyncClient()
+        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
         response = await client.chat.completions.create(
@@ -399,6 +411,7 @@ class LLMAdapter:
             "ollama": OllamaProvider(),
         }
         self.default_provider = settings.default_llm_provider
+        self._active_connections: Dict[str, Any] = {}  # Track active connections
     
     def get_provider(self, provider_name: Optional[str] = None) -> BaseLLMProvider:
         """Get a specific provider"""
@@ -432,12 +445,44 @@ class LLMAdapter:
         max_tokens: int = 2000
     ) -> LLMResponse:
         """Send chat request to specified provider"""
-        llm = self.get_provider(provider)
+        provider_name = provider or self.default_provider
+        
+        # Close previous provider's connections if switching
+        if provider_name in self._active_connections:
+            previous_provider = self._active_connections.get(provider_name)
+            if previous_provider and previous_provider != provider_name:
+                await self._close_provider_connections(previous_provider)
+        
+        llm = self.get_provider(provider_name)
         
         if not llm.is_available():
-            raise ValueError(f"Provider {provider or self.default_provider} is not configured")
+            raise ValueError(f"Provider {provider_name} is not configured")
         
-        return await llm.chat(messages, model, temperature, max_tokens)
+        # Track active provider
+        self._active_connections[provider_name] = provider_name
+        
+        try:
+            return await llm.chat(messages, model, temperature, max_tokens)
+        finally:
+            # Clean up connections after use (for providers that create new clients each time)
+            pass
+    
+    async def _close_provider_connections(self, provider_name: str):
+        """Close connections for a specific provider"""
+        try:
+            provider = self.providers.get(provider_name)
+            if provider and hasattr(provider, 'close'):
+                await provider.close()
+            logger.debug(f"Closed connections for provider: {provider_name}")
+        except Exception as e:
+            logger.warning(f"Error closing connections for {provider_name}: {e}")
+    
+    async def close_all_connections(self):
+        """Close all active connections"""
+        for provider_name in list(self._active_connections.keys()):
+            await self._close_provider_connections(provider_name)
+        self._active_connections.clear()
+        logger.info("All LLM provider connections closed")
 
 
 # Singleton instance

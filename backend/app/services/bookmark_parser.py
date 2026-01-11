@@ -34,20 +34,36 @@ class BookmarkParser:
         self.bookmarks_count = 0
         self.folders_count = 0
         
+        # Use lxml parser for better handling of Netscape bookmark format
         soup = BeautifulSoup(html_content, 'lxml')
         
-        # Find the root DL element
-        root_dl = soup.find('dl')
-        if not root_dl:
-            logger.warning("No <DL> element found in bookmark file")
-            return BookmarkCollection(
-                root=BookmarkFolder(name="Bookmarks", path="/"),
-                total_bookmarks=0,
-                total_folders=0
-            )
+        # Simple approach: find all DT elements with A tags
+        # and determine folder path from parent DL/H3 structure
+        root_folder = BookmarkFolder(name="Bookmarks", path="/", bookmarks=[], subfolders=[])
         
-        # Parse the bookmark tree
-        root_folder = self._parse_folder(root_dl, "Bookmarks", "/")
+        # Find all A tags with HREF (these are the actual bookmarks)
+        all_links = soup.find_all('a', href=True)
+        
+        # Extract folder structure from H3 tags
+        folder_map = {}  # Map H3 elements to folder paths
+        all_h3s = soup.find_all('h3')
+        
+        for h3 in all_h3s:
+            folder_name = h3.get_text(strip=True)
+            # Build path by traversing up through parent DL/H3 elements
+            path = self._get_folder_path(h3)
+            folder_map[h3] = path
+            self.folders_count += 1
+        
+        # Process each bookmark
+        for a in all_links:
+            # Find the containing folder by looking for nearest H3 ancestor
+            folder_path = self._get_bookmark_folder_path(a, folder_map)
+            
+            bookmark = self._parse_bookmark(a, folder_path)
+            if bookmark:
+                root_folder.bookmarks.append(bookmark)
+                self.bookmarks_count += 1
         
         logger.info(f"Parsed {self.bookmarks_count} bookmarks in {self.folders_count} folders")
         
@@ -56,6 +72,49 @@ class BookmarkParser:
             total_bookmarks=self.bookmarks_count,
             total_folders=self.folders_count
         )
+    
+    def _get_folder_path(self, h3_element: Tag) -> str:
+        """Get the folder path for an H3 element by traversing up the tree"""
+        path_parts = [h3_element.get_text(strip=True)]
+        
+        # Walk up the DOM tree looking for parent H3s (indicating nested folders)
+        current = h3_element.parent
+        while current:
+            if current.name == 'dl':
+                # Look for the preceding H3 in the parent DT
+                prev_dt = None
+                for sibling in current.previous_siblings:
+                    if hasattr(sibling, 'name') and sibling.name == 'dt':
+                        prev_dt = sibling
+                        break
+                
+                if prev_dt:
+                    prev_h3 = prev_dt.find('h3')
+                    if prev_h3:
+                        path_parts.insert(0, prev_h3.get_text(strip=True))
+            
+            current = current.parent
+        
+        return "/" + "/".join(path_parts) + "/"
+    
+    def _get_bookmark_folder_path(self, a_element: Tag, folder_map: dict) -> str:
+        """Determine the folder path for a bookmark by finding its containing folder"""
+        # Walk up the DOM tree to find the containing DL, then its preceding H3
+        current = a_element.parent
+        
+        while current:
+            if current.name == 'dl':
+                # Look for the H3 that defines this folder
+                for sibling in current.previous_siblings:
+                    if hasattr(sibling, 'name') and sibling.name == 'dt':
+                        h3 = sibling.find('h3')
+                        if h3 and h3 in folder_map:
+                            return folder_map[h3]
+                        break
+            
+            current = current.parent
+        
+        return "/"
     
     def _parse_folder(self, dl_element: Tag, folder_name: str, folder_path: str) -> BookmarkFolder:
         """
@@ -76,38 +135,60 @@ class BookmarkParser:
             subfolders=[]
         )
         
-        # Find all DT children (direct children only)
-        dt_elements = dl_element.find_all('dt', recursive=False)
+        # Iterate through direct children of DL
+        # In Netscape bookmark format, DL contains DT and nested DL as siblings
+        children = list(dl_element.children)
+        i = 0
         
-        for dt in dt_elements:
-            # Check if it's a folder (H3) or a bookmark (A)
-            h3 = dt.find('h3', recursive=False)
-            a = dt.find('a', recursive=False)
+        while i < len(children):
+            child = children[i]
             
-            if h3:
-                # This is a folder
-                subfolder_name = h3.get_text(strip=True)
-                subfolder_path = f"{folder_path}{subfolder_name}/"
+            # Skip non-element nodes (text, NavigableString, etc.)
+            if not hasattr(child, 'name') or not child.name:
+                i += 1
+                continue
+            
+            if child.name == 'dt':
+                # Check if it's a folder (H3) or a bookmark (A)
+                h3 = child.find('h3', recursive=False)
+                a = child.find('a', recursive=False)
                 
-                # Get folder metadata
-                add_date = self._parse_timestamp(h3.get('add_date'))
-                last_modified = self._parse_timestamp(h3.get('last_modified'))
-                
-                # Find the associated DL element
-                subfolder_dl = dt.find('dl', recursive=False)
-                if subfolder_dl:
-                    subfolder = self._parse_folder(subfolder_dl, subfolder_name, subfolder_path)
-                    subfolder.add_date = add_date
-                    subfolder.last_modified = last_modified
-                    folder.subfolders.append(subfolder)
-                    self.folders_count += 1
+                if h3:
+                    # This is a folder
+                    subfolder_name = h3.get_text(strip=True)
+                    subfolder_path = f"{folder_path}{subfolder_name}/"
                     
-            elif a:
-                # This is a bookmark
-                bookmark = self._parse_bookmark(a, folder_path)
-                if bookmark:
-                    folder.bookmarks.append(bookmark)
-                    self.bookmarks_count += 1
+                    # Get folder metadata
+                    add_date = self._parse_timestamp(h3.get('add_date'))
+                    last_modified = self._parse_timestamp(h3.get('last_modified'))
+                    
+                    # Find the associated DL element (should be next sibling)
+                    subfolder_dl = None
+                    for j in range(i + 1, len(children)):
+                        sibling = children[j]
+                        if hasattr(sibling, 'name'):
+                            if sibling.name == 'dl':
+                                subfolder_dl = sibling
+                                break
+                            elif sibling.name == 'dt':
+                                # Next DT found, no DL for this folder
+                                break
+                    
+                    if subfolder_dl:
+                        subfolder = self._parse_folder(subfolder_dl, subfolder_name, subfolder_path)
+                        subfolder.add_date = add_date
+                        subfolder.last_modified = last_modified
+                        folder.subfolders.append(subfolder)
+                        self.folders_count += 1
+                        
+                elif a:
+                    # This is a bookmark
+                    bookmark = self._parse_bookmark(a, folder_path)
+                    if bookmark:
+                        folder.bookmarks.append(bookmark)
+                        self.bookmarks_count += 1
+            
+            i += 1
         
         return folder
     

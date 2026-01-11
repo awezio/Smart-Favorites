@@ -77,6 +77,28 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("Shutting down Smart Favorites Backend...")
+    
+    # Clean up LLM connections
+    try:
+        from .services import get_llm_adapter
+        llm = get_llm_adapter()
+        await llm.close_all_connections()
+    except Exception as e:
+        logger.warning(f"Error during LLM cleanup: {e}")
+    
+    # Clean up vector store connections
+    try:
+        from .services import get_vector_store
+        vector_store = get_vector_store()
+        if hasattr(vector_store, 'close'):
+            try:
+                vector_store.close()
+            except Exception as e:
+                logger.warning(f"Error closing vector store: {e}")
+    except Exception as e:
+        logger.warning(f"Error during vector store cleanup: {e}")
+    
+    logger.info("Shutdown complete")
 
 
 @app.get("/")

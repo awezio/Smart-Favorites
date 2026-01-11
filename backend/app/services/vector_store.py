@@ -33,10 +33,40 @@ class VectorStore:
                     model_name=settings.embedding_model
                 )
             else:
+                # Configure Hugging Face mirror for better connectivity in China
+                import os
+                
+                # Check if HF_ENDPOINT is set in environment or settings
+                hf_endpoint = os.environ.get('HF_ENDPOINT')
+                if hf_endpoint:
+                    logger.info(f"Using Hugging Face endpoint: {hf_endpoint}")
+                    os.environ['HF_ENDPOINT'] = hf_endpoint
+                
                 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-                self._embedding_function = SentenceTransformerEmbeddingFunction(
-                    model_name=settings.embedding_model
-                )
+                try:
+                    logger.info(f"Initializing embedding model: {settings.embedding_model}")
+                    logger.info("This may take a while on first run as the model needs to be downloaded...")
+                    
+                    self._embedding_function = SentenceTransformerEmbeddingFunction(
+                        model_name=settings.embedding_model
+                    )
+                    logger.info(f"Embedding function initialized successfully with model: {settings.embedding_model}")
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"Failed to initialize embedding function: {error_msg}")
+                    
+                    if "Connection" in error_msg or "reset" in error_msg.lower() or "10054" in error_msg:
+                        logger.warning("=" * 60)
+                        logger.warning("Network connection error detected!")
+                        logger.warning("Solutions:")
+                        logger.warning("1. Use Hugging Face mirror (recommended for China):")
+                        logger.warning("   Set environment variable: HF_ENDPOINT=https://hf-mirror.com")
+                        logger.warning("   Or add to .env file: HF_ENDPOINT=https://hf-mirror.com")
+                        logger.warning("2. Check your network connection and firewall settings")
+                        logger.warning("3. Pre-download the model manually:")
+                        logger.warning(f"   python -c \"from sentence_transformers import SentenceTransformer; SentenceTransformer('{settings.embedding_model}')\"")
+                        logger.warning("=" * 60)
+                    raise
         return self._embedding_function
     
     def _ensure_client(self):
