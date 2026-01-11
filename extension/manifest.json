@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Smart Favorites",
+  "version": "1.0.0",
+  "description": "智能收藏夹管理 - 基于 AI 的收藏夹语义搜索和问答",
+  "author": "Smart Favorites Team",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Smart Favorites"
+  },
+  "background": {
+    "service_worker": "background/background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_page": "options/options.html"
+}

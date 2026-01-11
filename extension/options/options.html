@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Favorites - 设置</title>
+  <style>
+    :root {
+      --primary-color: #4a90d9;
+      --primary-hover: #357abd;
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --text-color: #333333;
+      --text-muted: #6c757d;
+      --border-color: #dee2e6;
+      --success-color: #28a745;
+      --danger-color: #dc3545;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      color: var(--primary-color);
+      margin-bottom: 30px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .section {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .section h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: var(--text-color);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    .form-group .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border-color);
+    }
+
+    .status {
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    .status.success {
+      background-color: #d4edda;
+      color: var(--success-color);
+    }
+
+    .status.error {
+      background-color: #f8d7da;
+      color: var(--danger-color);
+    }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .provider-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .provider-card h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .provider-card .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--danger-color);
+    }
+
+    .provider-card .status-dot.configured {
+      background-color: var(--success-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔖 Smart Favorites 设置</h1>
+
+    <div id="status-message" class="status" style="display: none;"></div>
+
+    <div class="section">
+      <h2>🌐 后端服务配置</h2>
+      <div class="form-group">
+        <label for="backend-url">后端服务地址</label>
+        <input type="text" id="backend-url" value="http://localhost:8000" placeholder="http://localhost:8000">
+        <p class="hint">默认使用本地后端服务，如需远程部署请修改此地址</p>
+      </div>
+      <button id="test-connection" class="btn btn-secondary">测试连接</button>
+    </div>
+
+    <div class="section">
+      <h2>🤖 AI 模型配置</h2>
+      <div class="form-group">
+        <label for="default-provider">默认 AI 服务商</label>
+        <select id="default-provider">
+          <option value="openai">OpenAI (GPT)</option>
+          <option value="deepseek" selected>DeepSeek</option>
+          <option value="kimi">Kimi (Moonshot)</option>
+          <option value="qwen">Qwen (通义千问)</option>
+          <option value="claude">Claude</option>
+          <option value="gemini">Gemini</option>
+          <option value="glm">GLM (智谱)</option>
+          <option value="ollama">Ollama (本地)</option>
+        </select>
+      </div>
+
+      <h3 style="margin: 20px 0 16px;">API 密钥配置</h3>
+      <p class="hint" style="margin-bottom: 16px;">在后端 .env 文件中配置 API 密钥，或在下方输入（仅保存到本地）</p>
+
+      <div class="provider-grid">
+        <div class="provider-card">
+          <h3><span class="status-dot" id="openai-status"></span> OpenAI</h3>
+          <div class="form-group">
+            <input type="password" id="openai-key" placeholder="sk-...">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="deepseek-status"></span> DeepSeek</h3>
+          <div class="form-group">
+            <input type="password" id="deepseek-key" placeholder="sk-...">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="kimi-status"></span> Kimi</h3>
+          <div class="form-group">
+            <input type="password" id="kimi-key" placeholder="sk-...">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="qwen-status"></span> Qwen</h3>
+          <div class="form-group">
+            <input type="password" id="qwen-key" placeholder="sk-...">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="claude-status"></span> Claude</h3>
+          <div class="form-group">
+            <input type="password" id="claude-key" placeholder="sk-...">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="gemini-status"></span> Gemini</h3>
+          <div class="form-group">
+            <input type="password" id="gemini-key" placeholder="AI...">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="glm-status"></span> GLM</h3>
+          <div class="form-group">
+            <input type="password" id="glm-key" placeholder="API Key">
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <h3><span class="status-dot" id="ollama-status"></span> Ollama</h3>
+          <div class="form-group">
+            <input type="text" id="ollama-url" placeholder="http://localhost:11434">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <button id="save-settings" class="btn btn-primary">保存设置</button>
+      <button id="reset-settings" class="btn btn-secondary" style="margin-left: 10px;">重置为默认</button>
+    </div>
+  </div>
+
+  <script>
+    // Load settings
+    async function loadSettings() {
+      const settings = await chrome.storage.local.get([
+        'backendUrl',
+        'defaultProvider',
+        'apiKeys'
+      ]);
+
+      if (settings.backendUrl) {
+        document.getElementById('backend-url').value = settings.backendUrl;
+      }
+
+      if (settings.defaultProvider) {
+        document.getElementById('default-provider').value = settings.defaultProvider;
+      }
+
+      if (settings.apiKeys) {
+        Object.entries(settings.apiKeys).forEach(([provider, key]) => {
+          const input = document.getElementById(`${provider}-key`) || document.getElementById(`${provider}-url`);
+          if (input && key) {
+            input.value = key;
+            const status = document.getElementById(`${provider}-status`);
+            if (status) status.classList.add('configured');
+          }
+        });
+      }
+    }
+
+    // Save settings
+    document.getElementById('save-settings').addEventListener('click', async () => {
+      const apiKeys = {};
+      ['openai', 'deepseek', 'kimi', 'qwen', 'claude', 'gemini', 'glm'].forEach(provider => {
+        const input = document.getElementById(`${provider}-key`);
+        if (input && input.value) {
+          apiKeys[provider] = input.value;
+        }
+      });
+
+      const ollamaUrl = document.getElementById('ollama-url').value;
+      if (ollamaUrl) {
+        apiKeys.ollama = ollamaUrl;
+      }
+
+      await chrome.storage.local.set({
+        backendUrl: document.getElementById('backend-url').value,
+        defaultProvider: document.getElementById('default-provider').value,
+        apiKeys
+      });
+
+      showStatus('设置已保存', 'success');
+    });
+
+    // Test connection
+    document.getElementById('test-connection').addEventListener('click', async () => {
+      const url = document.getElementById('backend-url').value;
+      try {
+        const response = await fetch(`${url}/api/health`);
+        if (response.ok) {
+          showStatus('连接成功！后端服务正常运行', 'success');
+        } else {
+          showStatus('连接失败：服务响应异常', 'error');
+        }
+      } catch (error) {
+        showStatus('连接失败：无法连接到后端服务', 'error');
+      }
+    });
+
+    // Reset settings
+    document.getElementById('reset-settings').addEventListener('click', async () => {
+      await chrome.storage.local.clear();
+      location.reload();
+    });
+
+    // Show status message
+    function showStatus(message, type) {
+      const status = document.getElementById('status-message');
+      status.textContent = message;
+      status.className = `status ${type}`;
+      status.style.display = 'block';
+      setTimeout(() => {
+        status.style.display = 'none';
+      }, 3000);
+    }
+
+    // Initialize
+    loadSettings();
+  </script>
+</body>
+</html>
