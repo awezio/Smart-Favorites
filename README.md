@@ -33,7 +33,7 @@
 
 ### 核心功能
 
-<table style="width:100%">
+<table style="width:100%" align="center">
   <tr>
     <th style="width:20%">功能</th>
     <th style="width:80%">描述</th>
@@ -63,7 +63,7 @@
 
 ### 智能工具
 
-<table style="width:100%">
+<table style="width:100%" align="center">
   <tr>
     <th style="width:20%">功能</th>
     <th style="width:80%">描述</th>
@@ -85,7 +85,7 @@
 
 ### 界面特性
 
-<table style="width:100%">
+<table style="width:100%" align="center">
   <tr>
     <th style="width:20%">功能</th>
     <th style="width:80%">描述</th>
@@ -378,7 +378,7 @@ POST /api/ai/duplicates
 
 ## 🤖 支持的 AI 模型
 
-<table style="width:100%">
+<table style="width:100%" align="center">
   <tr>
     <th style="width:20%">提供商</th>
     <th style="width:30%">模型</th>
