@@ -14,11 +14,13 @@
 <p align="center">
   <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/stargazers">
     <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?style=social" alt="GitHub stars">
-  <a>
+  </a>
   <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/issues">
     <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites" alt="GitHub issues">
+  </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
+  </a>
   <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
