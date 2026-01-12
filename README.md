@@ -13,19 +13,18 @@
 
 <p align="center">
   <a href="https://github.com/awezio/Smart-Favorites/stargazers">
-    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github" alt="GitHub stars" style="margin-right:8px;">
+    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github" alt="GitHub stars">
   </a>
   <a href="https://github.com/awezio/Smart-Favorites/issues">
-    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github" alt="GitHub issues" style="margin-right:8px;">
+    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github" alt="GitHub issues">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" style="margin-right:8px;">
+    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="license">
   </a>
-  <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version" style="margin-right:8px;">
-  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform" style="margin-right:8px;">
+  <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
 </p>
-
 
 ---
 
