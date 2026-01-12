@@ -63,6 +63,9 @@
 <p align="center">
   <img src="image/dark-mode.jpg" alt="Dark Mode" width="350">
   <img src="image/light-mode.jpg" alt="Light Mode" width="350">
+</p>
+
+<p align="center">
   <i>侧边栏深色模式 - Cyber Teal 主题</i><br>
   <i>侧边栏浅色模式 - Ocean Teal 主题</i><br>
 </p>
