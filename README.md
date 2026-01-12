@@ -62,12 +62,12 @@
 
 <p align="center">
   <i>侧边栏深色模式 - Cyber Teal 主题</i><br>
-  <!-- <img src="image/dark-mode.jpg" alt="Dark Mode" width="350"> -->
+  <img src="image/dark-mode.jpg" alt="Dark Mode" width="350">
 </p>
 
 <p align="center">
   <i>侧边栏浅色模式 - Ocean Teal 主题</i><br>
-  <!-- <img src="https://github.com/awezio/Smart-Favorites/blob/ff04f72260b85fb88a931beb4403a9e1f55eb6bd/image/light-mode.jpg" alt="Light Mode" width="350"> -->
+  <img src="image/light-mode.jpg" alt="Light Mode" width="350">
 </p>
 
 ## 🚀 快速开始
