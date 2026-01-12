@@ -13,10 +13,10 @@
 
 <p align="center">
   <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/stargazers">
-    <img src="https://img.shields.io/github/stars/awezio/Personalize-the-Bing.com-search-interface?style=social" alt="GitHub stars">
+    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?style=social" alt="GitHub stars">
   </a>
   <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/issues">
-    <img src="https://img.shields.io/github/issues/awezio/Personalize-the-Bing.com-search-interface" alt="GitHub issues">
+    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites" alt="GitHub issues">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
