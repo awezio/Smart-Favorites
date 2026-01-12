@@ -12,22 +12,20 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/stargazers">
-    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?style=social" alt="GitHub stars">
+  <a href="https://github.com/awezio/Smart-Favorites/stargazers">
+    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github" alt="GitHub stars" style="margin-right:8px;">
   </a>
-  <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/issues">
-    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites" alt="GitHub issues">
+  <a href="https://github.com/awezio/Smart-Favorites/issues">
+    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github" alt="GitHub issues" style="margin-right:8px;">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
+    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" style="margin-right:8px;">
   </a>
-  <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version">
-  </a>
-  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
-  </a>
+  <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version" style="margin-right:8px;">
+  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform" style="margin-right:8px;">
   <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
-  </a>
 </p>
+
 
 ---
 
