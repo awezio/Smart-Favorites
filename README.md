@@ -62,7 +62,7 @@
 
 <p align="center">
   <i>侧边栏深色模式 - Cyber Teal 主题</i><br>
-  <!-- <img src="docs/screenshots/dark-mode.png" alt="Dark Mode" width="350"> -->
+  <!-- <img src="image/dark-mode.jpg" alt="Dark Mode" width="350"> -->
 </p>
 
 <p align="center">
