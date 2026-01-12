@@ -1,3 +1,5 @@
+<a href="README.md">🌐 中文</a> | <a href="README-EN.md">🌐 English</a>
+
 # Smart Favorites 智能收藏夹
 
 <p align="center">
