@@ -1,3 +1,4 @@
+<a href="README.md">🌐 中文</a> | <a >🌐 English</a>
 # Smart Favorites
 
 <p align="center">
