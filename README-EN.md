@@ -1,5 +1,11 @@
 <a href="README.md">🌐 中文</a> | <a >🌐 English</a>
 # Smart Favorites
+[![GitHub stars](https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/issues)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg)
+![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)
 
 <p align="center">
   <img src="extension/icons/icon128.png" alt="Smart Favorites Logo" width="128" height="128">
@@ -9,22 +15,6 @@
   <strong>AI-Powered Browser Bookmark Intelligent Management System</strong><br>
   Supports semantic search, RAG Q&A, intelligent categorization, chat history persistence, and multi-model switching
 </p>
-
-<p align="center">
-  <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/stargazers">
-    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?style=social" alt="GitHub stars">
-  </a>
-  <a href="https://github.com/awezio/Personalize-the-Bing.com-search-interface/issues">
-    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites" alt="GitHub issues">
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
-  </a>
-  <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version">
-  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
-</p>
->
 
 ---
 
