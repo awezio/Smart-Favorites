@@ -11,14 +11,13 @@
   支持语义搜索、RAG 问答、智能分类、聊天记录持久化和多模型切换
 </p>
 
-<p align="center">
-  [![GitHub stars](https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/stargazers)
-  [![GitHub issues](https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/issues)
-  [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-  ![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)
-  ![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg)
-  ![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)
-</p>
+
+[![GitHub stars](https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/issues)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg)
+![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)
 
 ---
 
