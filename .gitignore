@@ -1,4 +1,4 @@
-# Python
+# ==================== Python ====================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,53 +20,115 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# ==================== Virtual Environment ====================
 venv/
 ENV/
 env/
 .venv/
 
-# IDE
+# ==================== IDE ====================
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+.cursor/
 
-# Environment variables
+# ==================== Environment & Secrets ====================
+# Environment variables (contains API keys)
 .env
 .env.local
 .env.*.local
+*.env
 
-# Data
+# ==================== Data & Database ====================
+# All data files (contains user data and encrypted secrets)
 backend/data/
 *.db
 *.sqlite
 *.sqlite3
 
-# ChromaDB
+# ChromaDB vector database
 chroma/
+backend/chroma/
 
-# Logs
+# Encryption key (CRITICAL - never commit!)
+.encryption_key
+backend/data/.encryption_key
+
+# ==================== Logs ====================
 *.log
 logs/
+backend/logs/
 
-# OS
+# ==================== OS Generated ====================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Node
+# ==================== Node (if any frontend build tools) ====================
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Extension build
+# ==================== Extension Build ====================
 extension/dist/
 *.crx
 *.pem
+*.xpi
 
-# Test
+# ==================== Test ====================
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
 
-# Task files
+# ==================== Task Files ====================
 .tasks/
+
+# ==================== Backup Files ====================
+*.bak
+*.backup
+*.old
+*~
+
+# ==================== User-specific Files ====================
+# Bookmarks export files (may contain personal data)
+*.html
+!extension/**/*.html
+
+# User favorites exports
+favorites_*.html
+bookmarks_*.html
+
+# ==================== Temporary Files ====================
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+
+# ==================== Model Cache (large files) ====================
+# Sentence transformers cache (will be downloaded on first run)
+.cache/
+models/
+*.bin
+*.safetensors
+
+# ==================== Jupyter (if used for development) ====================
+.ipynb_checkpoints/
+*.ipynb
+
+# ==================== Docker (if used) ====================
+docker-compose.override.yml
+.docker/

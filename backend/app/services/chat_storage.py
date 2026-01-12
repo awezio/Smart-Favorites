@@ -195,14 +195,25 @@ class ChatStorage:
         sources: Optional[List[dict]] = None
     ) -> ChatMessage:
         """Add a message to a session"""
+        from loguru import logger
+        
         message = ChatMessage(
             role=role,
             content=content,
             sources=sources
         )
         
+        logger.info(f"Adding message to DB - session: {session_id}, role: {role}, msg_id: {message.id}")
+        
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            
+            # Check if session exists first
+            cursor.execute('SELECT id FROM sessions WHERE id = ?', (session_id,))
+            session_exists = cursor.fetchone()
+            if not session_exists:
+                logger.warning(f"Session {session_id} does not exist in database!")
+                return message
             
             # Insert message
             cursor.execute('''
@@ -217,6 +228,8 @@ class ChatStorage:
                 json.dumps(sources) if sources else None
             ))
             
+            logger.info(f"Message inserted, rows affected: {cursor.rowcount}")
+            
             # Update session's updated_at
             cursor.execute('''
                 UPDATE sessions
@@ -225,6 +238,11 @@ class ChatStorage:
             ''', (datetime.now().isoformat(), session_id))
             
             conn.commit()
+            
+            # Verify insertion
+            cursor.execute('SELECT COUNT(*) FROM messages WHERE session_id = ?', (session_id,))
+            msg_count = cursor.fetchone()[0]
+            logger.info(f"Session {session_id} now has {msg_count} messages in DB")
         
         return message
     

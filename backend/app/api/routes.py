@@ -12,7 +12,7 @@ from loguru import logger
 from ..models.api_models import (
     ImportRequest, ImportResponse,
     SearchRequest, SearchResponse, SearchResult,
-    ChatRequest, ChatResponse,
+    ChatRequest, ChatResponse, ChatAttachment,
     ModelInfo, ModelsResponse,
     ConfigRequest, ConfigResponse
 )
@@ -139,35 +139,72 @@ async def chat_with_bookmarks(request: ChatRequest):
         rag = get_rag_engine()
         chat_storage = get_chat_storage()
         
-        # Get or create session
-        session_id = request.conversation_id
+        # Get session ID from request
+        session_id = request.session_id
+        logger.info(f"Chat request received - session_id: {session_id}, message: {request.message[:50]}...")
+        
         if session_id:
             # Save user message to session
+            logger.info(f"Saving user message to session {session_id}")
             chat_storage.add_message(session_id, "user", request.message)
+        
+        # Prepare attachments for multimodal
+        attachments_data = None
+        if request.attachments:
+            attachments_data = [
+                {
+                    "type": att.type,
+                    "content": att.content,
+                    "filename": att.filename,
+                    "mime_type": att.mime_type
+                }
+                for att in request.attachments
+            ]
         
         response, sources, model, provider = await rag.chat(
             message=request.message,
             provider=request.provider,
             model=request.model,
-            include_sources=request.include_sources
+            include_sources=request.include_sources,
+            attachments=attachments_data,
+            web_search=request.web_search
         )
         
         # Save assistant response to session
         if session_id:
             # Format response with sources for storage
             response_content = response
+            
+            # Convert sources to dict format for storage
+            sources_dict = None
             if sources:
+                sources_dict = []
                 response_content += "\n\n**相关书签:**\n"
                 for src in sources:
-                    response_content += f"- [{src.get('title', 'Link')}]({src.get('url', '')})\n"
-            chat_storage.add_message(session_id, "assistant", response_content, sources)
+                    # Handle both dict and Bookmark object
+                    if hasattr(src, 'title'):
+                        title = src.title or 'Link'
+                        url = src.url or ''
+                        sources_dict.append({"title": title, "url": url})
+                    else:
+                        title = src.get('title', 'Link')
+                        url = src.get('url', '')
+                        sources_dict.append(src)
+                    response_content += f"- [{title}]({url})\n"
+            
+            logger.info(f"Saving assistant message to session {session_id}")
+            chat_storage.add_message(session_id, "assistant", response_content, sources_dict)
+            
+            # Verify messages were saved
+            saved_session = chat_storage.get_session(session_id)
+            logger.info(f"Session {session_id} now has {len(saved_session.messages) if saved_session else 0} messages")
         
         return ChatResponse(
             response=response,
             sources=sources,
             model=model,
             provider=provider,
-            conversation_id=session_id
+            session_id=session_id
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -9,11 +9,15 @@ let API_BASE_URL = 'http://localhost:8000';
 // State
 let isConnected = false;
 let currentModel = '--';
+let currentProvider = 'deepseek';
 let syncMode = 'manual';
 let currentSuggestions = [];
 let currentTheme = 'dark';
 let currentSessionId = null;
 let chatSessions = [];
+let webSearchEnabled = false;
+let attachments = []; // Store uploaded attachments
+let lastUserMessage = ''; // For regenerate feature
 
 // ==================== DOM Elements ====================
 
@@ -36,13 +40,21 @@ const searchResults = document.getElementById('search-results');
 const chatInput = document.getElementById('chat-input');
 const chatBtn = document.getElementById('chat-btn');
 const chatMessages = document.getElementById('chat-messages');
+
+// New Chat Input Area Elements
+const chatModelSelector = document.getElementById('chat-model-selector');
+const chatStatusDot = document.getElementById('chat-status-dot');
+const chatStatusText = document.getElementById('chat-status-text');
+const attachmentsPreview = document.getElementById('attachments-preview');
+const attachFileBtn = document.getElementById('attach-file-btn');
+const attachImageBtn = document.getElementById('attach-image-btn');
+const webSearchToggle = document.getElementById('web-search-toggle');
+const fileInput = document.getElementById('file-input');
+const imageInput = document.getElementById('image-input');
 const syncBtn = document.getElementById('sync-btn');
 const exportBtn = document.getElementById('export-btn');
 const importBtn = document.getElementById('import-btn');
 const importFile = document.getElementById('import-file');
-const statusIndicator = document.getElementById('status-indicator');
-const statusText = document.getElementById('status-text');
-const modelInfo = document.getElementById('model-info');
 const bookmarkCount = document.getElementById('bookmark-count');
 const lastSync = document.getElementById('last-sync');
 const syncModeSelect = document.getElementById('sync-mode-select');
@@ -221,7 +233,16 @@ async function checkConnection() {
     
     if (response.ok) {
       const data = await response.json();
-      const modelName = data.model || 'Unknown';
+      const modelName = data.model || '--';
+      
+      // Update current provider from backend
+      if (data.model) {
+        currentProvider = data.model;
+        if (chatModelSelector) {
+          chatModelSelector.value = data.model;
+        }
+      }
+      
       setConnected(true, modelName);
       
       if (data.bookmarks_count !== undefined) {
@@ -247,9 +268,14 @@ async function checkConnection() {
 function setConnected(connected, model = '--') {
   isConnected = connected;
   currentModel = model;
-  statusIndicator.className = `status-dot ${connected ? 'connected' : 'disconnected'}`;
-  statusText.textContent = connected ? '已连接' : '未连接';
-  modelInfo.textContent = model;
+  
+  // Update chat status indicator (new location in chat input area)
+  if (chatStatusDot) {
+    chatStatusDot.className = `status-dot-mini ${connected ? 'connected' : 'disconnected'}`;
+  }
+  if (chatStatusText) {
+    chatStatusText.textContent = connected ? `已连接 ${model}` : '未连接';
+  }
 }
 
 // ==================== Direct Bookmark Access ====================
@@ -506,15 +532,22 @@ const chatSidebar = document.getElementById('chat-sidebar');
  */
 async function loadChatSessions() {
   try {
+    // First, try to restore last used session from storage
+    const stored = await chrome.storage.local.get(['lastSessionId']);
+    const lastSessionId = stored.lastSessionId;
+    
     const response = await fetch(`${API_BASE_URL}/api/chat/sessions`);
     if (response.ok) {
       chatSessions = await response.json();
+      console.log('Loaded sessions:', chatSessions.length, 'Last session:', lastSessionId);
       renderChatSessions();
       
-      // If no current session, create one or select first
-      if (!currentSessionId && chatSessions.length > 0) {
-        selectSession(chatSessions[0].id);
-      } else if (!currentSessionId) {
+      // Try to restore last session, or select first, or create new
+      if (lastSessionId && chatSessions.find(s => s.id === lastSessionId)) {
+        await selectSession(lastSessionId);
+      } else if (chatSessions.length > 0) {
+        await selectSession(chatSessions[0].id);
+      } else {
         await createNewSession();
       }
     }
@@ -698,22 +731,38 @@ async function createNewSession() {
  */
 async function selectSession(sessionId) {
   currentSessionId = sessionId;
+  
+  // Save to storage for persistence across reloads
+  await chrome.storage.local.set({ lastSessionId: sessionId });
+  
   renderChatSessions();
   
   // Load session messages
   try {
+    console.log('Loading session:', sessionId);
     const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}`);
+    console.log('Response status:', response.status);
+    
     if (response.ok) {
       const data = await response.json();
+      console.log('Session data:', data);
+      console.log('Messages count:', data.messages ? data.messages.length : 0);
+      
       clearChatMessages();
       
       if (data.messages && data.messages.length > 0) {
         data.messages.forEach(msg => {
+          console.log('Rendering message:', msg.role, msg.content.substring(0, 50));
           appendMessage(msg.content, msg.role, true);
         });
       } else {
+        console.log('No messages, showing welcome');
         showWelcomeMessage();
       }
+    } else {
+      console.error('Failed to load session, status:', response.status);
+      clearChatMessages();
+      showWelcomeMessage();
     }
   } catch (error) {
     console.error('Failed to load session messages:', error);
@@ -806,7 +855,7 @@ function expandChatSidebar() {
 // ==================== Chat Functions ====================
 
 async function sendChatMessage(message) {
-  if (!message.trim()) return;
+  if (!message.trim() && attachments.length === 0) return;
   
   if (!isConnected) {
     const connected = await checkConnection();
@@ -816,21 +865,71 @@ async function sendChatMessage(message) {
     }
   }
   
-  appendMessage(message, 'user');
+  // Store for regenerate feature
+  lastUserMessage = message;
+  
+  // Ensure we have a valid backend session before sending message
+  if (!currentSessionId || currentSessionId.startsWith('local-')) {
+    try {
+      const sessionResponse = await fetch(`${API_BASE_URL}/api/chat/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '新会话' })
+      });
+      if (sessionResponse.ok) {
+        const session = await sessionResponse.json();
+        chatSessions.unshift(session);
+        currentSessionId = session.id;
+        renderChatSessions();
+        console.log('Created new session for chat:', currentSessionId);
+      }
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
+  }
+  
+  // Display user message with attachments info
+  let userMessageDisplay = message;
+  if (attachments.length > 0) {
+    const attachmentNames = attachments.map(a => a.name).join(', ');
+    userMessageDisplay = message + (message ? '\n' : '') + `[附件: ${attachmentNames}]`;
+  }
+  
+  appendMessage(userMessageDisplay, 'user');
   chatInput.value = '';
+  autoResizeTextarea(chatInput);
   
   const loadingId = appendMessage('<div class="loading"></div>', 'assistant', true);
   
   try {
+    // Prepare request body
+    const requestBody = { 
+      message, 
+      include_sources: true,
+      session_id: currentSessionId,
+      web_search: webSearchEnabled,
+      provider: currentProvider
+    };
+    
+    // Add attachments if any
+    if (attachments.length > 0) {
+      requestBody.attachments = attachments.map(a => ({
+        type: a.type,
+        content: a.content,
+        filename: a.name,
+        mime_type: a.mimeType
+      }));
+    }
+    
+    console.log('Sending chat with session_id:', currentSessionId);
     const response = await fetch(`${API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message, 
-        include_sources: true,
-        session_id: currentSessionId
-      })
+      body: JSON.stringify(requestBody)
     });
+    
+    // Clear attachments after sending
+    clearAttachments();
     
     if (!response.ok) {
       let errorDetail = `HTTP ${response.status}`;
@@ -848,25 +947,60 @@ async function sendChatMessage(message) {
       throw new Error('后端返回的数据格式不正确');
     }
     
-    let responseHtml = escapeHtml(data.response).replace(/\n/g, '<br>');
+    // Render response with Markdown
+    let responseContent = data.response;
+    
+    // Add sources section if available
+    let sourcesHtml = '';
     if (data.sources && data.sources.length > 0) {
-      responseHtml += '<br><br><strong>相关书签:</strong><ul>';
-      data.sources.forEach(source => {
-        responseHtml += `<li><a href="${escapeHtml(source.url)}" target="_blank">${escapeHtml(source.title)}</a></li>`;
-      });
-      responseHtml += '</ul>';
+      sourcesHtml = `
+        <div class="message-sources">
+          <div class="message-sources-title">相关书签</div>
+          <div class="message-sources-list">
+            ${data.sources.map(source => `
+              <a href="${escapeHtml(source.url)}" target="_blank" class="source-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                ${escapeHtml(source.title || source.url)}
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      `;
     }
     
-    appendMessage(responseHtml, 'assistant', true);
+    // Create message with Markdown content and sources
+    const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const msgDiv = document.createElement('div');
+    msgDiv.id = msgId;
+    msgDiv.className = 'message assistant';
+    msgDiv.dataset.rawContent = responseContent;
+    
+    const renderedMarkdown = renderMarkdown(responseContent);
+    msgDiv.innerHTML = `
+      <div class="markdown-content">${renderedMarkdown}</div>
+      ${sourcesHtml}
+      ${createMessageActions(msgId, true)}
+    `;
+    
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Apply syntax highlighting
+    if (typeof hljs !== 'undefined') {
+      msgDiv.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }
     
     // Update session title if it's still "新会话"
     const session = chatSessions.find(s => s.id === currentSessionId);
     if (session && session.title === '新会话') {
-      // Use first few characters of the message as title
       const newTitle = message.slice(0, 20) + (message.length > 20 ? '...' : '');
       session.title = newTitle;
       renderChatSessions();
-      // Update on backend
       fetch(`${API_BASE_URL}/api/chat/sessions/${currentSessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -879,31 +1013,57 @@ async function sendChatMessage(message) {
     
     let errorMsg = '抱歉，发生了错误。';
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      errorMsg = '无法连接到后端服务。请确认：<br>1. 后端服务正在运行 (http://localhost:8000)<br>2. 没有防火墙阻止连接';
+      errorMsg = '无法连接到后端服务。请确认：\n1. 后端服务正在运行 (http://localhost:8000)\n2. 没有防火墙阻止连接';
     } else if (error.message.includes('HTTP')) {
       errorMsg = `后端服务返回错误: ${error.message}`;
     } else {
       errorMsg = `错误: ${error.message}`;
     }
     
-    appendMessage(errorMsg, 'assistant', true);
+    appendMessage(errorMsg, 'assistant');
   }
 }
 
-function appendMessage(content, type, isHtml = false) {
-  const id = `msg-${Date.now()}`;
+function appendMessage(content, type, isHtml = false, rawContent = null) {
+  const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
   const div = document.createElement('div');
   div.id = id;
   div.className = `message ${type}`;
   
-  if (isHtml) {
+  // Store raw content for copy/download
+  if (rawContent) {
+    div.dataset.rawContent = rawContent;
+  } else if (!isHtml) {
+    div.dataset.rawContent = content;
+  }
+  
+  if (type === 'assistant' && !isHtml) {
+    // Use Markdown rendering for assistant messages
+    const renderedContent = renderMarkdown(content);
+    div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
+    div.innerHTML += createMessageActions(id, true);
+  } else if (type === 'user') {
+    div.innerHTML = `<p>${escapeHtml(content)}</p>`;
+    div.innerHTML += createMessageActions(id, false);
+  } else if (isHtml) {
     div.innerHTML = content;
+    // Add actions if it's an assistant message with HTML
+    if (type === 'assistant' && !content.includes('loading')) {
+      div.innerHTML += createMessageActions(id, true);
+    }
   } else {
     div.innerHTML = `<p>${escapeHtml(content)}</p>`;
   }
   
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+  // Apply syntax highlighting to code blocks
+  if (typeof hljs !== 'undefined') {
+    div.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+  }
   
   return id;
 }
@@ -1101,6 +1261,389 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ==================== Markdown Rendering ====================
+
+/**
+ * Configure marked.js for rendering
+ */
+function initMarkdownRenderer() {
+  if (typeof marked !== 'undefined') {
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(code, { language: lang }).value;
+          } catch (e) {}
+        }
+        return code;
+      },
+      breaks: true,
+      gfm: true
+    });
+  }
+}
+
+/**
+ * Render markdown content with code block enhancements
+ */
+function renderMarkdown(text) {
+  if (typeof marked === 'undefined') {
+    return escapeHtml(text).replace(/\n/g, '<br>');
+  }
+  
+  try {
+    let html = marked.parse(text);
+    
+    // Wrap code blocks with copy button
+    html = html.replace(/<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g, (match, attrs, code) => {
+      return `<div class="code-block-wrapper">
+        <button class="code-copy-btn" onclick="copyCodeBlock(this)">复制</button>
+        <pre><code${attrs}>${code}</code></pre>
+      </div>`;
+    });
+    
+    return html;
+  } catch (e) {
+    console.error('Markdown render error:', e);
+    return escapeHtml(text).replace(/\n/g, '<br>');
+  }
+}
+
+/**
+ * Copy code block content
+ */
+window.copyCodeBlock = function(btn) {
+  const codeBlock = btn.parentElement.querySelector('code');
+  if (codeBlock) {
+    navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+      const originalText = btn.textContent;
+      btn.textContent = '已复制!';
+      setTimeout(() => { btn.textContent = originalText; }, 2000);
+    });
+  }
+};
+
+// ==================== Attachment Handling ====================
+
+/**
+ * Handle file selection
+ */
+function handleFileSelect(files, type) {
+  for (const file of files) {
+    if (type === 'image') {
+      if (!file.type.startsWith('image/')) continue;
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('图片大小不能超过10MB', 'warning');
+        continue;
+      }
+    } else {
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('文件大小不能超过20MB', 'warning');
+        continue;
+      }
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const attachment = {
+        id: `attach-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: type,
+        name: file.name,
+        mimeType: file.type,
+        content: e.target.result, // base64 data URL
+        size: file.size
+      };
+      attachments.push(attachment);
+      renderAttachments();
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+/**
+ * Render attachments preview
+ */
+function renderAttachments() {
+  if (!attachmentsPreview) return;
+  
+  if (attachments.length === 0) {
+    attachmentsPreview.style.display = 'none';
+    attachmentsPreview.innerHTML = '';
+    return;
+  }
+  
+  attachmentsPreview.style.display = 'flex';
+  attachmentsPreview.innerHTML = attachments.map(att => {
+    if (att.type === 'image') {
+      return `
+        <div class="attachment-item image-attachment" data-id="${att.id}">
+          <img src="${att.content}" alt="${escapeHtml(att.name)}">
+          <button class="attachment-remove" onclick="removeAttachment('${att.id}')">&times;</button>
+        </div>
+      `;
+    } else {
+      const icon = getFileIcon(att.mimeType);
+      return `
+        <div class="attachment-item" data-id="${att.id}">
+          <span class="attachment-icon">${icon}</span>
+          <span class="attachment-name" title="${escapeHtml(att.name)}">${escapeHtml(att.name)}</span>
+          <button class="attachment-remove" onclick="removeAttachment('${att.id}')">&times;</button>
+        </div>
+      `;
+    }
+  }).join('');
+}
+
+/**
+ * Get file icon based on mime type
+ */
+function getFileIcon(mimeType) {
+  if (mimeType.includes('pdf')) return '📄';
+  if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
+  if (mimeType.includes('text')) return '📃';
+  return '📎';
+}
+
+/**
+ * Remove an attachment
+ */
+window.removeAttachment = function(id) {
+  attachments = attachments.filter(a => a.id !== id);
+  renderAttachments();
+};
+
+/**
+ * Clear all attachments
+ */
+function clearAttachments() {
+  attachments = [];
+  renderAttachments();
+}
+
+// ==================== Web Search Toggle ====================
+
+/**
+ * Toggle web search mode
+ */
+function toggleWebSearch() {
+  webSearchEnabled = !webSearchEnabled;
+  if (webSearchToggle) {
+    webSearchToggle.classList.toggle('active', webSearchEnabled);
+  }
+  showToast(webSearchEnabled ? '联网搜索已开启' : '联网搜索已关闭', 'info', 2000);
+}
+
+// ==================== Model Selection ====================
+
+/**
+ * Change current AI model/provider
+ */
+async function changeProvider(provider) {
+  if (provider === currentProvider) return;
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/settings/provider`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider })
+    });
+    
+    if (response.ok) {
+      currentProvider = provider;
+      showToast(`已切换到 ${provider.toUpperCase()}`, 'success');
+      await checkConnection();
+    } else {
+      showToast('切换模型失败', 'error');
+      // Reset selector to current provider
+      if (chatModelSelector) chatModelSelector.value = currentProvider;
+    }
+  } catch (error) {
+    console.error('Change provider error:', error);
+    showToast('切换模型失败', 'error');
+    if (chatModelSelector) chatModelSelector.value = currentProvider;
+  }
+}
+
+// ==================== Textarea Auto-resize ====================
+
+/**
+ * Auto-resize textarea based on content
+ */
+function autoResizeTextarea(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+// ==================== Message Action Functions ====================
+
+/**
+ * Quote a message into the input
+ */
+window.quoteMessage = function(messageId) {
+  const messageEl = document.getElementById(messageId);
+  if (!messageEl) return;
+  
+  const content = messageEl.querySelector('.markdown-content')?.textContent || 
+                  messageEl.querySelector('p')?.textContent || '';
+  
+  if (chatInput) {
+    const quotedText = content.split('\n').map(line => `> ${line}`).join('\n');
+    chatInput.value = quotedText + '\n\n';
+    chatInput.focus();
+    autoResizeTextarea(chatInput);
+  }
+};
+
+/**
+ * Continue the conversation
+ */
+window.continueMessage = function() {
+  if (chatInput) {
+    chatInput.value = '请继续';
+    sendChatMessage('请继续');
+  }
+};
+
+/**
+ * Copy message content
+ */
+window.copyMessage = function(messageId) {
+  const messageEl = document.getElementById(messageId);
+  if (!messageEl) return;
+  
+  // Get raw content from data attribute or text content
+  const rawContent = messageEl.dataset.rawContent || 
+                     messageEl.querySelector('.markdown-content')?.textContent ||
+                     messageEl.querySelector('p')?.textContent || '';
+  
+  navigator.clipboard.writeText(rawContent).then(() => {
+    showToast('已复制到剪贴板', 'success', 2000);
+  });
+};
+
+/**
+ * Delete a message from session
+ */
+window.deleteMessage = async function(messageId) {
+  if (!confirm('确定要删除这条消息吗？')) return;
+  
+  const messageEl = document.getElementById(messageId);
+  if (messageEl) {
+    messageEl.remove();
+    showToast('消息已删除', 'info', 2000);
+    
+    // TODO: Also delete from backend session
+  }
+};
+
+/**
+ * Regenerate the last assistant response
+ */
+window.regenerateMessage = function(messageId) {
+  if (!lastUserMessage) {
+    showToast('无法重新生成', 'warning');
+    return;
+  }
+  
+  // Remove the message to regenerate
+  const messageEl = document.getElementById(messageId);
+  if (messageEl) {
+    messageEl.remove();
+  }
+  
+  // Resend the last user message
+  sendChatMessage(lastUserMessage);
+};
+
+/**
+ * Download message as markdown file
+ */
+window.downloadMessage = function(messageId) {
+  const messageEl = document.getElementById(messageId);
+  if (!messageEl) return;
+  
+  const rawContent = messageEl.dataset.rawContent || 
+                     messageEl.querySelector('.markdown-content')?.textContent ||
+                     messageEl.querySelector('p')?.textContent || '';
+  
+  const blob = new Blob([rawContent], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `message_${new Date().toISOString().slice(0, 10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  showToast('已下载', 'success', 2000);
+};
+
+/**
+ * Create message action buttons HTML (icon-only for sidebar responsiveness)
+ */
+function createMessageActions(messageId, isAssistant = true) {
+  if (isAssistant) {
+    return `
+      <div class="message-actions">
+        <button class="message-action-btn" onclick="quoteMessage('${messageId}')" title="引用">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21"/>
+            <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3"/>
+          </svg>
+        </button>
+        <button class="message-action-btn" onclick="continueMessage()" title="继续">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+        <button class="message-action-btn" onclick="copyMessage('${messageId}')" title="复制">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <button class="message-action-btn danger" onclick="deleteMessage('${messageId}')" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+        <button class="message-action-btn" onclick="regenerateMessage('${messageId}')" title="重新生成">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 16h5v5"/>
+          </svg>
+        </button>
+        <button class="message-action-btn" onclick="downloadMessage('${messageId}')" title="下载">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  } else {
+    return `
+      <div class="message-actions">
+        <button class="message-action-btn" onclick="copyMessage('${messageId}')" title="复制">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <button class="message-action-btn danger" onclick="deleteMessage('${messageId}')" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  }
 }
 
 // ==================== Settings Modal ====================
@@ -1388,8 +1931,59 @@ searchInput.addEventListener('keypress', (e) => {
 // Chat
 chatBtn.addEventListener('click', () => sendChatMessage(chatInput.value));
 chatInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') sendChatMessage(chatInput.value);
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage(chatInput.value);
+  }
 });
+
+// Textarea auto-resize
+chatInput.addEventListener('input', () => {
+  autoResizeTextarea(chatInput);
+});
+
+// Model selector
+if (chatModelSelector) {
+  chatModelSelector.addEventListener('change', (e) => {
+    changeProvider(e.target.value);
+  });
+}
+
+// File upload buttons
+if (attachFileBtn) {
+  attachFileBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+}
+
+if (attachImageBtn) {
+  attachImageBtn.addEventListener('click', () => {
+    imageInput.click();
+  });
+}
+
+if (fileInput) {
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleFileSelect(e.target.files, 'file');
+      e.target.value = ''; // Reset for re-selecting same file
+    }
+  });
+}
+
+if (imageInput) {
+  imageInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleFileSelect(e.target.files, 'image');
+      e.target.value = ''; // Reset for re-selecting same file
+    }
+  });
+}
+
+// Web search toggle
+if (webSearchToggle) {
+  webSearchToggle.addEventListener('click', toggleWebSearch);
+}
 
 // Sync
 syncBtn.addEventListener('click', () => syncBookmarks(true));
@@ -1431,6 +2025,9 @@ expandSidebarBtn.addEventListener('click', expandChatSidebar);
 // ==================== Initialize ====================
 
 async function init() {
+  // Initialize Markdown renderer
+  initMarkdownRenderer();
+  
   // Initialize theme first
   await initTheme();
   

@@ -45,14 +45,25 @@ class SearchResponse(BaseModel):
     query: str = Field(..., description="Original query")
 
 
+class ChatAttachment(BaseModel):
+    """Attachment for multimodal chat"""
+    
+    type: str = Field(..., description="Attachment type: 'image', 'file', or 'url'")
+    content: str = Field(..., description="Base64 encoded content or URL")
+    filename: Optional[str] = Field(default=None, description="Original filename")
+    mime_type: Optional[str] = Field(default=None, description="MIME type of the file")
+
+
 class ChatRequest(BaseModel):
     """Request for RAG chat"""
     
     message: str = Field(..., description="User message")
     model: Optional[str] = Field(default=None, description="LLM model to use")
     provider: Optional[str] = Field(default=None, description="LLM provider to use")
-    conversation_id: Optional[str] = Field(default=None, description="Conversation ID for context")
+    session_id: Optional[str] = Field(default=None, description="Chat session ID for history")
     include_sources: bool = Field(default=True, description="Include source bookmarks in response")
+    attachments: Optional[List[ChatAttachment]] = Field(default=None, description="File/image attachments for multimodal")
+    web_search: bool = Field(default=False, description="Enable web search for supported models")
 
 
 class ChatResponse(BaseModel):
@@ -62,7 +73,7 @@ class ChatResponse(BaseModel):
     sources: List[Bookmark] = Field(default_factory=list, description="Source bookmarks used")
     model: str = Field(..., description="Model used for generation")
     provider: str = Field(..., description="Provider used")
-    conversation_id: Optional[str] = Field(default=None, description="Conversation ID")
+    session_id: Optional[str] = Field(default=None, description="Chat session ID")
 
 
 class ModelInfo(BaseModel):

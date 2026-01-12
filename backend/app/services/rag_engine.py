@@ -96,7 +96,9 @@ class RAGEngine:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         include_sources: bool = True,
-        top_k: int = 5
+        top_k: int = 5,
+        attachments: Optional[List[dict]] = None,
+        web_search: bool = False
     ) -> Tuple[str, List[Bookmark], str, str]:
         """
         Chat with RAG - retrieve relevant bookmarks and generate response
@@ -107,6 +109,8 @@ class RAGEngine:
             model: Model to use
             include_sources: Whether to include source bookmarks
             top_k: Number of bookmarks to retrieve for context
+            attachments: List of attachment dicts with type, content, filename, mime_type
+            web_search: Whether to enable web search for supported models
             
         Returns:
             Tuple of (response, sources, model, provider)
@@ -118,13 +122,21 @@ class RAGEngine:
         # Build context from bookmarks
         context = self._build_context(sources)
         
-        # Build messages
-        messages = [
-            Message(role="system", content=self.SYSTEM_PROMPT),
-            Message(role="user", content=f"""参考书签信息：
+        # Build system prompt with web search indicator
+        system_prompt = self.SYSTEM_PROMPT
+        if web_search:
+            system_prompt += "\n\n注意：联网搜索已启用。如果需要，你可以搜索互联网获取最新信息来回答用户问题。"
+        
+        # Build user message content
+        user_content = f"""参考书签信息：
 {context}
 
-用户问题：{message}""")
+用户问题：{message}"""
+        
+        # Build messages
+        messages = [
+            Message(role="system", content=system_prompt),
+            Message(role="user", content=user_content)
         ]
         
         # Generate response
@@ -132,7 +144,9 @@ class RAGEngine:
             response = await self.llm_adapter.chat(
                 messages=messages,
                 provider=provider,
-                model=model
+                model=model,
+                attachments=attachments,
+                web_search=web_search
             )
             
             return (

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from ..config import settings
+from .config_manager import get_config_manager
 
 
 @dataclass
@@ -17,6 +18,7 @@ class Message:
     """Chat message"""
     role: str  # 'system', 'user', 'assistant'
     content: str
+    attachments: Optional[List[dict]] = None  # For multimodal messages
 
 
 @dataclass
@@ -39,7 +41,9 @@ class BaseLLMProvider(ABC):
         messages: List[Message],
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 2000
+        max_tokens: int = 2000,
+        attachments: Optional[List[dict]] = None,
+        web_search: bool = False
     ) -> LLMResponse:
         """Send chat completion request"""
         pass
@@ -52,6 +56,22 @@ class BaseLLMProvider(ABC):
     def get_default_model(self) -> str:
         """Get default model for this provider"""
         return ""
+    
+    def _build_multimodal_content(self, text: str, attachments: List[dict]) -> List[dict]:
+        """Build multimodal content for OpenAI-compatible APIs"""
+        content = [{"type": "text", "text": text}]
+        
+        for att in attachments:
+            if att.get('type') == 'image':
+                # Extract base64 data from data URL
+                image_data = att.get('content', '')
+                if image_data.startswith('data:'):
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": image_data}
+                    })
+        
+        return content
 
 
 class OpenAIProvider(BaseLLMProvider):
@@ -60,12 +80,19 @@ class OpenAIProvider(BaseLLMProvider):
     provider_name = "openai"
     
     def __init__(self):
-        self.api_key = settings.openai_api_key
         self.base_url = settings.openai_base_url
         self.default_model = settings.openai_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("openai") or settings.openai_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None, 
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         from openai import AsyncOpenAI
         import httpx
         
@@ -74,9 +101,19 @@ class OpenAIProvider(BaseLLMProvider):
         client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
+        # Build messages with multimodal support
+        formatted_messages = []
+        for m in messages:
+            if attachments and m.role == "user":
+                # Add images to the last user message
+                content = self._build_multimodal_content(m.content, attachments)
+                formatted_messages.append({"role": m.role, "content": content})
+            else:
+                formatted_messages.append({"role": m.role, "content": m.content})
+        
         response = await client.chat.completions.create(
             model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
+            messages=formatted_messages,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -96,17 +133,24 @@ class OpenAIProvider(BaseLLMProvider):
 
 
 class DeepSeekProvider(BaseLLMProvider):
-    """DeepSeek API provider (OpenAI compatible)"""
+    """DeepSeek API provider (OpenAI compatible) with web search support"""
     
     provider_name = "deepseek"
     
     def __init__(self):
-        self.api_key = settings.deepseek_api_key
         self.base_url = settings.deepseek_base_url
         self.default_model = settings.deepseek_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("deepseek") or settings.deepseek_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         from openai import AsyncOpenAI
         import httpx
         
@@ -115,12 +159,22 @@ class DeepSeekProvider(BaseLLMProvider):
         client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
+        formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
+        
+        # Build request kwargs
+        request_kwargs = {
+            "model": model,
+            "messages": formatted_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        # Enable web search if requested (DeepSeek supports this via tools)
+        if web_search:
+            request_kwargs["tools"] = [{"type": "web_search", "web_search": {"enable": True}}]
+            logger.info("DeepSeek web search enabled")
+        
+        response = await client.chat.completions.create(**request_kwargs)
         
         return LLMResponse(
             content=response.choices[0].message.content,
@@ -137,17 +191,24 @@ class DeepSeekProvider(BaseLLMProvider):
 
 
 class KimiProvider(BaseLLMProvider):
-    """Kimi (Moonshot) API provider (OpenAI compatible)"""
+    """Kimi (Moonshot) API provider (OpenAI compatible) with web search support"""
     
     provider_name = "kimi"
     
     def __init__(self):
-        self.api_key = settings.kimi_api_key
         self.base_url = settings.kimi_base_url
         self.default_model = settings.kimi_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("kimi") or settings.kimi_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         from openai import AsyncOpenAI
         import httpx
         
@@ -156,12 +217,22 @@ class KimiProvider(BaseLLMProvider):
         client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
+        formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
+        
+        # Build request kwargs
+        request_kwargs = {
+            "model": model,
+            "messages": formatted_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        # Kimi supports web search via tools
+        if web_search:
+            request_kwargs["tools"] = [{"type": "web_search"}]
+            logger.info("Kimi web search enabled")
+        
+        response = await client.chat.completions.create(**request_kwargs)
         
         return LLMResponse(
             content=response.choices[0].message.content,
@@ -178,29 +249,57 @@ class KimiProvider(BaseLLMProvider):
 
 
 class QwenProvider(BaseLLMProvider):
-    """Qwen (Aliyun DashScope) API provider"""
+    """Qwen (Aliyun DashScope) API provider with multimodal and web search support"""
     
     provider_name = "qwen"
     
     def __init__(self):
-        self.api_key = settings.qwen_api_key
         self.default_model = settings.qwen_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("qwen") or settings.qwen_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         import dashscope
         from dashscope import Generation
         
         dashscope.api_key = self.api_key
         model = model or self.default_model
         
-        response = Generation.call(
-            model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            result_format='message'
-        )
+        # Build messages with potential multimodal content
+        formatted_messages = []
+        for m in messages:
+            if attachments and m.role == "user":
+                # Qwen-VL format for multimodal
+                content = [{"text": m.content}]
+                for att in attachments:
+                    if att.get('type') == 'image':
+                        content.insert(0, {"image": att.get('content', '')})
+                formatted_messages.append({"role": m.role, "content": content})
+            else:
+                formatted_messages.append({"role": m.role, "content": m.content})
+        
+        # Build call kwargs
+        call_kwargs = {
+            "model": model,
+            "messages": formatted_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "result_format": 'message'
+        }
+        
+        # Qwen supports web search via enable_search parameter
+        if web_search:
+            call_kwargs["enable_search"] = True
+            logger.info("Qwen web search enabled")
+        
+        response = Generation.call(**call_kwargs)
         
         if response.status_code == 200:
             return LLMResponse(
@@ -220,16 +319,23 @@ class QwenProvider(BaseLLMProvider):
 
 
 class ClaudeProvider(BaseLLMProvider):
-    """Claude (Anthropic) API provider"""
+    """Claude (Anthropic) API provider with multimodal support"""
     
     provider_name = "claude"
     
     def __init__(self):
-        self.api_key = settings.claude_api_key
         self.default_model = settings.claude_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("claude") or settings.claude_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         from anthropic import AsyncAnthropic
         
         client = AsyncAnthropic(api_key=self.api_key)
@@ -242,7 +348,32 @@ class ClaudeProvider(BaseLLMProvider):
             if m.role == "system":
                 system = m.content
             else:
-                chat_messages.append({"role": m.role, "content": m.content})
+                # Build multimodal content for user messages with attachments
+                if attachments and m.role == "user":
+                    content = []
+                    # Add images first
+                    for att in attachments:
+                        if att.get('type') == 'image':
+                            image_data = att.get('content', '')
+                            if image_data.startswith('data:'):
+                                # Extract base64 and media type
+                                parts = image_data.split(',')
+                                if len(parts) == 2:
+                                    media_type = parts[0].replace('data:', '').replace(';base64', '')
+                                    base64_data = parts[1]
+                                    content.append({
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": media_type,
+                                            "data": base64_data
+                                        }
+                                    })
+                    # Add text
+                    content.append({"type": "text", "text": m.content})
+                    chat_messages.append({"role": m.role, "content": content})
+                else:
+                    chat_messages.append({"role": m.role, "content": m.content})
         
         response = await client.messages.create(
             model=model,
@@ -266,17 +397,25 @@ class ClaudeProvider(BaseLLMProvider):
 
 
 class GeminiProvider(BaseLLMProvider):
-    """Gemini (Google) API provider"""
+    """Gemini (Google) API provider with multimodal support"""
     
     provider_name = "gemini"
     
     def __init__(self):
-        self.api_key = settings.gemini_api_key
         self.default_model = settings.gemini_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("gemini") or settings.gemini_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         import google.generativeai as genai
+        import base64
         
         genai.configure(api_key=self.api_key)
         model_name = model or self.default_model
@@ -290,7 +429,31 @@ class GeminiProvider(BaseLLMProvider):
             history.append({"role": role, "parts": [m.content]})
         
         chat = gen_model.start_chat(history=history)
-        response = chat.send_message(messages[-1].content)
+        
+        # Build content parts for the last message
+        last_message = messages[-1]
+        content_parts = []
+        
+        # Add images if attachments present
+        if attachments:
+            for att in attachments:
+                if att.get('type') == 'image':
+                    image_data = att.get('content', '')
+                    if image_data.startswith('data:'):
+                        # Extract base64 data
+                        parts = image_data.split(',')
+                        if len(parts) == 2:
+                            mime_type = parts[0].replace('data:', '').replace(';base64', '')
+                            base64_data = parts[1]
+                            content_parts.append({
+                                "mime_type": mime_type,
+                                "data": base64_data
+                            })
+        
+        # Add text
+        content_parts.append(last_message.content)
+        
+        response = chat.send_message(content_parts if len(content_parts) > 1 else last_message.content)
         
         return LLMResponse(
             content=response.text,
@@ -306,17 +469,24 @@ class GeminiProvider(BaseLLMProvider):
 
 
 class GLMProvider(BaseLLMProvider):
-    """GLM (Zhipu) API provider (OpenAI compatible)"""
+    """GLM (Zhipu) API provider (OpenAI compatible) with multimodal and web search support"""
     
     provider_name = "glm"
     
     def __init__(self):
-        self.api_key = settings.glm_api_key
         self.base_url = settings.glm_base_url
         self.default_model = settings.glm_model
     
+    @property
+    def api_key(self):
+        """Get API key from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_api_key("glm") or settings.glm_api_key
+    
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         from openai import AsyncOpenAI
         import httpx
         
@@ -325,12 +495,30 @@ class GLMProvider(BaseLLMProvider):
         client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=http_client)
         model = model or self.default_model
         
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
+        # Build messages with multimodal support for GLM-4V
+        formatted_messages = []
+        for m in messages:
+            if attachments and m.role == "user":
+                # GLM-4V uses OpenAI-compatible multimodal format
+                content = self._build_multimodal_content(m.content, attachments)
+                formatted_messages.append({"role": m.role, "content": content})
+            else:
+                formatted_messages.append({"role": m.role, "content": m.content})
+        
+        # Build request kwargs
+        request_kwargs = {
+            "model": model,
+            "messages": formatted_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        # GLM supports web search via tools
+        if web_search:
+            request_kwargs["tools"] = [{"type": "web_search", "web_search": {"enable": True}}]
+            logger.info("GLM web search enabled")
+        
+        response = await client.chat.completions.create(**request_kwargs)
         
         return LLMResponse(
             content=response.choices[0].message.content,
@@ -347,7 +535,7 @@ class GLMProvider(BaseLLMProvider):
 
 
 class OllamaProvider(BaseLLMProvider):
-    """Ollama local API provider"""
+    """Ollama local API provider with multimodal support for llava models"""
     
     provider_name = "ollama"
     
@@ -356,17 +544,38 @@ class OllamaProvider(BaseLLMProvider):
         self.default_model = settings.ollama_model
     
     async def chat(self, messages: List[Message], model: Optional[str] = None,
-                   temperature: float = 0.7, max_tokens: int = 2000) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 2000,
+                   attachments: Optional[List[dict]] = None,
+                   web_search: bool = False) -> LLMResponse:
         import httpx
         
         model = model or self.default_model
+        
+        # Build messages with optional images for multimodal models (llava, etc.)
+        formatted_messages = []
+        for m in messages:
+            msg = {"role": m.role, "content": m.content}
+            if attachments and m.role == "user":
+                # Add images as base64 for Ollama multimodal models
+                images = []
+                for att in attachments:
+                    if att.get('type') == 'image':
+                        image_data = att.get('content', '')
+                        if image_data.startswith('data:'):
+                            # Extract base64 data
+                            parts = image_data.split(',')
+                            if len(parts) == 2:
+                                images.append(parts[1])
+                if images:
+                    msg["images"] = images
+            formatted_messages.append(msg)
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
                     "model": model,
-                    "messages": [{"role": m.role, "content": m.content} for m in messages],
+                    "messages": formatted_messages,
                     "stream": False,
                     "options": {
                         "temperature": temperature,
@@ -410,8 +619,13 @@ class LLMAdapter:
             "glm": GLMProvider(),
             "ollama": OllamaProvider(),
         }
-        self.default_provider = settings.default_llm_provider
         self._active_connections: Dict[str, Any] = {}  # Track active connections
+    
+    @property
+    def default_provider(self) -> str:
+        """Get default provider from ConfigManager (dynamic)"""
+        config = get_config_manager()
+        return config.get_default_provider()
     
     def get_provider(self, provider_name: Optional[str] = None) -> BaseLLMProvider:
         """Get a specific provider"""
@@ -442,7 +656,9 @@ class LLMAdapter:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 2000
+        max_tokens: int = 2000,
+        attachments: Optional[List[dict]] = None,
+        web_search: bool = False
     ) -> LLMResponse:
         """Send chat request to specified provider"""
         provider_name = provider or self.default_provider
@@ -461,11 +677,37 @@ class LLMAdapter:
         # Track active provider
         self._active_connections[provider_name] = provider_name
         
+        # If attachments are provided, use vision model for supported providers
+        actual_model = model
+        if attachments and any(a.get('type') == 'image' for a in attachments):
+            vision_model = self._get_vision_model(provider_name)
+            if vision_model:
+                actual_model = vision_model
+                logger.info(f"Using vision model {vision_model} for multimodal request")
+        
         try:
-            return await llm.chat(messages, model, temperature, max_tokens)
+            return await llm.chat(
+                messages, 
+                actual_model, 
+                temperature, 
+                max_tokens,
+                attachments=attachments,
+                web_search=web_search
+            )
         finally:
             # Clean up connections after use (for providers that create new clients each time)
             pass
+    
+    def _get_vision_model(self, provider_name: str) -> Optional[str]:
+        """Get vision-capable model for a provider"""
+        vision_models = {
+            "openai": settings.openai_vision_model,
+            "claude": settings.claude_vision_model,
+            "gemini": settings.gemini_vision_model,
+            "glm": settings.glm_vision_model,
+            "qwen": settings.qwen_vision_model,
+        }
+        return vision_models.get(provider_name)
     
     async def _close_provider_connections(self, provider_name: str):
         """Close connections for a specific provider"""
