@@ -125,17 +125,17 @@
 ### 2. Install Backend
 
 ```bash
-# 克隆仓库
+# Clone the repository
 git clone https://github.com/yourusername/smart-favorites.git
 cd smart-favorites
 
-# 进入后端目录
+# Enter the backend directory
 cd backend
 
-# 创建虚拟环境
+# Create a virtual environment
 python -m venv venv
 
-# 激活虚拟环境
+# Activate the virtual environment
 # Windows PowerShell:
 .\venv\Scripts\Activate.ps1
 # Windows CMD:
@@ -143,7 +143,7 @@ venv\Scripts\activate.bat
 # Linux/Mac:
 source venv/bin/activate
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -152,7 +152,7 @@ pip install -r requirements.txt
 **Method A: Using .env file (Recommended for initial setup)**
 
 ```bash
-# 复制环境变量配置
+# Copy environment variable configuration
 copy env.example .env  # Windows
 cp env.example .env    # Linux/Mac
 ```
@@ -160,13 +160,13 @@ cp env.example .env    # Linux/Mac
 Edit the `backend/.env` file:
 
 ```env
-# 选择默认使用的模型提供商
+# Choose the default model provider
 DEFAULT_LLM_PROVIDER=deepseek
 
-# DeepSeek (推荐国内用户)
+# DeepSeek ((Recommended for Chinese users))
 DEEPSEEK_API_KEY=sk-your-api-key
 
-# 或其他模型 (按需配置)
+# Or other models (configurable as needed)
 OPENAI_API_KEY=sk-your-api-key
 KIMI_API_KEY=sk-your-api-key
 QWEN_API_KEY=sk-your-api-key
@@ -224,46 +224,46 @@ The first startup will automatically download the Embedding model (approx. 90MB)
 
 ```
 Smart Favorites/
-├── backend/                       # Python 后端服务
+├── backend/                       # Python backend service
 │   ├── app/
-│   │   ├── api/                  # FastAPI 路由
-│   │   │   └── routes.py         # API 端点定义
-│   │   ├── config/               # 配置管理
-│   │   ├── models/               # 数据模型
-│   │   │   ├── api_models.py     # API 请求/响应模型
-│   │   │   ├── bookmark.py       # 书签模型
-│   │   │   ├── chat.py           # 聊天会话模型
-│   │   │   └── config.py         # 配置模型
-│   │   └── services/             # 核心服务
-│   │       ├── bookmark_parser.py    # 书签解析
-│   │       ├── vector_store.py       # ChromaDB 向量存储
-│   │       ├── llm_adapter.py        # 多 LLM 适配器
-│   │       ├── rag_engine.py         # RAG 检索增强生成
-│   │       ├── ai_analyzer.py        # AI 分析服务
-│   │       ├── chat_storage.py       # 聊天记录存储
-│   │       └── config_manager.py     # 配置与密钥管理
-│   ├── data/                     # 数据目录 (自动创建)
-│   │   ├── chroma/               # 向量数据库
-│   │   ├── chat_history.db       # 聊天记录
-│   │   └── config.db             # 加密配置
-│   ├── requirements.txt          # Python 依赖
-│   ├── env.example              # 环境变量示例
-│   └── run.py                   # 启动脚本
+│   │   ├── api/                  # FastAPI routes
+│   │   │   └── routes.py         # API endpoint definition
+│   │   ├── config/               # Configuration management
+│   │   ├── models/               # Data model
+│   │   │   ├── api_models.py     # API request/response model
+│   │   │   ├── bookmark.py       # Bookmark model
+│   │   │   ├── chat.py           # Chat session model
+│   │   │   └── config.py         # Configure the model
+│   │   └── services/             # Core Services
+│   │       ├── bookmark_parser.py    # Bookmark parsing
+│   │       ├── vector_store.py       # ChromaDB vector store
+│   │       ├── llm_adapter.py        # Multiple LLM Adapters
+│   │       ├── rag_engine.py         # Retrieval-Augmented Generation
+│   │       ├── ai_analyzer.py        # AI Analytics Service
+│   │       ├── chat_storage.py       # Chat history storage
+│   │       └── config_manager.py     # Configuration and Key Management
+│   ├── data/                     # Data Catalog (Automatically Created)
+│   │   ├── chroma/               # Vector database
+│   │   ├── chat_history.db       # Chat history
+│   │   └── config.db             # Encryption configuration
+│   ├── requirements.txt          # Python dependencies
+│   ├── env.example              # Environment variable example
+│   └── run.py                   # Start script
 │
-├── extension/                     # 浏览器插件 (Manifest V3)
-│   ├── manifest.json             # 插件配置
-│   ├── sidepanel/               # 侧边栏界面
-│   │   ├── sidepanel.html       # 主界面
-│   │   ├── sidepanel.css        # 样式 (含双主题)
-│   │   └── sidepanel.js         # 交互逻辑
+├── extension/                     # Browser extension (Manifest V3)
+│   ├── manifest.json             # Plugin Configuration
+│   ├── sidepanel/               # Sidebar interface
+│   │   ├── sidepanel.html       # Main interface
+│   │   ├── sidepanel.css        # Style (including dual theme)
+│   │   └── sidepanel.js         # Interaction logic
 │   ├── background/              # Service Worker
-│   │   └── background.js        # 后台服务
-│   ├── options/                 # 设置页面
-│   └── icons/                   # 图标资源
+│   │   └── background.js        # Background service
+│   ├── options/                 # Settings page
+│   └── icons/                   # Icon resources
 │
-├── .gitignore                    # Git 忽略配置
-├── LICENSE                       # Apache 2.0 许可证
-└── README.md                     # 项目说明
+├── .gitignore                    # Git ignore configuration
+├── LICENSE                       # Apache 2.0 license
+└── README.md
 ```
 
 ## 🔌 API Interfaces
@@ -331,35 +331,35 @@ Content-Type: application/json
 ### Session Management
 
 ```http
-# 获取所有会话
+# Get all sessions
 GET /api/chat/sessions
 
-# 创建新会话
+# Create a new session
 POST /api/chat/sessions
 { "title": "新会话" }
 
-# 获取会话详情（含消息）
+# Get session details (including messages)
 GET /api/chat/sessions/{session_id}
 
-# 更新会话
+# Update session
 PATCH /api/chat/sessions/{session_id}
 { "title": "新标题" }
 
-# 删除会话
+# Delete session
 DELETE /api/chat/sessions/{session_id}
 ```
 
 ### Settings Management
 
 ```http
-# 获取当前设置
+# Get current settings
 GET /api/settings
 
-# 设置默认服务商
+# Set default service provider
 POST /api/settings/provider
 { "provider": "deepseek" }
 
-# 设置 API 密钥（加密存储）
+# Set API key (encrypted storage)
 POST /api/settings/apikey
 { "provider": "deepseek", "api_key": "sk-xxx" }
 ```
@@ -367,10 +367,10 @@ POST /api/settings/apikey
 ### AI Smart Tools
 
 ```http
-# 智能分类
+# Intelligent categorization
 POST /api/ai/categorize
 
-# 重复检测
+# Duplicate detection
 POST /api/ai/duplicates
 ```
 
