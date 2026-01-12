@@ -13,19 +13,18 @@
 
 <p align="center">
   <a href="https://github.com/awezio/Smart-Favorites/stargazers">
-    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github" alt="GitHub stars">
+    <img src="https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github&style=for-the-badge&label=Stars&color=gray" alt="GitHub stars">
   </a>
   <a href="https://github.com/awezio/Smart-Favorites/issues">
-    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github" alt="GitHub issues">
+    <img src="https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github&style=for-the-badge&label=issues&color=green" alt="GitHub issues">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="license">
+    <img src="https://img.shields.io/badge/License-Apache%202.0?style=for-the-badge&color=blue" alt="license">
   </a>
-  <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version">
-  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
+  <img src="https://img.shields.io/badge/Version-1.1.0?style=for-the-badge&color=green" alt="Version">
+  <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome?style=for-the-badge&color=orange" alt="Platform">
+  <img src="https://img.shields.io/badge/Python-3.11%2B?style=for-the-badge&color=yellow" alt="Python">
 </p>
-
 ---
 
 ## ✨ v1.1 新特性
