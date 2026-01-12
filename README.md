@@ -33,30 +33,81 @@
 
 ### 核心功能
 
-| 功能 | 描述 |
-|------|------|
-| 🔍 **语义搜索** | 使用向量数据库进行智能语义检索，不仅仅是关键词匹配 |
-| 💬 **AI 问答** | 基于 RAG 技术，用自然语言询问收藏夹相关问题 |
-| 📝 **聊天记录** | 对话历史自动保存，支持多会话管理 |
-| 🔄 **自动同步** | 直接读取浏览器收藏夹，支持自动/定时/手动同步 |
-| 🤖 **多模型支持** | 适配 OpenAI、DeepSeek、Kimi、Qwen、Claude、Gemini、GLM、Ollama |
+<table style="width:100%">
+  <tr>
+    <th style="width:20%">功能</th>
+    <th style="width:80%">描述</th>
+  </tr>
+  <tr>
+    <td>🔍 <b>语义搜索</b></td>
+    <td>使用向量数据库进行智能语义检索，不仅仅是关键词匹配</td>
+  </tr>
+  <tr>
+    <td>💬 <b>AI 问答</b></td>
+    <td>基于 RAG 技术，用自然语言询问收藏夹相关问题</td>
+  </tr>
+  <tr>
+    <td>📝 <b>聊天记录</b></td>
+    <td>对话历史自动保存，支持多会话管理</td>
+  </tr>
+  <tr>
+    <td>🔄 <b>自动同步</b></td>
+    <td>直接读取浏览器收藏夹，支持自动/定时/手动同步</td>
+  </tr>
+  <tr>
+    <td>🤖 <b>多模型支持</b></td>
+    <td>适配 OpenAI、DeepSeek、Kimi、Qwen、Claude、Gemini、GLM、Ollama</td>
+  </tr>
+</table>
+
 
 ### 智能工具
 
-| 功能 | 描述 |
-|------|------|
-| 🏷️ **智能分类** | AI 分析书签内容，建议更合理的分类方式 |
-| 🔍 **重复检测** | 自动检测重复或相似的书签，提供整合建议 |
-| ✅ **用户确认** | 所有 AI 建议需用户手动确认后才会执行 |
+<table style="width:100%">
+  <tr>
+    <th style="width:20%">功能</th>
+    <th style="width:80%">描述</th>
+  </tr>
+  <tr>
+    <td>🏷️ <b>智能分类</b></td>
+    <td>AI 分析书签内容，建议更合理的分类方式</td>
+  </tr>
+  <tr>
+    <td>🔍 <b>重复检测</b></td>
+    <td>自动检测重复或相似的书签，提供整合建议</td>
+  </tr>
+  <tr>
+    <td>✅ <b>用户确认</b></td>
+    <td>所有 AI 建议需用户手动确认后才会执行</td>
+  </tr>
+</table>
+
 
 ### 界面特性
 
-| 功能 | 描述 |
-|------|------|
-| 🌙 **双主题** | 深色/浅色模式切换，支持跟随系统 |
-| 📱 **侧边栏** | 不遮挡页面内容，随时可用 |
-| 🪟 **独立窗口** | 可分离为独立窗口使用 |
-| ⚙️ **集成设置** | 在插件内直接配置，无需打开新页面 |
+<table style="width:100%">
+  <tr>
+    <th style="width:20%">功能</th>
+    <th style="width:80%">描述</th>
+  </tr>
+  <tr>
+    <td>🌙 <b>双主题</b></td>
+    <td>深色/浅色模式切换，支持跟随系统</td>
+  </tr>
+  <tr>
+    <td>📱 <b>侧边栏</b></td>
+    <td>不遮挡页面内容，随时可用</td>
+  </tr>
+  <tr>
+    <td>🪟 <b>独立窗口</b></td>
+    <td>可分离为独立窗口使用</td>
+  </tr>
+  <tr>
+    <td>⚙️ <b>集成设置</b></td>
+    <td>在插件内直接配置，无需打开新页面</td>
+  </tr>
+</table>
+
 
 ## 🖼️ 截图预览
 
@@ -64,12 +115,6 @@
   <img src="image/dark-mode.jpg" alt="Dark Mode" width="350">
   <img src="image/light-mode.jpg" alt="Light Mode" width="350">
 </p>
-
-<p align="center">
-  <i>侧边栏深色模式 - Cyber Teal 主题</i><br>
-  <i>侧边栏浅色模式 - Ocean Teal 主题</i><br>
-</p>
-
 
 ## 🚀 快速开始
 
@@ -333,16 +378,53 @@ POST /api/ai/duplicates
 
 ## 🤖 支持的 AI 模型
 
-| 提供商 | 模型 | 说明 |
-|--------|------|------|
-| **DeepSeek** | deepseek-chat | ⭐ 推荐，国内可用，性价比高 |
-| OpenAI | gpt-3.5-turbo, gpt-4 | 需要 API Key，可能需要代理 |
-| Kimi | moonshot-v1-8k | 月之暗面，支持长文本 |
-| Qwen | qwen-turbo | 阿里通义千问 |
-| Claude | claude-3-sonnet | Anthropic |
-| Gemini | gemini-pro | Google |
-| GLM | glm-4 | 智谱 AI |
-| Ollama | llama2, mistral 等 | 本地部署，无需 API Key |
+<table style="width:100%">
+  <tr>
+    <th style="width:20%">提供商</th>
+    <th style="width:30%">模型</th>
+    <th style="width:50%">说明</th>
+  </tr>
+  <tr>
+    <td><b>DeepSeek</b></td>
+    <td>deepseek-chat</td>
+    <td>⭐ 推荐，国内可用，性价比高</td>
+  </tr>
+  <tr>
+    <td>OpenAI</td>
+    <td>gpt-3.5-turbo, gpt-4</td>
+    <td>需要 API Key，可能需要代理</td>
+  </tr>
+  <tr>
+    <td>Kimi</td>
+    <td>moonshot-v1-8k</td>
+    <td>月之暗面，支持长文本</td>
+  </tr>
+  <tr>
+    <td>Qwen</td>
+    <td>qwen-turbo</td>
+    <td>阿里通义千问</td>
+  </tr>
+  <tr>
+    <td>Claude</td>
+    <td>claude-3-sonnet</td>
+    <td>Anthropic</td>
+  </tr>
+  <tr>
+    <td>Gemini</td>
+    <td>gemini-pro</td>
+    <td>Google</td>
+  </tr>
+  <tr>
+    <td>GLM</td>
+    <td>glm-4</td>
+    <td>智谱 AI</td>
+  </tr>
+  <tr>
+    <td>Ollama</td>
+    <td>llama2, mistral 等</td>
+    <td>本地部署，无需 API Key</td>
+  </tr>
+</table>
 
 ## 🛠️ 技术栈
 
