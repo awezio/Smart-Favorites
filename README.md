@@ -22,8 +22,11 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <img src="https://img.shields.io/badge/Version-1.1.0-green.svg" alt="Version">
+  </a>
   <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
+  </a>
   <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
+  </a>
 </p>
 
 ---
