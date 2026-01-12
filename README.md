@@ -25,7 +25,6 @@
   <img src="https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Python-3.11+-yellow.svg" alt="Python">
 </p>
->
 
 ---
 
