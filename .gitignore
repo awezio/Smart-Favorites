@@ -73,6 +73,8 @@ desktop.ini
 
 # ==================== Node (if any frontend build tools) ====================
 node_modules/
+.next/
+smart-favorites-web/.next/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
