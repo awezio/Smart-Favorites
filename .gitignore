@@ -40,6 +40,7 @@ env/
 .env.local
 .env.*.local
 *.env
+Google_OAuth_settings.json
 
 # ==================== Data & Database ====================
 # All data files (contains user data and encrypted secrets)
