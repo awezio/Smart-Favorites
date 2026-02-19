@@ -3,9 +3,10 @@
 [![GitHub stars](https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/issues)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)
-![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg)
+![Version](https://img.shields.io/badge/Version-2.0.3-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome%20%7C%20Web-orange.svg)
 ![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)
+![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)
 
 <p align="center">
   <img src="extension/icons/icon128.png" alt="Smart Favorites Logo" width="128" height="128">
@@ -16,7 +17,18 @@
   Supports semantic search, RAG Q&A, intelligent categorization, chat history persistence, and multi-model switching
 </p>
 
+<p align="center">
+  <strong>Web app + browser extension</strong>: Deploy the <a href="smart-favorites-web/QUICK_START.md">Web app</a> (Next.js + Supabase / Vercel) first; the extension connects to the Web API by default. You can also self-host the <code>backend/</code> if needed.
+</p>
+
 ---
+
+## ✨ v2.0 New Features
+
+- **Web App**: Standalone Next.js app, deployable to Vercel without running a local backend
+- **Supabase Backend**: Bookmarks and GitHub Stars with PostgreSQL + pgvector for vector search
+- **GitHub Stars Support**: Manage GitHub starred repos with unified search and AI Q&A
+- **Extension uses Web by default**: Browser extension connects to the Web app API for cloud sync
 
 ## ✨ v1.1 New Features
 
@@ -115,115 +127,32 @@
 
 ## 🚀 Quick Start
 
-### 1. Prerequisites
+### 1. Deploy the Web app
 
-- **Python 3.11+**
-- **Edge 114+ / Chrome 114+** (Supports Side Panel API)
-- **At least one AI model's API Key** (DeepSeek is recommended for its availability in China and high cost-effectiveness)
+1. Go to the `smart-favorites-web` directory
+2. Follow [smart-favorites-web/QUICK_START.md](smart-favorites-web/QUICK_START.md) to set up Supabase (tables, env vars) and deploy to Vercel
+3. Get your Web app URL (e.g. `https://xxx.vercel.app`)
 
-### 2. Install Backend
+### 2. Install the browser extension and connect to the Web app
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/smart-favorites.git
-cd smart-favorites
+1. Open Edge or Chrome and go to `edge://extensions/` or `chrome://extensions/`
+2. Enable **Developer mode**, click **Load unpacked**, and select the project’s `extension` directory (or download from [Releases](https://github.com/yourusername/smart-favorites/releases), extract, then load)
+3. In the extension sidebar, open **Settings**, set the backend URL to your Web app URL (e.g. `https://xxx.vercel.app`), save and refresh the connection
 
-# Enter the backend directory
-cd backend
+### 3. Start using
 
-# Create a virtual environment
-python -m venv venv
+Use the sidebar to sync bookmarks, run semantic search, AI Q&A, and smart categorization; data is stored on the Web app.
 
-# Activate the virtual environment
-# Windows PowerShell:
-.\venv\Scripts\Activate.ps1
-# Windows CMD:
-venv\Scripts\activate.bat
-# Linux/Mac:
-source venv/bin/activate
+---
 
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configure AI Models
-
-**Method A: Using .env file (Recommended for initial setup)**
-
-```bash
-# Copy environment variable configuration
-copy env.example .env  # Windows
-cp env.example .env    # Linux/Mac
-```
-
-Edit the `backend/.env` file:
-
-```env
-# Choose the default model provider
-DEFAULT_LLM_PROVIDER=deepseek
-
-# DeepSeek ((Recommended for Chinese users))
-DEEPSEEK_API_KEY=sk-your-api-key
-
-# Or other models (configurable as needed)
-OPENAI_API_KEY=sk-your-api-key
-KIMI_API_KEY=sk-your-api-key
-QWEN_API_KEY=sk-your-api-key
-CLAUDE_API_KEY=sk-your-api-key
-GEMINI_API_KEY=your-api-key
-GLM_API_KEY=your-api-key
-```
-
-**Method B: Using in-extension settings (Recommended for daily use)**
-
-After starting the backend, click the settings icon ⚙️ in the extension sidebar to configure directly:
-
-- Backend address
-- Default AI service provider
-- API keys for each service provider
-
-API keys are encrypted and stored in the backend database for enhanced security.
-
-### 4. Start Backend Service
-
-```bash
-cd backend
-python run.py
-```
-
-The service will start at **http://localhost:8000**
-
-The first startup will automatically download the Embedding model (approx. 90MB), please be patient.
-
-### 5. Install Browser Extension
-
-**Method A: Install from source (Recommended for developers)**
-
-1. Open the Edge browser and go to `edge://extensions/`
-2. Enable **Developer mode** (toggle in the top right corner)
-3. Click **Load unpacked**
-4. Select the `extension` directory in the project
-
-**Method B: Download from Release**
-
-1. Go to the [Releases](https://github.com/yourusername/smart-favorites/releases) page
-2. Download the latest version of `smart-favorites-extension.zip`
-3. Extract it to a local directory
-4. Follow steps 1-4 from Method A to load the extracted directory
-
-### 6. Start Using
-
-1. Click the Smart Favorites icon in the browser toolbar, the sidebar will open automatically
-2. On first use, go to the **Sync** tab to synchronize your browser bookmarks
-3. Perform semantic searches in the **Search** tab
-4. Chat with AI in the **Q&A** tab to ask questions about your bookmarks
-5. Use intelligent categorization and duplicate detection features in the **AI** tab
+**Optional: Local backend**  
+To run a backend locally (without Vercel/Supabase), you can self-host `backend/` — see `backend/README.md`. Point the extension’s backend URL to `http://localhost:8000`.
 
 ## 📁 Project Structure
 
 ```
 Smart Favorites/
-├── backend/                       # Python backend service
+├── backend/                       # Local Python backend (optional, for self-hosting)
 │   ├── app/
 │   │   ├── api/                  # FastAPI routes
 │   │   │   └── routes.py         # API endpoint definition
@@ -260,12 +189,23 @@ Smart Favorites/
 │   ├── options/                 # Settings page
 │   └── icons/                   # Icon resources
 │
+├── smart-favorites-web/          # Web app (Next.js 15 + Supabase)
+│   ├── app/                     # Next.js App Router pages & API
+│   ├── components/              # React components
+│   ├── supabase/                # Migrations & types
+│   │   └── migrations/          # DB schema & vector search functions
+│   ├── QUICK_START.md           # Web quick start guide
+│   └── package.json
+│
 ├── .gitignore                    # Git ignore configuration
 ├── LICENSE                       # Apache 2.0 license
-└── README.md
+├── README.md                     # Project readme (Chinese)
+└── README-EN.md                  # Project readme (English)
 ```
 
 ## 🔌 API Interfaces
+
+The following describe the **local backend** (`backend/`) API. When using the Web app, refer to the Web app’s routes and documentation.
 
 ### Health Check
 
@@ -427,7 +367,14 @@ Complete API documentation is available at: **http://localhost:8000/docs**
 
 ## 🛠️ Tech Stack
 
-### Backend
+### Web app (smart-favorites-web)
+
+- **Next.js 15** - React full-stack framework (App Router)
+- **Supabase** - PostgreSQL + pgvector for search, auth, and storage
+- **Vercel** - Frontend and serverless deployment
+- **Tailwind CSS / shadcn/ui** - Styling and components
+
+### Local backend (optional, for self-hosting)
 
 - **FastAPI** - High-performance asynchronous Python web framework
 - **ChromaDB** - Vector database for semantic search
@@ -462,6 +409,9 @@ Complete API documentation is available at: **http://localhost:8000/docs**
 - [x] Session management (v1.1)
 - [x] API key encrypted storage (v1.1)
 - [x] Integrated settings panel (v1.1)
+- [x] Web app Next.js + Supabase (v2.0)
+- [x] GitHub Stars management & unified search (v2.0)
+- [x] Vercel deployment & extension connecting to web API (v2.0)
 - [ ] Dead link detection
 - [ ] Automatic bookmark tagging
 - [ ] Multi-language support

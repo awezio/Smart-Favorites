@@ -5,9 +5,10 @@
 [![GitHub stars](https://img.shields.io/github/stars/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/awezio/Smart-Favorites?logo=github)](https://github.com/awezio/Smart-Favorites/issues)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)
-![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome-orange.svg)
+![Version](https://img.shields.io/badge/Version-2.0.3-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Edge%20%7C%20Chrome%20%7C%20Web-orange.svg)
 ![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)
+![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)
 
 <p align="center">
   <img src="extension/icons/icon128.png" alt="Smart Favorites Logo" width="128" height="128">
@@ -18,7 +19,18 @@
   支持语义搜索、RAG 问答、智能分类、聊天记录持久化和多模型切换
 </p>
 
+<p align="center">
+  <strong>Web 端 + 浏览器插件</strong>：先部署 <a href="smart-favorites-web/QUICK_START.md">Web 端</a>（Next.js + Supabase / Vercel），插件统一接入 Web 端 API；如需本地运行也可自行部署 <code>backend/</code>。
+</p>
+
 ---
+
+## ✨ v2.0 新特性
+
+- **Web 端应用**: 独立 Next.js 应用，支持部署到 Vercel，无需本地运行后端
+- **Supabase 后端**: 书签与 GitHub Stars 使用 PostgreSQL + pgvector 向量搜索
+- **GitHub Stars 支持**: 管理 GitHub 星标仓库，与书签统一检索与 AI 问答
+- **插件统一接入 Web 端**: 浏览器插件默认连接 Web 端 API，数据云端同步
 
 ## ✨ v1.1 新特性
 
@@ -120,114 +132,32 @@
 
 ## 🚀 快速开始
 
-### 1. 环境要求
+### 1. 部署 Web 端
 
-- **Python 3.11+**
-- **Edge 114+ / Chrome 114+** (支持 Side Panel API)
-- **至少一个 AI 模型的 API Key** (推荐 DeepSeek，国内可用且性价比高)
+1. 进入目录 `smart-favorites-web`
+2. 按照 [smart-favorites-web/QUICK_START.md](smart-favorites-web/QUICK_START.md) 完成 Supabase 建表、环境变量与 Vercel 部署
+3. 获得你的 Web 端地址（如 `https://xxx.vercel.app`）
 
-### 2. 安装后端
+### 2. 安装浏览器插件并接入 Web 端
 
-```bash
-# 克隆仓库
-git clone https://github.com/yourusername/smart-favorites.git
-cd smart-favorites
+1. 打开 Edge / Chrome，访问 `edge://extensions/` 或 `chrome://extensions/`
+2. 开启「**开发人员模式**」，点击「**加载解压缩的扩展**」，选择项目中的 `extension` 目录（或从 [Releases](https://github.com/yourusername/smart-favorites/releases) 下载并解压后加载）
+3. 在插件侧边栏中打开 **设置**，将「后端地址」填写为你的 Web 端地址（如 `https://xxx.vercel.app`），保存并刷新连接
 
-# 进入后端目录
-cd backend
+### 3. 开始使用
 
-# 创建虚拟环境
-python -m venv venv
+在侧边栏中同步书签、语义搜索、AI 问答与智能分类等，数据均保存在 Web 端。
 
-# 激活虚拟环境
-# Windows PowerShell:
-.\venv\Scripts\Activate.ps1
-# Windows CMD:
-venv\Scripts\activate.bat
-# Linux/Mac:
-source venv/bin/activate
+---
 
-# 安装依赖
-pip install -r requirements.txt
-```
-
-### 3. 配置 AI 模型
-
-**方法 A: 使用 .env 文件（推荐初次配置）**
-
-```bash
-# 复制环境变量配置
-copy env.example .env  # Windows
-cp env.example .env    # Linux/Mac
-```
-
-编辑 `backend/.env` 文件：
-
-```env
-# 选择默认使用的模型提供商
-DEFAULT_LLM_PROVIDER=deepseek
-
-# DeepSeek (推荐国内用户)
-DEEPSEEK_API_KEY=sk-your-api-key
-
-# 或其他模型 (按需配置)
-OPENAI_API_KEY=sk-your-api-key
-KIMI_API_KEY=sk-your-api-key
-QWEN_API_KEY=sk-your-api-key
-CLAUDE_API_KEY=sk-your-api-key
-GEMINI_API_KEY=your-api-key
-GLM_API_KEY=your-api-key
-```
-
-**方法 B: 使用插件内设置（推荐日常使用）**
-
-启动后端后，在插件侧边栏点击设置图标 ⚙️，可直接配置：
-- 后端地址
-- 默认 AI 服务商
-- 各服务商的 API 密钥
-
-API 密钥会加密存储在后端数据库中，更安全。
-
-### 4. 启动后端服务
-
-```bash
-cd backend
-python run.py
-```
-
-服务将在 **http://localhost:8000** 启动
-
-首次启动会自动下载 Embedding 模型（约 90MB），请耐心等待。
-
-### 5. 安装浏览器插件
-
-**方法 A: 从源码安装（开发者推荐）**
-
-1. 打开 Edge 浏览器，访问 `edge://extensions/`
-2. 开启「**开发人员模式**」（右上角开关）
-3. 点击「**加载解压缩的扩展**」
-4. 选择项目中的 `extension` 目录
-
-**方法 B: 从 Release 下载**
-
-1. 前往 [Releases](https://github.com/yourusername/smart-favorites/releases) 页面
-2. 下载最新版本的 `smart-favorites-extension.zip`
-3. 解压到本地目录
-4. 按照方法 A 的步骤 1-4 加载解压后的目录
-
-### 6. 开始使用
-
-1. 点击浏览器工具栏中的 Smart Favorites 图标，侧边栏将自动打开
-2. 首次使用，点击「同步」标签页同步你的浏览器收藏夹
-3. 在「搜索」标签页进行语义搜索
-4. 在「问答」标签页与 AI 对话，询问收藏夹相关问题
-5. 在「AI」标签页使用智能分类和重复检测功能
+**可选：本地后端**  
+如需在本地运行后端（不依赖 Vercel/Supabase），可自行部署 `backend/`，详见 `backend/README.md`。插件将后端地址指向 `http://localhost:8000` 即可。
 
 ## 📁 项目结构
 
 ```
 Smart Favorites/
-├── backend/                       # Python 后端服务
+├── backend/                       # 本地 Python 后端（可选，自托管用）
 │   ├── app/
 │   │   ├── api/                  # FastAPI 路由
 │   │   │   └── routes.py         # API 端点定义
@@ -264,12 +194,23 @@ Smart Favorites/
 │   ├── options/                 # 设置页面
 │   └── icons/                   # 图标资源
 │
+├── smart-favorites-web/          # Web 端 (Next.js 15 + Supabase)
+│   ├── app/                     # Next.js App Router 页面与 API
+│   ├── components/              # React 组件
+│   ├── supabase/                # 迁移与类型
+│   │   └── migrations/          # 数据库建表与向量搜索函数
+│   ├── QUICK_START.md           # Web 端快速开始
+│   └── package.json
+│
 ├── .gitignore                    # Git 忽略配置
 ├── LICENSE                       # Apache 2.0 许可证
-└── README.md                     # 项目说明
+├── README.md                     # 项目说明（中文）
+└── README-EN.md                  # 项目说明（英文）
 ```
 
 ## 🔌 API 接口
+
+以下为**本地后端**（`backend/`）的 API；使用 Web 端时请以 Web 端实际路由与文档为准。
 
 ### 健康检查
 
@@ -430,7 +371,14 @@ POST /api/ai/duplicates
 
 ## 🛠️ 技术栈
 
-### 后端
+### Web 端 (smart-favorites-web)
+
+- **Next.js 15** - React 全栈框架（App Router）
+- **Supabase** - PostgreSQL + pgvector 向量搜索、认证与存储
+- **Vercel** - 前端与 Serverless 部署
+- **Tailwind CSS / shadcn/ui** - 样式与组件
+
+### 本地后端（可选，自托管时使用）
 
 - **FastAPI** - 高性能异步 Python Web 框架
 - **ChromaDB** - 向量数据库，用于语义搜索
@@ -465,6 +413,9 @@ POST /api/ai/duplicates
 - [x] 会话管理 (v1.1)
 - [x] API 密钥加密存储 (v1.1)
 - [x] 集成设置面板 (v1.1)
+- [x] Web 端应用 Next.js + Supabase (v2.0)
+- [x] GitHub Stars 管理与统一检索 (v2.0)
+- [x] Vercel 部署与扩展连接 Web API (v2.0)
 - [ ] 死链检测
 - [ ] 书签标签自动生成
 - [ ] 多语言支持
