@@ -175,10 +175,25 @@
       <h2>🌐 后端服务配置</h2>
       <div class="form-group">
         <label for="backend-url">后端服务地址</label>
-        <input type="text" id="backend-url" value="http://localhost:8000" placeholder="http://localhost:8000">
-        <p class="hint">默认使用本地后端服务，如需远程部署请修改此地址</p>
+        <input type="text" id="backend-url" value="https://smart-favorites-web.vercel.app" placeholder="https://smart-favorites-web.vercel.app">
+        <p class="hint">输入 Web 端地址（Vercel 部署地址或本地 http://localhost:3000）</p>
       </div>
       <button id="test-connection" class="btn btn-secondary">测试连接</button>
+    </div>
+
+    <div class="section">
+      <h2>🔑 云端登录</h2>
+      <p class="hint" style="margin-bottom:12px;">登录同一账号后，书签、个人资料等与 Web 端自动同步</p>
+      <div class="form-group">
+        <button id="login-via-web" class="btn btn-primary" style="margin-bottom:12px;">通过 Web 端登录（推荐）</button>
+        <p class="hint">点击后打开 Web 端登录页，登录成功将自动连接扩展</p>
+      </div>
+      <div class="form-group" style="margin-top:20px;">
+        <label for="auth-token">或：手动粘贴 API Token</label>
+        <input type="password" id="auth-token" placeholder="从 Web 端设置页「生成扩展 Token」复制">
+        <p class="hint">适用于无法打开新标签页的场景</p>
+      </div>
+      <div id="auth-status" style="margin-top:10px;"></div>
     </div>
 
     <div class="section">
@@ -271,7 +286,8 @@
       const settings = await chrome.storage.local.get([
         'backendUrl',
         'defaultProvider',
-        'apiKeys'
+        'apiKeys',
+        'authToken'
       ]);
 
       if (settings.backendUrl) {
@@ -280,6 +296,10 @@
 
       if (settings.defaultProvider) {
         document.getElementById('default-provider').value = settings.defaultProvider;
+      }
+
+      if (settings.authToken) {
+        document.getElementById('auth-token').value = settings.authToken;
       }
 
       if (settings.apiKeys) {
@@ -291,6 +311,32 @@
             if (status) status.classList.add('configured');
           }
         });
+      }
+
+      // Check auth status
+      checkAuthStatus();
+    }
+
+    async function checkAuthStatus() {
+      const authStatusEl = document.getElementById('auth-status');
+      const token = document.getElementById('auth-token').value;
+      if (!token) {
+        authStatusEl.innerHTML = '<span style="color: var(--text-muted);">未配置 Token</span>';
+        return;
+      }
+      try {
+        const backendUrl = document.getElementById('backend-url').value || 'https://smart-favorites-web.vercel.app';
+        const response = await fetch(`${backendUrl}/api/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const profile = await response.json();
+          authStatusEl.innerHTML = `<span style="color: var(--success-color);">✓ 已登录: ${profile.display_name || profile.email || '用户'}</span>`;
+        } else {
+          authStatusEl.innerHTML = '<span style="color: var(--danger-color);">✗ Token 无效或已过期</span>';
+        }
+      } catch (error) {
+        authStatusEl.innerHTML = '<span style="color: var(--danger-color);">✗ 无法连接到后端验证 Token</span>';
       }
     }
 
@@ -312,10 +358,20 @@
       await chrome.storage.local.set({
         backendUrl: document.getElementById('backend-url').value,
         defaultProvider: document.getElementById('default-provider').value,
+        authToken: document.getElementById('auth-token').value,
         apiKeys
       });
 
       showStatus('设置已保存', 'success');
+      checkAuthStatus();
+    });
+
+    // Login via Web (OAuth flow)
+    document.getElementById('login-via-web').addEventListener('click', () => {
+      const backendUrl = document.getElementById('backend-url').value || 'https://smart-favorites-web.vercel.app';
+      const base = backendUrl.replace(/\/$/, '');
+      const url = base + '/auth/extension?ext_id=' + chrome.runtime.id;
+      chrome.tabs.create({ url });
     });
 
     // Test connection

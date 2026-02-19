@@ -4,7 +4,17 @@
  */
 
 // Configuration - will be loaded from storage
-let API_BASE_URL = 'http://localhost:8000';
+let API_BASE_URL = 'https://smart-favorites-web.vercel.app';
+
+// Helper: fetch with auth token
+async function fetchWithAuth(url, options = {}) {
+  const { authToken } = await chrome.storage.local.get(['authToken']);
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return fetch(url, { ...options, headers });
+}
 
 // State
 let isConnected = false;
@@ -68,6 +78,9 @@ const resultsContent = document.getElementById('results-content');
 const closeResults = document.getElementById('close-results');
 const applySuggestions = document.getElementById('apply-suggestions');
 const cancelSuggestions = document.getElementById('cancel-suggestions');
+const userArea = document.getElementById('user-area');
+const userAvatar = document.getElementById('user-avatar');
+const userName = document.getElementById('user-name');
 
 // ==================== Toast Notifications ====================
 
@@ -226,9 +239,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 async function checkConnection() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/health`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/health`, {
+      method: 'GET'
     });
     
     if (response.ok) {
@@ -277,6 +289,92 @@ function setConnected(connected, model = '--') {
     chatStatusText.textContent = connected ? `已连接 ${model}` : '未连接';
   }
 }
+
+// ==================== Auth & Profile ====================
+
+/**
+ * Check auth status and update user area. Fetches profile from API when logged in.
+ */
+async function checkExtensionAuthStatus() {
+  if (!userArea || !userAvatar || !userName) return;
+  
+  const { authToken, backendUrl } = await chrome.storage.local.get(['authToken', 'backendUrl']);
+  const apiBase = backendUrl || API_BASE_URL;
+  
+  if (!authToken) {
+    userName.textContent = '未登录';
+    userAvatar.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>';
+    userArea.title = '点击登录（打开 Web 端登录页）';
+    return;
+  }
+  
+  try {
+    const res = await fetchWithAuth(`${apiBase}/api/profile`);
+    if (res.ok) {
+      const profile = await res.json();
+      const displayName = profile.display_name || profile.email || '用户';
+      userName.textContent = displayName.length > 8 ? displayName.slice(0, 7) + '…' : displayName;
+      
+      if (profile.avatar_url) {
+        userAvatar.innerHTML = `<img src="${profile.avatar_url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      } else if (profile.avatar_seed) {
+        const [style, seed] = (profile.avatar_seed + ':default').split(':').slice(0, 2);
+        const url = `https://api.dicebear.com/9.x/${encodeURIComponent(style || 'adventurer')}/svg?seed=${encodeURIComponent(seed || profile.id)}&size=32`;
+        userAvatar.innerHTML = `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      }
+      userArea.title = displayName + ' - 点击打开 Web 端个人资料';
+    } else {
+      userName.textContent = '登录已过期';
+      userAvatar.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>';
+      userArea.title = '点击重新登录';
+    }
+  } catch (e) {
+    userName.textContent = '未登录';
+    userAvatar.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>';
+    userArea.title = '点击登录';
+  }
+}
+
+/**
+ * Open Web login/connect page for extension auth
+ */
+function openExtensionLogin() {
+  chrome.storage.local.get(['backendUrl'], (stored) => {
+    const base = stored.backendUrl || API_BASE_URL;
+    const url = base.replace(/\/$/, '') + '/auth/extension?ext_id=' + chrome.runtime.id;
+    chrome.tabs.create({ url });
+  });
+}
+
+/**
+ * Open Web dashboard (profile or home)
+ */
+function openWebDashboard() {
+  chrome.storage.local.get(['backendUrl'], (stored) => {
+    const base = stored.backendUrl || API_BASE_URL;
+    chrome.tabs.create({ url: base.replace(/\/$/, '') + '/dashboard/profile' });
+  });
+}
+
+// User area click: login or open profile
+if (userArea) {
+  userArea.addEventListener('click', async () => {
+    const { authToken } = await chrome.storage.local.get(['authToken']);
+    if (authToken) {
+      openWebDashboard();
+    } else {
+      openExtensionLogin();
+    }
+  });
+}
+
+// Listen for auth token changes (e.g. after OAuth callback)
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && (changes.authToken || changes.backendUrl)) {
+    if (changes.backendUrl) API_BASE_URL = changes.backendUrl.newValue || API_BASE_URL;
+    checkExtensionAuthStatus();
+  }
+});
 
 // ==================== Direct Bookmark Access ====================
 
@@ -365,28 +463,28 @@ async function syncBookmarks(showAlert = true) {
     const htmlContent = convertBookmarkTreeToHtml(bookmarkTree);
     const allBookmarks = flattenBookmarks(bookmarkTree);
     
-    const response = await fetch(`${API_BASE_URL}/api/bookmarks/sync`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/bookmarks/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html_content: htmlContent, replace_existing: true })
+      body: JSON.stringify({ htmlContent })
     });
     
     if (!response.ok) throw new Error('Sync failed');
     
     const data = await response.json();
+    const count = data.total_imported || data.totalImported || 0;
     
-    bookmarkCount.innerHTML = `📚 书签数量: <strong>${data.total_imported}</strong>`;
+    bookmarkCount.innerHTML = `📚 书签数量: <strong>${count}</strong>`;
     const now = new Date();
     lastSync.innerHTML = `⏱️ 上次同步: <strong>${now.toLocaleString()}</strong>`;
     
     await chrome.storage.local.set({
       lastSync: now.getTime(),
-      bookmarkCount: data.total_imported,
+      bookmarkCount: count,
       bookmarkData: allBookmarks
     });
     
     if (showAlert) {
-      alert(`同步成功！共同步 ${data.total_imported} 个书签`);
+      alert(`同步成功！共同步 ${count} 个书签`);
     }
   } catch (error) {
     console.error('Sync error:', error);
@@ -452,46 +550,62 @@ async function updateSyncMode(mode) {
 
 // ==================== Search Functions ====================
 
+async function searchLocalBookmarks(query, topK = 10) {
+  const tree = await getBookmarksFromBrowser();
+  const flat = tree.flatMap((root) => (root.children ? flattenBookmarks(root.children, root.title || '') : []));
+  const q = query.trim().toLowerCase();
+  const matched = flat
+    .filter((b) => (b.title || '').toLowerCase().includes(q) || (b.url || '').toLowerCase().includes(q))
+    .slice(0, topK);
+  return matched.map((b) => ({
+    type: 'bookmark',
+    bookmark: { title: b.title || 'Untitled', url: b.url },
+    similarity: 1,
+    score: 1,
+  }));
+}
+
 async function searchBookmarks(query) {
   if (!query.trim()) return;
-  
-  if (!isConnected) {
-    const connected = await checkConnection();
-    if (!connected) {
-      searchResults.innerHTML = '<p class="placeholder-text">无法连接到后端服务。请确认后端服务正在运行 (http://localhost:8000)</p>';
-      return;
+
+  searchResults.innerHTML = '<div class="loading"></div> 搜索中...';
+
+  const { authToken } = await chrome.storage.local.get(['authToken']);
+  const hasAuth = !!authToken;
+
+  if (hasAuth) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/search`, {
+        method: 'POST',
+        body: JSON.stringify({ query, top_k: 10 }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const list = data.results || [];
+        displaySearchResults(list);
+        return;
+      }
+      if (response.status === 401) {
+        showToast('未登录，使用本地书签搜索', 'info');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        showToast('无法连接后端，切换到本地搜索', 'info');
+      }
     }
   }
-  
-  searchResults.innerHTML = '<div class="loading"></div> 搜索中...';
-  
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, top_k: 10 })
-    });
-    
-    if (!response.ok) {
-      let errorDetail = `HTTP ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorDetail = errorData.detail || errorData.message || errorDetail;
-      } catch (e) {}
-      throw new Error(errorDetail);
+    const localResults = await searchLocalBookmarks(query, 20);
+    displaySearchResults(localResults);
+    if (localResults.length > 0 && !hasAuth) {
+      showToast('当前为本地书签搜索，登录后可使用 AI 语义搜索', 'info');
     }
-    
-    const data = await response.json();
-    displaySearchResults(data.results);
-  } catch (error) {
-    console.error('Search error:', error);
-    let errorMsg = '搜索失败';
-    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      errorMsg = '无法连接到后端服务。请确认后端服务正在运行 (http://localhost:8000)';
-    } else {
-      errorMsg = `搜索失败: ${error.message}`;
-    }
-    searchResults.innerHTML = `<p class="placeholder-text">${errorMsg}</p>`;
+  } catch (err) {
+    console.error('Local search error:', err);
+    searchResults.innerHTML = '<p class="placeholder-text">本地搜索失败</p>';
   }
 }
 
@@ -500,17 +614,24 @@ function displaySearchResults(results) {
     searchResults.innerHTML = '<p class="placeholder-text">未找到相关结果</p>';
     return;
   }
-  
-  searchResults.innerHTML = results.map(result => `
-    <div class="result-item" data-url="${result.bookmark.url}">
+
+  const score = (r) => ((r.similarity ?? r.score ?? 1) * 100).toFixed(1);
+  const getItem = (r) => {
+    const b = r.bookmark || r.star;
+    const url = b?.url || '';
+    const title = b?.title || (r.star ? `${r.star.owner}/${r.star.repo}` : 'Untitled');
+    const icon = r.bookmark?.icon;
+    return `<div class="result-item" data-url="${escapeHtml(url)}">
       <div class="result-title">
-        ${result.bookmark.icon ? `<img src="${result.bookmark.icon}" alt="">` : '🔖'}
-        ${escapeHtml(result.bookmark.title)}
+        ${icon ? `<img src="${escapeHtml(icon)}" alt="">` : '🔖'}
+        ${escapeHtml(title)}
       </div>
-      <div class="result-url">${escapeHtml(result.bookmark.url)}</div>
-      <div class="result-score">相关度: ${(result.score * 100).toFixed(1)}%</div>
-    </div>
-  `).join('');
+      <div class="result-url">${escapeHtml(url)}</div>
+      <div class="result-score">相关度: ${score(r)}%</div>
+    </div>`;
+  };
+
+  searchResults.innerHTML = results.map(getItem).join('');
   
   searchResults.querySelectorAll('.result-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -536,7 +657,7 @@ async function loadChatSessions() {
     const stored = await chrome.storage.local.get(['lastSessionId']);
     const lastSessionId = stored.lastSessionId;
     
-    const response = await fetch(`${API_BASE_URL}/api/chat/sessions`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions`);
     if (response.ok) {
       chatSessions = await response.json();
       console.log('Loaded sessions:', chatSessions.length, 'Last session:', lastSessionId);
@@ -672,9 +793,8 @@ async function finishRenameSession(input) {
   
   // Update on backend
   try {
-    await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
+    await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newTitle })
     });
     showToast('会话已重命名', 'success');
@@ -703,9 +823,8 @@ function cancelRenameSession(input) {
  */
 async function createNewSession() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/chat/sessions`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: '新会话' })
     });
     
@@ -740,7 +859,7 @@ async function selectSession(sessionId) {
   // Load session messages
   try {
     console.log('Loading session:', sessionId);
-    const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}`);
     console.log('Response status:', response.status);
     
     if (response.ok) {
@@ -778,7 +897,7 @@ async function deleteSession(sessionId) {
   if (!confirm('确定要删除这个会话吗？')) return;
   
   try {
-    await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
+    await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
       method: 'DELETE'
     });
     
@@ -2031,8 +2150,8 @@ async function init() {
   // Initialize theme first
   await initTheme();
   
-  // Load backend URL from storage
-  const urlStored = await chrome.storage.local.get(['backendUrl']);
+  // Load backend URL and auth token from storage
+  const urlStored = await chrome.storage.local.get(['backendUrl', 'authToken']);
   if (urlStored.backendUrl) {
     API_BASE_URL = urlStored.backendUrl;
   }
@@ -2068,6 +2187,9 @@ async function init() {
   
   // Check connection
   await checkConnection();
+  
+  // Check auth status and show login indicator
+  await checkExtensionAuthStatus();
   
   // Load chat sessions
   await loadChatSessions();

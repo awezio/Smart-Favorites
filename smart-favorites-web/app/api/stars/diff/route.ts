@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchUserStars, diffStars } from "@/lib/parsers/github-stars";
 import { getStars } from "@/lib/db/github-stars";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { username, token, format = "json" } = body;
 
@@ -17,8 +23,8 @@ export async function POST(request: NextRequest) {
     // Fetch new stars from GitHub
     const newStars = await fetchUserStars(username, token);
 
-    // Get existing stars
-    const existingStars = await getStars(10000);
+    // Get existing stars for this user
+    const existingStars = await getStars(10000, 0, userId);
 
     // Perform diff
     const diff = diffStars(existingStars, newStars);

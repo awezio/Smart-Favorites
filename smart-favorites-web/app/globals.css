@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* highlight.js theme for code blocks (light + dark) */
+@import "highlight.js/styles/github.min.css";
+
+/* Code blocks in chat - dark mode support via next-themes */
+.dark .hljs {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

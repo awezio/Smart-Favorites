@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const { id } = await params;
     const supabase = createAdminClient();
 
@@ -13,6 +19,7 @@ export async function GET(
       .from("chat_sessions")
       .select("*")
       .eq("id", id)
+      .eq("user_id", userId)
       .single();
 
     if (error) throw error;
@@ -28,6 +35,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { title, messages } = body;
@@ -42,6 +54,7 @@ export async function PATCH(
       .from("chat_sessions")
       .update(updates)
       .eq("id", id)
+      .eq("user_id", userId)
       .select()
       .single();
 
@@ -58,13 +71,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const { id } = await params;
     const supabase = createAdminClient();
 
     const { error } = await supabase
       .from("chat_sessions")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", userId);
 
     if (error) throw error;
 

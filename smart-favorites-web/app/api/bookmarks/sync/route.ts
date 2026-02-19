@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseBookmarksHtml, diffBookmarks } from "@/lib/parsers/bookmark-parser";
 import { bulkInsertBookmarks, getBookmarks, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { htmlContent } = body;
 
@@ -18,13 +24,13 @@ export async function POST(request: NextRequest) {
     // Parse HTML
     const parsedBookmarks = parseBookmarksHtml(htmlContent);
 
-    // Get existing bookmarks
-    const existingBookmarks = await getBookmarks(10000);
+    // Get existing bookmarks for this user
+    const existingBookmarks = await getBookmarks(10000, 0, userId);
 
     // Convert parsed bookmarks to Bookmark format for diff
     const newBookmarks = parsedBookmarks.map(pb => ({
-      id: '',  // Will be generated
-      user_id: '',  // Will be set
+      id: '',
+      user_id: userId,
       title: pb.title,
       url: pb.url,
       description: '',
@@ -44,7 +50,7 @@ export async function POST(request: NextRequest) {
         const textToEmbed = `${bookmark.title} ${bookmark.description || ""} ${bookmark.url}`;
         const embedding = await generateEmbedding(textToEmbed);
         return {
-          user_id: '',
+          user_id: userId,
           title: bookmark.title,
           url: bookmark.url,
           description: bookmark.description,
@@ -80,8 +86,10 @@ export async function POST(request: NextRequest) {
       await deleteBookmark(bookmark.id);
     }
 
+    const totalImported = diff.added.length + diff.modified.length;
     return NextResponse.json({
       success: true,
+      total_imported: totalImported,
       summary: {
         added: diff.added.length,
         modified: diff.modified.length,

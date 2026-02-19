@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseBookmarksHtml, diffBookmarks, toBookmarkRecord } from "@/lib/parsers/bookmark-parser";
 import { getBookmarks } from "@/lib/db/bookmarks";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { htmlContent, format = "json" } = body;
 
@@ -14,20 +20,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse new bookmarks
     const parsedBookmarks = parseBookmarksHtml(htmlContent);
+    const existingBookmarks = await getBookmarks(10000, 0, userId);
 
-    // Get existing bookmarks
-    const existingBookmarks = await getBookmarks(10000);
-
-    // Convert parsed bookmarks to Bookmark format for diff
     const newBookmarks = parsedBookmarks.map(pb => ({
       ...toBookmarkRecord(pb),
-      id: '',  // Temporary ID for diff
-      created_at: new Date().toISOString(),  // Temporary timestamp
+      id: '',
+      created_at: new Date().toISOString(),
     }));
 
-    // Perform diff
     const diff = diffBookmarks(existingBookmarks, newBookmarks);
 
     if (format === "markdown") {

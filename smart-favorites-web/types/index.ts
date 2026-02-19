@@ -115,3 +115,58 @@ export interface PaginatedResponse<T> {
   pageSize: number;
   hasMore: boolean;
 }
+
+// Profile
+export type Profile = {
+  id: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  avatar_seed: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Square (广场) types
+export type SquarePostMedia = {
+  id: string;
+  post_id: string;
+  url: string;
+  media_type: "image" | "video";
+  sort_order: number;
+  created_at: string;
+};
+
+export type SquarePostVotes = {
+  helpful_count: number;
+  not_helpful_count: number;
+  user_vote: boolean | null; // null = not voted, true = helpful, false = not helpful
+};
+
+export type SquarePost = {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  rating: number | null;
+  target_type: "bookmark" | "star" | "general" | null;
+  target_id: string | null;
+  target_url: string | null;
+  created_at: string;
+  updated_at: string;
+  author?: {
+    display_name: string | null;
+    avatar_url: string | null;
+    avatar_seed: string | null;
+  };
+  media?: SquarePostMedia[];
+  votes?: SquarePostVotes;
+};
+
+export type SquarePostVote = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  helpful: boolean;
+  created_at: string;
+};

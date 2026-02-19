@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchAll, searchBookmarks, searchStars } from "@/lib/rag/search";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { query, type = "all", topK = 10, threshold = 0.3 } = body;
 
@@ -17,14 +23,14 @@ export async function POST(request: NextRequest) {
 
     switch (type) {
       case "bookmarks":
-        results = await searchBookmarks(query, topK, threshold);
+        results = await searchBookmarks(query, topK, threshold, userId);
         break;
       case "stars":
-        results = await searchStars(query, topK, threshold);
+        results = await searchStars(query, topK, threshold, userId);
         break;
       case "all":
       default:
-        results = await searchAll(query, topK, threshold);
+        results = await searchAll(query, topK, threshold, userId);
         break;
     }
 

@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ragChat } from "@/lib/rag/rag-engine";
+import { getAuthUser } from "@/lib/auth/get-user";
+import type { LLMProvider } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
-    const { query, sessionId, chatHistory = [] } = body;
+    const { query, sessionId, chatHistory = [], provider, model } = body;
 
     if (!query || typeof query !== "string") {
       return NextResponse.json(
@@ -13,8 +23,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Perform RAG-powered chat
-    const result = await ragChat(query, chatHistory);
+    const validProviders: LLMProvider[] = [
+      "openai", "deepseek", "kimi", "qwen", "claude", "gemini", "glm", "ollama",
+    ];
+    const providerOverride =
+      provider && validProviders.includes(provider) ? provider : undefined;
+    const modelOverride =
+      typeof model === "string" && model.trim() ? model.trim() : undefined;
+
+    const result = await ragChat(query, chatHistory, 5, userId, providerOverride, modelOverride);
 
     return NextResponse.json({
       answer: result.answer,

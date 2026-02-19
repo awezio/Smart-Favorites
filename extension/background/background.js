@@ -3,7 +3,53 @@
  * Handles side panel, auto-sync, scheduled sync, and bookmark change monitoring
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+let API_BASE_URL = 'https://smart-favorites-web.vercel.app';
+
+// Load API URL from storage
+chrome.storage.local.get(['backendUrl']).then(settings => {
+  if (settings.backendUrl) {
+    API_BASE_URL = settings.backendUrl;
+  }
+});
+
+// Listen for storage changes to update API_BASE_URL dynamically
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes.backendUrl) {
+    API_BASE_URL = changes.backendUrl.newValue || 'https://smart-favorites-web.vercel.app';
+  }
+});
+
+// Helper: get auth headers including extension token
+async function getAuthHeaders() {
+  const { authToken } = await chrome.storage.local.get(['authToken']);
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return headers;
+}
+
+// Helper: get current API base URL from storage
+async function getCurrentApiUrl() {
+  const { backendUrl } = await chrome.storage.local.get(['backendUrl']);
+  return backendUrl || API_BASE_URL;
+}
+
+// Check extension auth status against the web backend
+async function getAuthStatus() {
+  try {
+    const headers = await getAuthHeaders();
+    const url = await getCurrentApiUrl();
+    const response = await fetch(`${url}/api/profile`, { headers });
+    if (response.ok) {
+      const profile = await response.json();
+      return { authenticated: true, profile };
+    }
+    return { authenticated: false };
+  } catch (error) {
+    return { authenticated: false, error: error.message };
+  }
+}
 
 // ==================== Side Panel Setup (runs on every service worker start) ====================
 
@@ -80,6 +126,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       syncBookmarks().then(sendResponse);
       return true;
       
+    case 'getAuthStatus':
+      getAuthStatus().then(sendResponse);
+      return true;
+
     case 'closeSidePanel':
       // Close the side panel by disabling and re-enabling it
       chrome.sidePanel.setOptions({ enabled: false }).then(() => {
@@ -96,11 +146,13 @@ async function syncBookmarks() {
   try {
     const bookmarkTree = await chrome.bookmarks.getTree();
     const htmlContent = convertBookmarkTreeToHtml(bookmarkTree);
+    const headers = await getAuthHeaders();
+    const url = await getCurrentApiUrl();
     
-    const response = await fetch(`${API_BASE_URL}/api/bookmarks/sync`, {
+    const response = await fetch(`${url}/api/bookmarks/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html_content: htmlContent, replace_existing: true })
+      headers,
+      body: JSON.stringify({ htmlContent })
     });
     
     if (!response.ok) throw new Error('Sync failed');
@@ -109,11 +161,12 @@ async function syncBookmarks() {
     
     await chrome.storage.local.set({
       lastSync: Date.now(),
-      bookmarkCount: data.total_imported
+      bookmarkCount: data.total_imported || data.totalImported
     });
     
-    console.log(`Sync completed: ${data.total_imported} bookmarks`);
-    return { success: true, count: data.total_imported };
+    const count = data.total_imported || data.totalImported || 0;
+    console.log(`Sync completed: ${count} bookmarks`);
+    return { success: true, count };
   } catch (error) {
     console.error('Sync error:', error);
     return { success: false, error: error.message };
@@ -251,7 +304,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 async function checkConnection() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/health`);
+    const headers = await getAuthHeaders();
+    const url = await getCurrentApiUrl();
+    const response = await fetch(`${url}/api/health`, { headers });
     if (response.ok) {
       const data = await response.json();
       return { connected: true, model: data.model || 'Unknown' };
@@ -264,9 +319,11 @@ async function checkConnection() {
 
 async function searchBookmarks(query) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/search`, {
+    const headers = await getAuthHeaders();
+    const url = await getCurrentApiUrl();
+    const response = await fetch(`${url}/api/search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ query, top_k: 10 })
     });
     
@@ -280,9 +337,11 @@ async function searchBookmarks(query) {
 
 async function sendChatMessage(message) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/chat`, {
+    const headers = await getAuthHeaders();
+    const url = await getCurrentApiUrl();
+    const response = await fetch(`${url}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ message, include_sources: true })
     });
     

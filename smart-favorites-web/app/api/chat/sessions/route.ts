@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function GET(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
 
     const { data: sessions, error } = await supabase
       .from("chat_sessions")
       .select("*")
+      .eq("user_id", userId)
       .order("updated_at", { ascending: false });
 
     if (error) throw error;
@@ -20,6 +27,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { title } = body;
 
@@ -37,6 +49,7 @@ export async function POST(request: NextRequest) {
       .insert({
         title,
         messages: [],
+        user_id: userId,
       })
       .select()
       .single();

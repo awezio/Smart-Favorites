@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchUserStars, diffStars } from "@/lib/parsers/github-stars";
 import { bulkInsertStars, getStars, updateStar, deleteStar } from "@/lib/db/github-stars";
 import { generateEmbedding } from "@/lib/rag/embedding";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { username, token } = body;
 
@@ -18,8 +24,8 @@ export async function POST(request: NextRequest) {
     // Fetch stars from GitHub
     const fetchedStars = await fetchUserStars(username, token);
 
-    // Get existing stars
-    const existingStars = await getStars(10000);
+    // Get existing stars for this user
+    const existingStars = await getStars(10000, 0, userId);
 
     // Perform diff
     const diff = diffStars(existingStars, fetchedStars);
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
         const textToEmbed = `${star.owner}/${star.repo} ${star.description || ""} ${star.language || ""}`;
         const embedding = await generateEmbedding(textToEmbed);
         return {
-          user_id: '',
+          user_id: userId,
           owner: star.owner,
           repo: star.repo,
           url: star.url,

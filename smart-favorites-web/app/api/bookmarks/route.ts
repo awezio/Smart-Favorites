@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBookmarks, createBookmark, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
+import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function GET(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get("limit") || "100");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    const bookmarks = await getBookmarks(limit, offset);
+    const bookmarks = await getBookmarks(limit, offset, userId || undefined);
 
     return NextResponse.json({
       bookmarks,
@@ -21,6 +23,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { title, url, description, folder_path } = body;
 
@@ -31,12 +38,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate embedding
     const textToEmbed = `${title} ${description || ""} ${url}`;
     const embedding = await generateEmbedding(textToEmbed);
 
     const bookmark = await createBookmark({
-      user_id: '',  // Will be set by createBookmark
+      user_id: userId,
       title,
       url,
       description,
@@ -53,6 +59,11 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, title, url, description, folder_path } = body;
 
@@ -66,7 +77,6 @@ export async function PUT(request: NextRequest) {
     if (description !== undefined) updates.description = description;
     if (folder_path !== undefined) updates.folder_path = folder_path;
 
-    // Regenerate embedding if content changed
     if (title !== undefined || description !== undefined || url !== undefined) {
       const textToEmbed = `${title || ""} ${description || ""} ${url || ""}`;
       updates.embedding = await generateEmbedding(textToEmbed);
@@ -82,16 +92,36 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    await deleteBookmark(id);
+    // Support batch delete via body or single via query param
+    const searchParams = request.nextUrl.searchParams;
+    const singleId = searchParams.get("id");
 
-    return NextResponse.json({ success: true });
+    let ids: string[] = [];
+    if (singleId) {
+      ids = [singleId];
+    } else {
+      try {
+        const body = await request.json();
+        ids = body.ids || [];
+      } catch {
+        return NextResponse.json({ error: "ID is required" }, { status: 400 });
+      }
+    }
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "At least one ID is required" }, { status: 400 });
+    }
+
+    for (const id of ids) {
+      await deleteBookmark(id);
+    }
+
+    return NextResponse.json({ success: true, deleted: ids.length });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
