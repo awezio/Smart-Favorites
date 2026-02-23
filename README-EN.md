@@ -330,37 +330,37 @@ Complete API documentation is available at: **http://localhost:8000/docs**
   </tr>
   <tr>
     <td>OpenAI</td>
-    <td>gpt-3.5-turbo, gpt-4</td>
+    <td>gpt-5.2</td>
     <td>Requires API Key, may need a proxy</td>
   </tr>
   <tr>
     <td>Kimi</td>
-    <td>moonshot-v1-8k</td>
+    <td>moonshot-2.5</td>
     <td>Moonshot AI, supports long context</td>
   </tr>
   <tr>
     <td>Qwen</td>
-    <td>qwen-turbo</td>
+    <td>qwen-3</td>
     <td>Alibaba Tongyi Qianwen</td>
   </tr>
   <tr>
     <td>Claude</td>
-    <td>claude-3-sonnet</td>
+    <td>claude 4.5 sonnet, opus 4.6</td>
     <td>Anthropic</td>
   </tr>
   <tr>
     <td>Gemini</td>
-    <td>gemini-pro</td>
+    <td>gemini 3.1 pro</td>
     <td>Google</td>
   </tr>
   <tr>
     <td>GLM</td>
-    <td>glm-4</td>
+    <td>glm-4.7, glm-5</td>
     <td>Zhipu AI</td>
   </tr>
   <tr>
     <td>Ollama</td>
-    <td>llama2, mistral, etc.</td>
+    <td>llama3, mistral, etc.</td>
     <td>Local deployment, no API Key required</td>
   </tr>
 </table>
