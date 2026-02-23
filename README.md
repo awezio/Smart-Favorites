@@ -334,37 +334,37 @@ POST /api/ai/duplicates
   </tr>
   <tr>
     <td>OpenAI</td>
-    <td>gpt-3.5-turbo, gpt-4</td>
+    <td>gpt-5.2</td>
     <td>需要 API Key，可能需要代理</td>
   </tr>
   <tr>
     <td>Kimi</td>
-    <td>moonshot-v1-8k</td>
+    <td>moonshot-2.5</td>
     <td>月之暗面，支持长文本</td>
   </tr>
   <tr>
     <td>Qwen</td>
-    <td>qwen-turbo</td>
+    <td>qwen-3 plus</td>
     <td>阿里通义千问</td>
   </tr>
   <tr>
     <td>Claude</td>
-    <td>claude-3-sonnet</td>
+    <td>claude-4.5-sonnet, opus 4.6</td>
     <td>Anthropic</td>
   </tr>
   <tr>
     <td>Gemini</td>
-    <td>gemini-pro</td>
+    <td>gemini-3.1 pro</td>
     <td>Google</td>
   </tr>
   <tr>
     <td>GLM</td>
-    <td>glm-4</td>
+    <td>glm-4.7, glm-5</td>
     <td>智谱 AI</td>
   </tr>
   <tr>
     <td>Ollama</td>
-    <td>llama2, mistral 等</td>
+    <td>llama3, mistral 等</td>
     <td>本地部署，无需 API Key</td>
   </tr>
 </table>
