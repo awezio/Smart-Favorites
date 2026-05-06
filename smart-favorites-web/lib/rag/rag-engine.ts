@@ -1,6 +1,6 @@
 import { searchAll } from "@/lib/rag/search";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { Bookmark, GitHubStar, LLMMessage, LLMProvider, SearchResult } from "@/types";
+import { Bookmark, GitHubStar, Note, LLMMessage, LLMProvider, SearchResult } from "@/types";
 
 const PROVIDER_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
@@ -204,11 +204,18 @@ function buildStarLine(index: number, g: GitHubStar): string {
   return `[${index}] GitHub Star: ${g.owner}/${g.repo}\nURL: ${g.url}${desc}${lang}`;
 }
 
+function buildNoteLine(index: number, n: Note): string {
+  const tags = n.tags?.length ? `\n标签: ${n.tags.join(", ")}` : "";
+  const src = n.source_url ? `\n来源: ${n.source_url}` : "";
+  return `[${index}] 笔记: ${n.title}\n${n.content.slice(0, 400)}${tags}${src}`;
+}
+
 function buildContext(sources: SearchResult[]): string {
   return sources
     .map((s, i) => {
       if (s.type === "bookmark" && s.bookmark) return buildBookmarkLine(i + 1, s.bookmark);
       if (s.type === "star" && s.star) return buildStarLine(i + 1, s.star);
+      if (s.type === "note" && s.note) return buildNoteLine(i + 1, s.note);
       return "";
     })
     .filter(Boolean)
