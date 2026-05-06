@@ -5,6 +5,14 @@ import { Bookmark, GitHubStar, SearchResult } from "@/types";
 const DEFAULT_THRESHOLD = 0.3;
 const DEFAULT_TOP_K = 10;
 
+interface KeywordBookmarkRow extends Bookmark {
+  rank?: number;
+}
+
+interface KeywordStarRow extends GitHubStar {
+  rank?: number;
+}
+
 export async function searchBookmarks(
   query: string,
   topK: number = DEFAULT_TOP_K,
@@ -108,7 +116,7 @@ async function keywordSearchBookmarks(
 
   if (error) return [];
 
-  return (data ?? []).map((r: any, i: number) => ({
+  return (data ?? []).map((r: KeywordBookmarkRow, i: number) => ({
     type: "bookmark" as const,
     id: r.id,
     similarity: Math.max(0, 1 - i * 0.05),
@@ -130,7 +138,7 @@ async function keywordSearchStars(
 
   if (error) return [];
 
-  return (data ?? []).map((r: any, i: number) => ({
+  return (data ?? []).map((r: KeywordStarRow, i: number) => ({
     type: "star" as const,
     id: r.id,
     similarity: Math.max(0, 1 - i * 0.05),

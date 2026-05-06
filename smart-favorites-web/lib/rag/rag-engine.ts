@@ -65,17 +65,43 @@ async function callOpenAICompatible(
   return json.choices[0].message.content as string;
 }
 
+interface AnthropicMessage {
+  role: string;
+  content: string;
+}
+
+interface AnthropicRequestBody {
+  model: string;
+  max_tokens: number;
+  messages: AnthropicMessage[];
+  system?: string;
+}
+
+interface GeminiPart {
+  text: string;
+}
+
+interface GeminiContent {
+  role: string;
+  parts: GeminiPart[];
+}
+
+interface GeminiRequestBody {
+  contents: GeminiContent[];
+  systemInstruction?: { parts: GeminiPart[] };
+}
+
 async function callAnthropic(
   messages: LLMMessage[],
   apiKey: string,
   model: string
 ): Promise<string> {
   const systemMsg = messages.find((m) => m.role === "system");
-  const userMessages = messages
+  const userMessages: AnthropicMessage[] = messages
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role, content: m.content }));
 
-  const body: Record<string, any> = {
+  const body: AnthropicRequestBody = {
     model,
     max_tokens: 2048,
     messages: userMessages,
@@ -106,7 +132,7 @@ async function callGemini(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const contents = messages
+  const contents: GeminiContent[] = messages
     .filter((m) => m.role !== "system")
     .map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -114,13 +140,13 @@ async function callGemini(
     }));
 
   const systemMsg = messages.find((m) => m.role === "system");
-  const body: Record<string, any> = { contents };
+  const body: GeminiRequestBody = { contents };
   if (systemMsg) {
     body.systemInstruction = { parts: [{ text: systemMsg.content }] };
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -141,8 +167,7 @@ export async function callLLM(
   messages: LLMMessage[],
   provider: LLMProvider,
   apiKey: string,
-  model?: string,
-  baseURL?: string
+  model?: string
 ): Promise<string> {
   const resolvedModel = model || DEFAULT_MODELS[provider] || "gpt-4o-mini";
 
@@ -154,11 +179,11 @@ export async function callLLM(
     return callGemini(messages, apiKey, resolvedModel);
   }
 
+  // Resolve base URL exclusively from server-side config (no user-supplied URLs)
   const resolvedBaseURL =
-    baseURL ||
-    (provider === "ollama"
+    provider === "ollama"
       ? `${process.env.OLLAMA_BASE_URL || "http://localhost:11434"}/v1`
-      : PROVIDER_BASE_URLS[provider]);
+      : PROVIDER_BASE_URLS[provider];
 
   if (!resolvedBaseURL) {
     throw new Error(`Unknown provider: ${provider}`);

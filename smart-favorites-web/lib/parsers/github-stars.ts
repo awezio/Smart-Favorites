@@ -82,6 +82,27 @@ export async function fetchUserStars(
   return allStars;
 }
 
+function applyFetchedData(existing: GitHubStar, fetched: FetchedStar): GitHubStar {
+  return {
+    ...existing,
+    owner: fetched.owner,
+    repo: fetched.repo,
+    description: fetched.description ?? undefined,
+    language: fetched.language ?? undefined,
+    stars: fetched.stars,
+    forks: fetched.forks,
+    updated: fetched.updated,
+  };
+}
+
+function hasDataChanged(existing: GitHubStar, fetched: FetchedStar): boolean {
+  return (
+    existing.stars !== fetched.stars ||
+    existing.forks !== fetched.forks ||
+    existing.description !== (fetched.description ?? undefined)
+  );
+}
+
 export function diffStars(
   existing: GitHubStar[],
   fetched: FetchedStar[]
@@ -111,53 +132,16 @@ export function diffStars(
         created_at: "",
         updated_at: "",
       } as GitHubStar);
-    } else if (
-      es.stars !== fs.stars ||
-      es.forks !== fs.forks ||
-      es.description !== (fs.description ?? undefined)
-    ) {
-      modified.push({
-        old: es,
-        new: {
-          ...es,
-          owner: fs.owner,
-          repo: fs.repo,
-          description: fs.description ?? undefined,
-          language: fs.language ?? undefined,
-          stars: fs.stars,
-          forks: fs.forks,
-          updated: fs.updated,
-        },
-        change_type: "data",
-      });
+    } else if (hasDataChanged(es, fs)) {
+      modified.push({ old: es, new: applyFetchedData(es, fs), change_type: "data" });
     } else {
       unchanged_count++;
     }
   }
 
   for (const es of existing) {
-    const fs = fetchedByUrl.get(es.url);
-    if (!fs) {
+    if (!fetchedByUrl.has(es.url)) {
       removed.push(es);
-    } else if (
-      es.stars !== fs.stars ||
-      es.forks !== fs.forks ||
-      es.description !== (fs.description ?? undefined)
-    ) {
-      modified.push({
-        old: es,
-        new: {
-          ...es,
-          stars: fs.stars,
-          forks: fs.forks,
-          description: fs.description ?? undefined,
-          language: fs.language ?? undefined,
-          updated: fs.updated,
-        },
-        change_type: "data",
-      });
-    } else {
-      unchanged_count++;
     }
   }
 
