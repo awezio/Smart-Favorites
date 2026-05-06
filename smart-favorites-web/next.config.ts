@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  serverExternalPackages: ["@xenova/transformers"],
 };
 
 export default nextConfig;
