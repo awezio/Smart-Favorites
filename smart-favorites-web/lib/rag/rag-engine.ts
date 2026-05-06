@@ -1,6 +1,6 @@
 import { searchAll } from "@/lib/rag/search";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { LLMMessage, LLMProvider, SearchResult } from "@/types";
+import { Bookmark, GitHubStar, LLMMessage, LLMProvider, SearchResult } from "@/types";
 
 const PROVIDER_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
@@ -192,17 +192,23 @@ export async function callLLM(
   return callOpenAICompatible(messages, resolvedBaseURL, apiKey, resolvedModel);
 }
 
+function buildBookmarkLine(index: number, b: Bookmark): string {
+  const desc = b.description ? `\n描述: ${b.description}` : "";
+  const folder = b.folder_path ? `\n文件夹: ${b.folder_path}` : "";
+  return `[${index}] 书签: ${b.title}\nURL: ${b.url}${desc}${folder}`;
+}
+
+function buildStarLine(index: number, g: GitHubStar): string {
+  const desc = g.description ? `\n描述: ${g.description}` : "";
+  const lang = g.language ? `\n语言: ${g.language}` : "";
+  return `[${index}] GitHub Star: ${g.owner}/${g.repo}\nURL: ${g.url}${desc}${lang}`;
+}
+
 function buildContext(sources: SearchResult[]): string {
   return sources
     .map((s, i) => {
-      if (s.type === "bookmark" && s.bookmark) {
-        const b = s.bookmark;
-        return `[${i + 1}] 书签: ${b.title}\nURL: ${b.url}${b.description ? `\n描述: ${b.description}` : ""}${b.folder_path ? `\n文件夹: ${b.folder_path}` : ""}`;
-      }
-      if (s.type === "star" && s.star) {
-        const g = s.star;
-        return `[${i + 1}] GitHub Star: ${g.owner}/${g.repo}\nURL: ${g.url}${g.description ? `\n描述: ${g.description}` : ""}${g.language ? `\n语言: ${g.language}` : ""}`;
-      }
+      if (s.type === "bookmark" && s.bookmark) return buildBookmarkLine(i + 1, s.bookmark);
+      if (s.type === "star" && s.star) return buildStarLine(i + 1, s.star);
       return "";
     })
     .filter(Boolean)

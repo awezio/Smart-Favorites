@@ -61,12 +61,18 @@ export async function fetchUserStars(
       );
     }
 
-    const data = await response.json();
+interface StarredItem {
+  starred_at?: string;
+  repo?: RawStarredRepo;
+}
+
+    const data: (StarredItem | RawStarredRepo)[] = await response.json();
 
     // With star+json header, each item has a { starred_at, repo } shape
-    const repos: RawStarredRepo[] = data.map((item: any) =>
-      item.repo ? item.repo : item
-    );
+    const repos: RawStarredRepo[] = data.map((item) => {
+      const starredItem = item as StarredItem;
+      return starredItem.repo ? starredItem.repo : (item as RawStarredRepo);
+    });
 
     allStars.push(...repos.map(mapRepo));
 

@@ -90,14 +90,19 @@ export function diffBookmarks(
     const eb = existingByUrl.get(nb.url);
     if (!eb) {
       added.push(nb);
-    } else if (eb.title !== nb.title) {
-      modified.push({
-        old: eb,
-        new: { ...eb, title: nb.title, folder_path: nb.folder_path },
-        change_type: "title",
-      });
     } else {
-      unchanged_count++;
+      const titleChanged = eb.title !== nb.title;
+      const folderChanged = eb.folder_path !== nb.folder_path;
+      if (titleChanged || folderChanged) {
+        const changeType = titleChanged && folderChanged ? "both" : titleChanged ? "title" : "both";
+        modified.push({
+          old: eb,
+          new: { ...eb, title: nb.title, folder_path: nb.folder_path },
+          change_type: changeType,
+        });
+      } else {
+        unchanged_count++;
+      }
     }
   }
 
