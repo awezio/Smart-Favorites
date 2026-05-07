@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBookmarks, updateBookmark } from "@/lib/db/bookmarks";
+import { getBookmarks } from "@/lib/db/bookmarks";
 import { getAuthUser } from "@/lib/auth/get-user";
 
 interface LinkCheckResult {

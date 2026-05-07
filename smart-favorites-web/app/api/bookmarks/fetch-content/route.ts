@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch page content via Jina Reader
-    const jinaUrl = `https://r.jina.ai/${encodeURIComponent(bookmark.url)}`;
+    const jinaUrl = `https://r.jina.ai/${bookmark.url}`;
     const jinaRes = await fetch(jinaUrl, {
       headers: {
         Accept: "text/plain",
