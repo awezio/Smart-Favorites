@@ -1,1 +1,12 @@
-{"functions":{"app/api/**/*.ts":{"maxDuration":60}}}
+{
+  "functions": {
+    "app/api/**/*.ts": { "maxDuration": 60 }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/sync-stars",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
+

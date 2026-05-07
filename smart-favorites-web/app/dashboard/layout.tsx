@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   Globe,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -28,8 +29,18 @@ const navItems = [
   { href: "/dashboard/chat", icon: MessageSquare, label: "AI 问答" },
   { href: "/dashboard/bookmarks", icon: Bookmark, label: "书签管理" },
   { href: "/dashboard/stars", icon: Star, label: "GitHub Stars" },
+  { href: "/dashboard/notes", icon: FileText, label: "知识笔记" },
   { href: "/dashboard/square", icon: Globe, label: "广场" },
   { href: "/dashboard/profile", icon: User, label: "个人资料" },
+  { href: "/dashboard/settings", icon: Settings, label: "设置" },
+];
+
+// Bottom nav items for mobile (5 most important)
+const mobileNavItems = [
+  { href: "/dashboard", icon: Search, label: "搜索" },
+  { href: "/dashboard/chat", icon: MessageSquare, label: "问答" },
+  { href: "/dashboard/bookmarks", icon: Bookmark, label: "书签" },
+  { href: "/dashboard/notes", icon: FileText, label: "笔记" },
   { href: "/dashboard/settings", icon: Settings, label: "设置" },
 ];
 
@@ -96,7 +107,7 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transition-transform duration-200 lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transition-transform duration-200 lg:static lg:translate-x-0 flex flex-col",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -115,7 +126,7 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        <nav className="space-y-1 p-4">
+        <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -142,7 +153,7 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t p-4 space-y-1">
+        <div className="border-t p-4 space-y-1">
           {user && (
             <Link
               href="/dashboard/profile"
@@ -212,8 +223,8 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header: mobile menu + title + theme (GitHub-style compact) */}
-        <header className="flex h-16 items-center gap-4 border-b bg-card px-6">
+        {/* Header: mobile menu + title + theme */}
+        <header className="flex h-16 items-center gap-4 border-b bg-card px-4 sm:px-6">
           <button
             className="p-1 rounded hover:bg-accent lg:hidden"
             onClick={() => setSidebarOpen(true)}
@@ -224,9 +235,40 @@ export default function DashboardLayout({
           <ThemeToggleCompact className="h-9 w-9 p-1.5" />
         </header>
 
+        {/* Page content — add bottom padding on mobile for the bottom nav */}
         <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto max-w-6xl p-6">{children}</div>
+          <div className="container mx-auto max-w-6xl p-4 sm:p-6 pb-20 lg:pb-6">
+            {children}
+          </div>
         </main>
+
+        {/* Mobile bottom navigation (visible on small screens only) */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 backdrop-blur-sm">
+          <div className="flex items-stretch">
+            {mobileNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] transition-colors",
+                    isActive
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className={cn("h-5 w-5", isActive && "scale-110")} />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

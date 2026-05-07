@@ -49,11 +49,12 @@ export interface ChatMessage {
 
 // Search and RAG types
 export interface SearchResult {
-  type: "bookmark" | "star";
+  type: "bookmark" | "star" | "note";
   id: string;
   similarity: number;
   bookmark?: Bookmark;
   star?: GitHubStar;
+  note?: Note;
 }
 
 export interface DiffResult<T> {
@@ -126,6 +127,19 @@ export type Profile = {
   created_at: string;
   updated_at: string;
 };
+
+// Note type
+export interface Note {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  source_url?: string | null;
+  embedding?: number[];
+  created_at: string;
+  updated_at: string;
+}
 
 // Square (广场) types
 export type SquarePostMedia = {

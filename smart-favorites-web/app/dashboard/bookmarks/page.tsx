@@ -112,6 +112,14 @@ function BookmarkListSkeleton() {
 type ViewMode = "list" | "card" | "compact";
 type SortKey = "title" | "created_at" | "url";
 type FilterStatus = "all" | "has_desc" | "no_desc";
+type DeadLinkResult = {
+  id: string;
+  url: string;
+  title: string;
+  status: string;
+  statusCode?: number;
+  error?: string;
+};
 
 const COLORS = [
   "#6366f1",
@@ -154,6 +162,14 @@ export default function BookmarksPage() {
   const [newUrl, setNewUrl] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newFolder, setNewFolder] = useState("");
+
+  // Dead link checking
+  const [checkingLinks, setCheckingLinks] = useState(false);
+  const [deadLinks, setDeadLinks] = useState<DeadLinkResult[]>([]);
+  const [showDeadLinks, setShowDeadLinks] = useState(false);
+
+  // Fetch content
+  const [fetchingContent, setFetchingContent] = useState<string | null>(null);
 
   useEffect(() => {
     loadBookmarks();
@@ -395,6 +411,57 @@ export default function BookmarksPage() {
     }
   };
 
+  const handleCheckLinks = async () => {
+    setCheckingLinks(true);
+    setShowDeadLinks(false);
+    toast.loading("正在检测死链...", { id: "check-links" });
+    try {
+      const res = await fetch("/api/bookmarks/check-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      const dead = (data.results || []).filter(
+        (r: any) => r.status === "dead" || r.status === "error"
+      );
+      setDeadLinks(dead);
+      setShowDeadLinks(true);
+      if (dead.length === 0) {
+        toast.success(`检测完成：${data.checked} 条全部正常`, { id: "check-links" });
+      } else {
+        toast.warning(`检测完成：发现 ${dead.length} 条死链`, { id: "check-links" });
+      }
+    } catch {
+      toast.error("死链检测失败", { id: "check-links" });
+    } finally {
+      setCheckingLinks(false);
+    }
+  };
+
+  const handleFetchContent = async (bookmark: Bookmark) => {
+    setFetchingContent(bookmark.id);
+    toast.loading("正在抓取网页内容...", { id: `fetch-${bookmark.id}` });
+    try {
+      const res = await fetch("/api/bookmarks/fetch-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bookmark.id }),
+      });
+      if (res.ok) {
+        toast.success("内容抓取成功，描述已更新", { id: `fetch-${bookmark.id}` });
+        await loadBookmarks();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "抓取失败", { id: `fetch-${bookmark.id}` });
+      }
+    } catch {
+      toast.error("抓取失败", { id: `fetch-${bookmark.id}` });
+    } finally {
+      setFetchingContent(null);
+    }
+  };
+
   if (initialLoading && bookmarks.length === 0) {
     return <BookmarkListSkeleton />;
   }
@@ -492,6 +559,18 @@ export default function BookmarksPage() {
               <RefreshCw className="h-4 w-4 mr-2" />刷新
             </Button>
 
+            <Button
+              variant="outline"
+              onClick={handleCheckLinks}
+              disabled={checkingLinks || bookmarks.length === 0}
+            >
+              {checkingLinks ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />检测中...</>
+              ) : (
+                <><Search className="h-4 w-4 mr-2" />死链检测</>
+              )}
+            </Button>
+
             {isEditing && (
               <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="h-4 w-4 mr-2" />手动添加
@@ -509,6 +588,39 @@ export default function BookmarksPage() {
               </Button>
             )}
           </div>
+
+          {/* Dead links panel */}
+          {showDeadLinks && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-destructive">
+                  {deadLinks.length === 0 ? "✅ 所有链接正常" : `⚠️ 发现 ${deadLinks.length} 条死链`}
+                </p>
+                <Button variant="ghost" size="sm" onClick={() => setShowDeadLinks(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              {deadLinks.map((d) => (
+                <div key={d.id} className="flex items-start justify-between gap-2 text-sm border-t pt-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{d.title}</p>
+                    <p className="text-muted-foreground truncate text-xs">{d.url}</p>
+                    <p className="text-destructive text-xs">
+                      {d.status === "dead" ? `HTTP ${d.statusCode}` : d.error}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => handleDelete([d.id])}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Filter Row */}
           <div className="flex gap-2 flex-wrap items-center">
@@ -760,6 +872,21 @@ export default function BookmarksPage() {
                             生成描述
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          disabled={fetchingContent === b.id}
+                          onClick={() => handleFetchContent(b)}
+                          title="用 Jina Reader 抓取网页全文，更新描述和语义检索"
+                        >
+                          {fetchingContent === b.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                          )}
+                          抓取
+                        </Button>
                         {isEditing && (
                           <Button
                             size="sm"
