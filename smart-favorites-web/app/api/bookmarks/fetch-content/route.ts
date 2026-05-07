@@ -3,6 +3,7 @@ import { getBookmark, updateBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
 
+// Keep extracted content compact for DB storage and embedding cost.
 const MAX_DESCRIPTION_LENGTH = 1000;
 
 /**

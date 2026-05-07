@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBookmarks } from "@/lib/db/bookmarks";
 import { getAuthUser } from "@/lib/auth/get-user";
 
+// Conservative concurrency to reduce network pressure and timeouts.
 const LINK_CHECK_CONCURRENCY = 5;
 
 interface LinkCheckResult {

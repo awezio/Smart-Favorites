@@ -30,6 +30,7 @@ const ENV_API_KEYS: Record<string, string | undefined> = {
   gemini: process.env.GEMINI_API_KEY,
   glm: process.env.GLM_API_KEY,
 };
+// Keep note snippets concise so prompt context remains focused.
 const MAX_NOTE_CONTENT_LENGTH = 400;
 
 async function getUserSettings(userId: string) {
@@ -208,7 +209,10 @@ function buildStarLine(index: number, g: GitHubStar): string {
 function buildNoteLine(index: number, n: Note): string {
   const tags = n.tags?.length ? `\n标签: ${n.tags.join(", ")}` : "";
   const src = n.source_url ? `\n来源: ${n.source_url}` : "";
-  return `[${index}] 笔记: ${n.title}\n${n.content.slice(0, MAX_NOTE_CONTENT_LENGTH)}${tags}${src}`;
+  const isTruncated = n.content.length > MAX_NOTE_CONTENT_LENGTH;
+  const preview =
+    n.content.slice(0, MAX_NOTE_CONTENT_LENGTH) + (isTruncated ? "…（已截断）" : "");
+  return `[${index}] 笔记: ${n.title}\n${preview}${tags}${src}`;
 }
 
 function buildContext(sources: SearchResult[]): string {

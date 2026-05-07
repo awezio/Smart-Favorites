@@ -112,6 +112,14 @@ function BookmarkListSkeleton() {
 type ViewMode = "list" | "card" | "compact";
 type SortKey = "title" | "created_at" | "url";
 type FilterStatus = "all" | "has_desc" | "no_desc";
+type DeadLinkResult = {
+  id: string;
+  url: string;
+  title: string;
+  status: string;
+  statusCode?: number;
+  error?: string;
+};
 
 const COLORS = [
   "#6366f1",
@@ -157,7 +165,7 @@ export default function BookmarksPage() {
 
   // Dead link checking
   const [checkingLinks, setCheckingLinks] = useState(false);
-  const [deadLinks, setDeadLinks] = useState<Array<{ id: string; url: string; title: string; status: string; statusCode?: number; error?: string }>>([]);
+  const [deadLinks, setDeadLinks] = useState<DeadLinkResult[]>([]);
   const [showDeadLinks, setShowDeadLinks] = useState(false);
 
   // Fetch content
