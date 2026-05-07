@@ -1,14 +1,20 @@
 import { pipeline, env } from "@xenova/transformers";
 
-let embeddingPipeline: any = null;
+type EmbeddingPipelineOutput = { data: ArrayLike<number> };
+type EmbeddingPipeline = (
+  input: string,
+  options: { pooling: "mean"; normalize: true }
+) => Promise<EmbeddingPipelineOutput>;
+
+let embeddingPipeline: EmbeddingPipeline | null = null;
 
 async function getEmbeddingPipeline() {
   if (!embeddingPipeline) {
     env.cacheDir = "./.cache/transformers";
-    embeddingPipeline = await pipeline(
+    embeddingPipeline = (await pipeline(
       "feature-extraction",
       process.env.EMBEDDING_MODEL || "Xenova/all-MiniLM-L6-v2"
-    );
+    )) as EmbeddingPipeline;
   }
   return embeddingPipeline;
 }

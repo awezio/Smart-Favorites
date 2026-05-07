@@ -53,7 +53,7 @@ async function checkUrl(url: string): Promise<{
  * Checks a batch of bookmark URLs for dead links.
  *
  * Body: { ids?: string[] }
- * If ids is empty/omitted, checks all bookmarks for the user (up to 50 at a time).
+ * If ids is empty/omitted, checks all bookmarks for the user.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -65,8 +65,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { ids } = body as { ids?: string[] };
 
-    // Load bookmarks
-    const allBookmarks = await getBookmarks(50, 0, userId);
+    // Load all bookmarks in pages
+    const pageSize = 500;
+    const allBookmarks = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const page = await getBookmarks(pageSize, offset, userId);
+      allBookmarks.push(...page);
+      if (page.length < pageSize) break;
+    }
     const toCheck = ids?.length
       ? allBookmarks.filter((b) => ids.includes(b.id))
       : allBookmarks;

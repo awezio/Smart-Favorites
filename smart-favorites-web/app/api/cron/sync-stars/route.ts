@@ -47,7 +47,13 @@ export async function POST(request: NextRequest) {
 
     try {
       const fetchedStars = await fetchUserStars(username, token ?? undefined);
-      const existingStars = await getStars(10000, 0, userId);
+      const existingStars = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await getStars(pageSize, offset, userId);
+        existingStars.push(...page);
+        if (page.length < pageSize) break;
+      }
       const diff = diffStars(existingStars, fetchedStars);
 
       // Add new stars with embeddings

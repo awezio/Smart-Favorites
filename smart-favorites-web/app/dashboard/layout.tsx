@@ -107,7 +107,7 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transition-transform duration-200 lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transition-transform duration-200 lg:static lg:translate-x-0 flex flex-col",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -126,7 +126,7 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        <nav className="space-y-1 p-4 overflow-y-auto pb-40">
+        <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -153,7 +153,7 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t p-4 space-y-1">
+        <div className="border-t p-4 space-y-1">
           {user && (
             <Link
               href="/dashboard/profile"
