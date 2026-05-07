@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBookmarks } from "@/lib/db/bookmarks";
 import { getAuthUser } from "@/lib/auth/get-user";
 
+const LINK_CHECK_CONCURRENCY = 5;
+
 interface LinkCheckResult {
   id: string;
   url: string;
@@ -81,12 +83,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [], checked: 0 });
     }
 
-    // Check URLs concurrently (limit to 5 at a time to avoid overloading)
-    const CONCURRENCY = 5;
+    // Check URLs concurrently
     const results: LinkCheckResult[] = [];
 
-    for (let i = 0; i < toCheck.length; i += CONCURRENCY) {
-      const batch = toCheck.slice(i, i + CONCURRENCY);
+    for (let i = 0; i < toCheck.length; i += LINK_CHECK_CONCURRENCY) {
+      const batch = toCheck.slice(i, i + LINK_CHECK_CONCURRENCY);
       const batchResults = await Promise.all(
         batch.map(async (bookmark) => {
           const check = await checkUrl(bookmark.url);

@@ -236,7 +236,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content — add bottom padding on mobile for the bottom nav */}
-        <main className="flex-1 overflow-y-auto pb-safe">
+        <main className="flex-1 overflow-y-auto">
           <div className="container mx-auto max-w-6xl p-4 sm:p-6 pb-20 lg:pb-6">
             {children}
           </div>

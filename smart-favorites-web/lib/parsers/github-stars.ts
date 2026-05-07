@@ -21,6 +21,11 @@ interface FetchedStar {
   updated: string;
 }
 
+interface StarredItem {
+  starred_at?: string;
+  repo?: RawStarredRepo;
+}
+
 function mapRepo(raw: RawStarredRepo): FetchedStar {
   const [owner, repo] = raw.full_name.split("/");
   return {
@@ -60,11 +65,6 @@ export async function fetchUserStars(
         `GitHub API error ${response.status}: ${await response.text()}`
       );
     }
-
-interface StarredItem {
-  starred_at?: string;
-  repo?: RawStarredRepo;
-}
 
     const data: (StarredItem | RawStarredRepo)[] = await response.json();
 

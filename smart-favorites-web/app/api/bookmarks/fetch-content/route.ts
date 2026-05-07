@@ -3,6 +3,8 @@ import { getBookmark, updateBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
 
+const MAX_DESCRIPTION_LENGTH = 1000;
+
 /**
  * POST /api/bookmarks/fetch-content
  * Fetches the full text of a bookmark URL via Jina Reader and
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const rawText = await jinaRes.text();
     // Trim to a reasonable length for storage and embedding
-    const description = rawText.slice(0, 1000).trim();
+    const description = rawText.slice(0, MAX_DESCRIPTION_LENGTH).trim();
 
     if (!description) {
       return NextResponse.json({ error: "No content extracted" }, { status: 422 });

@@ -94,7 +94,14 @@ export function diffBookmarks(
       const titleChanged = eb.title !== nb.title;
       const folderChanged = eb.folder_path !== nb.folder_path;
       if (titleChanged || folderChanged) {
-        const changeType = titleChanged && folderChanged ? "both" : titleChanged ? "title" : "folder";
+        let changeType: "both" | "title" | "folder";
+        if (titleChanged && folderChanged) {
+          changeType = "both";
+        } else if (titleChanged) {
+          changeType = "title";
+        } else {
+          changeType = "folder";
+        }
         modified.push({
           old: eb,
           new: { ...eb, title: nb.title, folder_path: nb.folder_path },
