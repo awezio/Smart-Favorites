@@ -1,6 +1,6 @@
 # Smart Favorites - LLM Wiki 平台建设计划
 
-**最后更新**: 2026-05-08  
+**最后更新**: 2026-05-09  
 **项目版本**: v2.1 开发中  
 **定位**: 个人知识库 + 学习研究工具 + AI 应用平台
 
@@ -1307,9 +1307,9 @@ docs/
 ## 📈 实时进度追踪
 
 ### 总体进度
-- **当前状态**: ✅ Phase 1 - UI 深度打磨完成 (智能收藏/个人资料/广场系列)
-- **下一步**: 🟡 Phase 2 - 文件系统基础开发 (LLM-wiki功能)
-- **完成率**: 25% (UI系列完成 + 深度规划 / 总体)
+- **当前状态**: ✅ Phase 2 - Dashboard 个人资料设置完成 (UI系列)
+- **下一步**: 🟡 Phase 3 - 广场分享功能开发 (UI系列)
+- **完成率**: 35% (Phase 1 + Phase 2 完成 / 总体)
 
 ### 各阶段进度
 
@@ -1327,17 +1327,17 @@ Phase 1: UI 深度打磨 (UI 系列)
 ✅ 完成 | 实际: 2026-05-09
 
 Phase 2: Dashboard 个人资料设置页 (UI 系列)
-├─ [ ] 创建 profiles 表与 Supabase Storage  (预计: 2026-05-16)
-├─ [ ] 头像库与 Profile API               (预计: 2026-05-18)
-├─ [ ] Profile 编辑页面 UI               (预计: 2026-05-20)
-└─ [ ] 布局显示 Profile                  (预计: 2026-05-22)
-🟡 待开始 | 预计: 2026-05-22
+├─ [x] 创建 profiles 表与 Supabase Storage  (✅ 完成: 2026-05-09)
+├─ [x] 头像库与 Profile API               (✅ 完成: 2026-05-09)
+├─ [x] Profile 编辑页面 UI               (✅ 完成: 2026-05-09)
+└─ [x] 布局显示 Profile                  (✅ 完成: 2026-05-09)
+✅ 完成 | 实际: 2026-05-09
 
 Phase 3: 广场分享功能 (UI 系列 - Steam 风格)
 ├─ [ ] 数据库与 Storage               (预计: 2026-05-29)
 ├─ [ ] Square API 与类型              (预计: 2026-05-31)
 └─ [ ] 广场页面 UI                    (预计: 2026-06-05)
-⏳ 未开始 | 预计: 2026-06-05
+🟡 待开始 | 预计: 2026-06-05
 
 Phase 4: 浏览器扩展与 Web 联动 (UI 系列)
 ├─ [ ] 扩展配置与 API 端点            (预计: 2026-06-12)
@@ -1387,6 +1387,18 @@ Phase 5: 优化、文档、发布
 ---
 
 ## 🔄 更新日志
+
+### 2026-05-09 - Phase 2 完成 (UI 系列 - 个人资料设置)
+- ✅ 创建 profiles 数据库表与 RLS 策略 → `supabase/migrations/005_create_profiles.sql`
+- ✅ 实现 Profile API 端点 → `app/api/profile/route.ts`
+- ✅ 实现头像上传功能 → `app/api/profile/avatar/route.ts`
+- ✅ 创建 DiceBear 头像库 → `lib/avatars.ts`
+- ✅ 完成 ProfileForm 编辑组件 → `components/profile-form.tsx`
+- ✅ 在 Dashboard layout 集成 Profile 显示 → `app/dashboard/layout.tsx`
+- ✅ Settings 页面展示个人资料卡片 → `app/dashboard/settings/page.tsx`
+- ✅ 创建 lib 目录基础工具库 → `lib/utils.ts`, `lib/supabase/client.ts`, `lib/supabase/admin.ts`, `lib/auth/get-user.ts`
+- 📝 支持自定义头像上传、DiceBear 头像库、头像风格切换
+- 🚀 Phase 3 (广场分享功能) 准备就绪
 
 ### 2026-05-09 - Phase 1 完成 (UI 系列)
 - ✅ 完成 next-themes 集成与主题切换 → `components/theme-provider.tsx`, `components/theme-toggle.tsx`
