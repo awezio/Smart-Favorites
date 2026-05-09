@@ -31,6 +31,37 @@ export interface GitHubStar {
   updated_at: string;
 }
 
+export interface DocumentRecord {
+  id: string;
+  user_id: string;
+  title: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  status: "pending" | "processing" | "completed" | "failed";
+  storage_path: string;
+  metadata?: Record<string, any> | null;
+  processing_error?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentChunkRecord {
+  document_id: string;
+  user_id: string;
+  content: string;
+  content_hash: string;
+  chunk_index: number;
+  page_number?: number | null;
+  section_title?: string | null;
+  char_start_pos?: number | null;
+  char_end_pos?: number | null;
+  embedding: number[];
+  char_count?: number | null;
+  estimated_token_count?: number | null;
+  created_at?: string;
+}
+
 export interface ChatSession {
   id: string;
   user_id: string;
