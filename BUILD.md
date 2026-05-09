@@ -1307,30 +1307,53 @@ docs/
 ## 📈 实时进度追踪
 
 ### 总体进度
-- **当前状态**: ✅ Phase 0 - 研究与规划完成
-- **下一步**: 🟡 Phase 1 - 文件系统基础开发
-- **完成率**: 15% (深度规划 + 研究 / 总体)
+- **当前状态**: ✅ Phase 1 - UI 深度打磨完成 (智能收藏/个人资料/广场系列)
+- **下一步**: 🟡 Phase 2 - 文件系统基础开发 (LLM-wiki功能)
+- **完成率**: 25% (UI系列完成 + 深度规划 / 总体)
 
 ### 各阶段进度
 
 ```
-Phase 0: 规划与研究
-├─ [x] 需求分析                  (完成)
-├─ [x] Karpathy LLM-wiki 研究    (完成 → docs/KARPATHY_RESEARCH.md)
-├─ [x] 文件解析库调研             (完成 → docs/FILE_PARSING_RESEARCH.md)
-├─ [x] 数据库 Schema 设计         (完成 → docs/DATABASE_SCHEMA_DESIGN.md)
-├─ [x] 插件规范设计              (完成 → docs/PLUGIN_SPEC.md)
-├─ [x] 技术选型与决策             (完成 → docs/TECH_DECISIONS.md)
+Phase 0: 规划与研究 (UI 系列 - 智能收藏/个人资料/广场)
+├─ [x] UI 打磨规划设计            (完成 → docs/plans/2026-02-14-ui-profile-square-extension-plan.md)
 └─ [x] 架构设计
-✅ 完成 | 实际: 2026-05-08
+✅ 完成 | 实际: 2026-02-14
 
-Phase 1: 文件系统基础
+Phase 1: UI 深度打磨 (UI 系列)
+├─ [x] 集成 next-themes 主题切换      (完成 → components/theme-provider.tsx, theme-toggle.tsx)
+├─ [x] 创建 Skeleton 骨架屏          (完成 → components/ui/skeleton.tsx)
+├─ [x] 空状态插图与动画              (完成 → components/empty-state.tsx)
+└─ [x] 应用于 bookmarks 和 stars 页面 (完成 → app/dashboard/bookmarks/page.tsx, stars/page.tsx)
+✅ 完成 | 实际: 2026-05-09
+
+Phase 2: Dashboard 个人资料设置页 (UI 系列)
+├─ [ ] 创建 profiles 表与 Supabase Storage  (预计: 2026-05-16)
+├─ [ ] 头像库与 Profile API               (预计: 2026-05-18)
+├─ [ ] Profile 编辑页面 UI               (预计: 2026-05-20)
+└─ [ ] 布局显示 Profile                  (预计: 2026-05-22)
+🟡 待开始 | 预计: 2026-05-22
+
+Phase 3: 广场分享功能 (UI 系列 - Steam 风格)
+├─ [ ] 数据库与 Storage               (预计: 2026-05-29)
+├─ [ ] Square API 与类型              (预计: 2026-05-31)
+└─ [ ] 广场页面 UI                    (预计: 2026-06-05)
+⏳ 未开始 | 预计: 2026-06-05
+
+Phase 4: 浏览器扩展与 Web 联动 (UI 系列)
+├─ [ ] 扩展配置与 API 端点            (预计: 2026-06-12)
+├─ [ ] 扩展 OAuth 登录               (预计: 2026-06-15)
+└─ [ ] 扩展数据同步                   (预计: 2026-06-18)
+⏳ 未开始 | 预计: 2026-06-18
+
+---
+
+Phase 1: 文件系统基础 (LLM-wiki 功能系列)
 ├─ [ ] 数据库扩展          (预计: 2026-05-22)
 ├─ [ ] 文件上传 API        (预计: 2026-05-25)
 ├─ [ ] 多格式解析器        (预计: 2026-06-01)
 ├─ [ ] 异步处理管道        (预计: 2026-06-05)
 └─ [ ] UI 组件             (预计: 2026-06-08)
-🟡 进行中 | 预计: 2026-06-15
+🟡 待开始 | 预计: 2026-06-15
 
 Phase 2: RAG 系统增强
 ├─ [ ] 统一搜索层          (预计: 2026-06-22)
@@ -1365,7 +1388,18 @@ Phase 5: 优化、文档、发布
 
 ## 🔄 更新日志
 
-### 2026-05-08 - Phase 0 完成
+### 2026-05-09 - Phase 1 完成 (UI 系列)
+- ✅ 完成 next-themes 集成与主题切换 → `components/theme-provider.tsx`, `components/theme-toggle.tsx`
+- ✅ 完成 Skeleton 骨架屏组件 → `components/ui/skeleton.tsx`
+- ✅ 完成 EmptyState 空状态组件与动画 → `components/empty-state.tsx`
+- ✅ 在 bookmarks 页面集成 Skeleton + EmptyState → `app/dashboard/bookmarks/page.tsx`
+- ✅ 在 stars 页面集成 Skeleton + EmptyState → `app/dashboard/stars/page.tsx`
+- ✅ 在 dashboard layout 添加 ThemeToggleCompact → header 区域
+- ✅ 所有卡片添加 transition-all 和 hover 动画
+- 📝 已应用 framer-motion 用于入场动画
+- 🚀 Phase 2 (个人资料设置页) 准备就绪
+
+### 2026-05-08 - Phase 0 完成 (规划与研究)
 - ✅ 完成 Karpathy LLM-wiki 设计思想研究 → `docs/KARPATHY_RESEARCH.md`
 - ✅ 完成文件解析库调研与技术选型 → `docs/FILE_PARSING_RESEARCH.md`
 - ✅ 完成数据库 Schema 详细设计 → `docs/DATABASE_SCHEMA_DESIGN.md`
