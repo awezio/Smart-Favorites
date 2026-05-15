@@ -46,6 +46,32 @@ export interface DocumentRecord {
   updated_at: string;
 }
 
+export interface ApiKeyRecord {
+  id: string;
+  user_id: string;
+  name: string;
+  key_hash: string;
+  key_prefix: string;
+  permissions: string[];
+  enabled: boolean;
+  last_used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiAuditLogRecord {
+  id: string;
+  user_id: string;
+  api_key_id: string | null;
+  tool_name: string;
+  action: string;
+  request_meta: Record<string, any>;
+  response_meta: Record<string, any>;
+  status_code: number | null;
+  created_at: string;
+}
+
 export interface DocumentChunkRecord {
   document_id: string;
   user_id: string;
@@ -137,6 +163,44 @@ export interface APIResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+export type ToolCategory =
+  | "search"
+  | "documents"
+  | "bookmarks"
+  | "analytics"
+  | "annotations";
+
+export type ToolPermission =
+  | "knowledge:read"
+  | "knowledge:write"
+  | "documents:read"
+  | "documents:write"
+  | "bookmarks:write"
+  | "stats:read"
+  | "tools:manage"
+  | "*";
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  category: ToolCategory;
+  permissions: ToolPermission[];
+  input_schema: Record<string, any>;
+  output_schema: Record<string, any>;
+}
+
+export interface ToolExecutionContext {
+  userId: string;
+  authType: "session" | "api_key";
+  apiKeyId?: string;
+  permissions: string[];
+}
+
+export interface ToolExecutionResult {
+  output: Record<string, any>;
+  metadata: Record<string, any>;
 }
 
 export interface PaginatedResponse<T> {
