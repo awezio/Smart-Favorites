@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { SquarePost, SquarePostMedia, SquarePostVotes } from "@/types";
+import { isSquareTargetType } from "@/lib/square";
+import type {
+  SquarePost,
+  SquarePostCreateInput,
+  SquarePostMedia,
+  SquarePostVotes,
+} from "@/types";
 
 /**
  * GET /api/square - List posts with pagination
@@ -185,7 +191,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as SquarePostCreateInput;
     const { title, content, rating, target_type, target_id, target_url } = body;
 
     // Validate required fields
@@ -216,11 +222,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (
-      target_type !== undefined &&
-      target_type !== null &&
-      !["bookmark", "star", "general"].includes(target_type)
-    ) {
+    if (target_type !== undefined && target_type !== null && !isSquareTargetType(target_type)) {
       return NextResponse.json(
         { error: "Invalid target_type" },
         { status: 400 }

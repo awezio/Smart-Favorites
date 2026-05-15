@@ -9,12 +9,15 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Image,
+  Film,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getDiceBearUrl } from "@/lib/avatars";
+import { SQUARE_TARGET_LABELS } from "@/lib/square";
 import type { SquarePost } from "@/types";
 
 function timeAgo(date: string): string {
@@ -71,6 +74,8 @@ export function PostCard({
 
   const images = post.media?.filter((m) => m.media_type === "image") || [];
   const videos = post.media?.filter((m) => m.media_type === "video") || [];
+  const targetLabel = post.target_type ? SQUARE_TARGET_LABELS[post.target_type] : null;
+  const mediaCount = images.length + videos.length;
 
   const handleVote = (helpful: boolean) => {
     if (userVote === helpful) {
@@ -107,6 +112,21 @@ export function PostCard({
                 </h3>
               )}
             </div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {targetLabel && (
+              <Badge variant="secondary" className="text-xs">
+                {targetLabel}
+              </Badge>
+            )}
+            {mediaCount > 0 && (
+              <Badge variant="outline" className="text-xs gap-1">
+                {images.length > 0 && <Image className="h-3 w-3" />}
+                {videos.length > 0 && !images.length && <Film className="h-3 w-3" />}
+                {mediaCount} 个媒体
+              </Badge>
+            )}
             {post.target_url && (
               <a
                 href={post.target_url}

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { SQUARE_TARGET_OPTIONS } from "@/lib/square";
 import { toast } from "sonner";
 
 interface CreatePostModalProps {
@@ -24,13 +25,28 @@ interface MediaFile {
   type: "image" | "video";
 }
 
-const TARGET_TYPE_OPTIONS: { value: TargetType; label: string }[] = [
-  { value: "general", label: "通用" },
-  { value: "bookmark", label: "书签" },
-  { value: "star", label: "Star" },
-];
-
 const MAX_CONTENT_LENGTH = 2000;
+const MAX_MEDIA_FILES = 6;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
+
+function getMediaError(file: File): string | null {
+  if (file.type.startsWith("image/")) {
+    if (file.size > MAX_IMAGE_SIZE) {
+      return "图片不能超过 10MB";
+    }
+    return null;
+  }
+
+  if (file.type.startsWith("video/")) {
+    if (file.size > MAX_VIDEO_SIZE) {
+      return "视频不能超过 50MB";
+    }
+    return null;
+  }
+
+  return "仅支持图片和视频文件";
+}
 
 export function CreatePostModal({
   open,
@@ -75,8 +91,21 @@ export function CreatePostModal({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const newMedia: MediaFile[] = [];
+    let rejectedCount = 0;
 
     for (const file of files) {
+      if (newMedia.length + mediaFiles.length >= MAX_MEDIA_FILES) {
+        rejectedCount++;
+        continue;
+      }
+
+      const mediaError = getMediaError(file);
+      if (mediaError) {
+        rejectedCount++;
+        toast.error(`${file.name}: ${mediaError}`);
+        continue;
+      }
+
       if (file.type.startsWith("image/")) {
         newMedia.push({
           file,
@@ -93,6 +122,9 @@ export function CreatePostModal({
     }
 
     setMediaFiles((prev) => [...prev, ...newMedia]);
+    if (rejectedCount > 0 && newMedia.length === 0) {
+      toast.error("没有可添加的媒体文件");
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -112,6 +144,17 @@ export function CreatePostModal({
     const newMedia: MediaFile[] = [];
 
     for (const file of files) {
+      if (newMedia.length + mediaFiles.length >= MAX_MEDIA_FILES) {
+        toast.error(`最多只能添加 ${MAX_MEDIA_FILES} 个媒体文件`);
+        break;
+      }
+
+      const mediaError = getMediaError(file);
+      if (mediaError) {
+        toast.error(`${file.name}: ${mediaError}`);
+        continue;
+      }
+
       if (file.type.startsWith("image/")) {
         newMedia.push({
           file,
@@ -306,17 +349,18 @@ export function CreatePostModal({
           {/* Target Type */}
           <div className="space-y-2">
             <Label>分类</Label>
-            <div className="flex gap-2">
-              {TARGET_TYPE_OPTIONS.map((opt) => (
+            <div className="grid gap-2 sm:grid-cols-3">
+              {SQUARE_TARGET_OPTIONS.map((opt) => (
                 <Button
                   key={opt.value}
                   type="button"
                   variant={targetType === opt.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setTargetType(opt.value)}
+                  className="h-auto flex-col items-start justify-start px-3 py-2 text-left"
+                  onClick={() => setTargetType(opt.value as TargetType)}
                   disabled={submitting}
                 >
-                  {opt.label}
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  <span className="text-xs opacity-75">{opt.description}</span>
                 </Button>
               ))}
             </div>
@@ -324,7 +368,12 @@ export function CreatePostModal({
 
           {/* Media Upload */}
           <div className="space-y-2">
-            <Label>媒体附件 (可选)</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label>媒体附件 (可选)</Label>
+              <span className="text-xs text-muted-foreground">
+                最多 {MAX_MEDIA_FILES} 个，图片 10MB / 视频 50MB
+              </span>
+            </div>
             <div
               className={cn(
                 "border-2 border-dashed rounded-lg p-4 text-center transition-colors",

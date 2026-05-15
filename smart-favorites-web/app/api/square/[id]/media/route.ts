@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SQUARE_MEDIA_BUCKET } from "@/lib/square";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -101,13 +103,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // Build storage path
     const ext = getExtension(mimeType);
-    const timestamp = Date.now();
-    const storagePath = `${postId}/${timestamp}.${ext}`;
+    const storagePath = `${userId}/${postId}/${randomUUID()}.${ext}`;
 
     // Upload to Supabase Storage
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     const { error: uploadError } = await supabase.storage
-      .from("square_media")
+      .from(SQUARE_MEDIA_BUCKET)
       .upload(storagePath, fileBuffer, {
         contentType: mimeType,
         upsert: false,
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("square_media").getPublicUrl(storagePath);
+    } = supabase.storage.from(SQUARE_MEDIA_BUCKET).getPublicUrl(storagePath);
 
     // Get current media count for sort_order
     const { count: mediaCount } = await supabase
@@ -132,13 +133,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .insert({
         post_id: postId,
         url: publicUrl,
+        storage_path: storagePath,
         media_type: isImage ? "image" : "video",
         sort_order: mediaCount || 0,
       })
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      await supabase.storage.from(SQUARE_MEDIA_BUCKET).remove([storagePath]);
+      throw insertError;
+    }
 
     return NextResponse.json(mediaRecord, { status: 201 });
   } catch (error: any) {

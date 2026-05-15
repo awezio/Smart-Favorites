@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Globe, Plus, Loader2 } from "lucide-react";
+import { Globe, Plus, Loader2, Sparkles, Users, Image as ImageIcon, ThumbsUp, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { PostCard } from "@/components/square/post-card";
 import { CreatePostModal } from "@/components/square/create-post-modal";
 import { createClient } from "@/lib/supabase/client";
-import type { SquarePost } from "@/types";
+import { SQUARE_TARGET_OPTIONS } from "@/lib/square";
+import type { SquareFeedStats, SquarePost } from "@/types";
 
 type FilterType = "all" | "bookmark" | "star" | "general";
 
@@ -53,7 +55,9 @@ function PostCardSkeleton() {
 
 export default function SquarePage() {
   const [posts, setPosts] = useState<SquarePost[]>([]);
+  const [stats, setStats] = useState<SquareFeedStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -107,12 +111,29 @@ export default function SquarePage() {
     [filter]
   );
 
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/square/stats");
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      const data: SquareFeedStats = await res.json();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load square stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
   // Initial load and filter change
   useEffect(() => {
     setPage(1);
     setLoading(true);
     fetchPosts(1).finally(() => setLoading(false));
   }, [filter, fetchPosts]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const handleLoadMore = async () => {
     const nextPage = page + 1;
@@ -126,6 +147,7 @@ export default function SquarePage() {
     setPage(1);
     setLoading(true);
     fetchPosts(1).finally(() => setLoading(false));
+    void loadStats();
   };
 
   const handleVote = async (postId: string, helpful: boolean | null) => {
@@ -165,6 +187,7 @@ export default function SquarePage() {
       if (!res.ok) {
         throw new Error("Vote failed");
       }
+      void loadStats();
     } catch {
       // Revert on error - refetch
       toast.error("投票失败");
@@ -185,6 +208,7 @@ export default function SquarePage() {
       });
       if (!res.ok) throw new Error("Delete failed");
       toast.success("已删除");
+      void loadStats();
     } catch {
       toast.error("删除失败");
       // Revert
@@ -193,32 +217,137 @@ export default function SquarePage() {
     }
   };
 
+  const heroStats = [
+    {
+      label: "帖子",
+      value: statsLoading ? "..." : String(stats?.total_posts ?? posts.length),
+      icon: TrendingUp,
+    },
+    {
+      label: "媒体",
+      value: statsLoading ? "..." : String(stats?.total_media ?? 0),
+      icon: ImageIcon,
+    },
+    {
+      label: "作者",
+      value: statsLoading ? "..." : String(stats?.active_authors ?? 0),
+      icon: Users,
+    },
+    {
+      label: "有用投票",
+      value: statsLoading ? "..." : String(stats?.helpful_votes ?? 0),
+      icon: ThumbsUp,
+    },
+  ];
+
+  const targetCounts = stats?.posts_by_type ?? {
+    bookmark: 0,
+    star: 0,
+    general: 0,
+  };
+
+  const filterButtons = FILTER_OPTIONS.map((opt) => {
+    const count =
+      opt.value === "all" ? stats?.total_posts ?? posts.length : targetCounts[opt.value];
+
+    return {
+      ...opt,
+      count,
+    };
+  });
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">广场</h1>
-          <p className="text-muted-foreground mt-1">
-            分享你的发现，查看社区推荐
-          </p>
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-900 p-6 text-white shadow-[0_20px_80px_-24px_rgba(15,23,42,0.75)]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(34,197,94,0.16),transparent_28%)]" />
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white/10 to-transparent" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl space-y-4">
+            <Badge
+              variant="secondary"
+              className="w-fit border-white/20 bg-white/10 text-white"
+            >
+              <Sparkles className="mr-1 h-3.5 w-3.5" />
+              社区广场
+            </Badge>
+            <div className="space-y-2">
+              <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+                分享、评测、发现
+              </h1>
+              <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-base">
+                这里是你整理书签、GitHub Stars 和灵感碎片的公共展示台。
+                发帖、投票、晒资源，让好的信息更容易被看见。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-white text-slate-950 hover:bg-white/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                发布内容
+              </Button>
+              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white/80">
+                <TrendingUp className="h-4 w-4" />
+                最新动态已开启
+              </div>
+            </div>
+          </div>
+
+          <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4 lg:max-w-none lg:min-w-[36rem]">
+            {heroStats.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"
+                >
+                  <div className="flex items-center justify-between text-white/75">
+                    <span className="text-xs font-medium uppercase tracking-[0.18em]">
+                      {item.label}
+                    </span>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="mt-3 text-2xl font-semibold">{item.value}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          发布
-        </Button>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex gap-2 flex-wrap">
-        {FILTER_OPTIONS.map((opt) => (
+      <div className="grid gap-3 md:grid-cols-3">
+        {SQUARE_TARGET_OPTIONS.map((option) => (
+          <Card key={option.value} className="border-dashed bg-card/80">
+            <CardContent className="flex items-center justify-between gap-4 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{option.label}</p>
+                <p className="text-xs text-muted-foreground">{option.description}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-semibold">
+                  {targetCounts[option.value]}
+                </div>
+                <div className="text-xs text-muted-foreground">条发布</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {filterButtons.map((opt) => (
           <Button
             key={opt.value}
             variant={filter === opt.value ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(opt.value)}
+            className="gap-2"
           >
-            {opt.label}
+            <span>{opt.label}</span>
+            <Badge variant={filter === opt.value ? "secondary" : "outline"} className="h-5 px-2 text-[11px]">
+              {opt.count}
+            </Badge>
           </Button>
         ))}
       </div>

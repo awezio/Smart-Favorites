@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { SquarePost, SquarePostMedia, SquarePostVotes } from "@/types";
+import { isSquareTargetType } from "@/lib/square";
+import type {
+  SquarePost,
+  SquarePostMedia,
+  SquarePostUpdateInput,
+  SquarePostVotes,
+} from "@/types";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -151,7 +157,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as SquarePostUpdateInput;
     const updateData: Record<string, unknown> = {};
 
     if (body.title !== undefined) {
@@ -191,10 +197,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     if (body.target_type !== undefined) {
-      if (
-        body.target_type !== null &&
-        !["bookmark", "star", "general"].includes(body.target_type)
-      ) {
+      if (body.target_type !== null && !isSquareTargetType(body.target_type)) {
         return NextResponse.json(
           { error: "Invalid target_type" },
           { status: 400 }
@@ -268,6 +271,30 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
         { error: "You can only delete your own posts" },
         { status: 403 }
       );
+    }
+
+    const { data: mediaRows, error: mediaError } = await supabase
+      .from("square_post_media")
+      .select("storage_path")
+      .eq("post_id", id);
+
+    if (mediaError) throw mediaError;
+
+    const storagePaths = (mediaRows || [])
+      .map((row) => row.storage_path)
+      .filter((path): path is string => Boolean(path));
+
+    if (storagePaths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from("square_media")
+        .remove(storagePaths);
+
+      if (storageError) {
+        console.error(
+          "[DELETE /api/square/[id]] storage cleanup error",
+          storageError
+        );
+      }
     }
 
     const { error: deleteError } = await supabase

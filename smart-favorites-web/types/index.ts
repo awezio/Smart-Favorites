@@ -159,13 +159,37 @@ export type Profile = {
 };
 
 // Square (广场) types
+export type SquareTargetType = "bookmark" | "star" | "general";
+
 export type SquarePostMedia = {
   id: string;
   post_id: string;
   url: string;
+  storage_path: string;
   media_type: "image" | "video";
   sort_order: number;
   created_at: string;
+};
+
+export type SquarePostCreateInput = {
+  title: string;
+  content: string;
+  rating?: number | null;
+  target_type?: SquareTargetType | null;
+  target_id?: string | null;
+  target_url?: string | null;
+};
+
+export type SquarePostUpdateInput = Partial<SquarePostCreateInput>;
+
+export type SquareFeedStats = {
+  total_posts: number;
+  total_media: number;
+  active_authors: number;
+  latest_post_at: string | null;
+  helpful_votes: number;
+  not_helpful_votes: number;
+  posts_by_type: Record<SquareTargetType, number>;
 };
 
 export type SquarePostVotes = {
@@ -180,7 +204,7 @@ export type SquarePost = {
   title: string;
   content: string;
   rating: number | null;
-  target_type: "bookmark" | "star" | "general" | null;
+  target_type: SquareTargetType | null;
   target_id: string | null;
   target_url: string | null;
   created_at: string;
