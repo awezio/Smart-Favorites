@@ -1304,133 +1304,62 @@ docs/
 
 ---
 
-## 📈 实时进度追踪
+## 📈 统一进度追踪（唯一记录）
 
-### 总体进度
-- **当前状态**: ✅ Phase 2 - Dashboard 个人资料设置完成 (UI系列)
-- **下一步**: 🟡 Phase 3 - 广场分享功能开发 (UI系列)
-- **完成率**: 35% (Phase 1 + Phase 2 完成 / 总体)
+> 本节为本文件唯一有效的进度来源，已统合：完整开发路线图、实时进度追踪、更新日志。
 
-### 各阶段进度
+### 审查快照（基于 git status）
+- 仓库状态：`main...origin/main [ahead 1]`
+- 工作区状态：无未提交变更（clean working tree）
+- 最新里程碑提交：`eb48a0d`（Phase 3 广场功能主干）
 
-```
-Phase 0: 规划与研究 (UI 系列 - 智能收藏/个人资料/广场)
-├─ [x] UI 打磨规划设计            (完成 → docs/plans/2026-02-14-ui-profile-square-extension-plan.md)
-└─ [x] 架构设计
-✅ 完成 | 实际: 2026-02-14
+### 当前总体状态
+- **当前状态**: ✅ UI 系列 Phase 3（广场分享功能）已完成并提交
+- **下一步**: 🟡 UI 系列 Phase 4（浏览器扩展与 Web 联动）
+- **总体完成率（UI 系列）**: 75%（Phase 0-3 完成，共 4/5）
+- **总体完成率（LLM-wiki 功能系列）**: 0%（Phase 1-5 尚未启动）
 
-Phase 1: UI 深度打磨 (UI 系列)
-├─ [x] 集成 next-themes 主题切换      (完成 → components/theme-provider.tsx, theme-toggle.tsx)
-├─ [x] 创建 Skeleton 骨架屏          (完成 → components/ui/skeleton.tsx)
-├─ [x] 空状态插图与动画              (完成 → components/empty-state.tsx)
-└─ [x] 应用于 bookmarks 和 stars 页面 (完成 → app/dashboard/bookmarks/page.tsx, stars/page.tsx)
-✅ 完成 | 实际: 2026-05-09
+### 路线图状态（合并后）
 
-Phase 2: Dashboard 个人资料设置页 (UI 系列)
-├─ [x] 创建 profiles 表与 Supabase Storage  (✅ 完成: 2026-05-09)
-├─ [x] 头像库与 Profile API               (✅ 完成: 2026-05-09)
-├─ [x] Profile 编辑页面 UI               (✅ 完成: 2026-05-09)
-└─ [x] 布局显示 Profile                  (✅ 完成: 2026-05-09)
-✅ 完成 | 实际: 2026-05-09
+#### A. UI 系列（智能收藏 / 个人资料 / 广场 / 扩展联动）
+- ✅ Phase 0：规划与研究（完成）
+- ✅ Phase 1：UI 深度打磨（完成）
+- ✅ Phase 2：Dashboard 个人资料设置页（完成）
+- ✅ Phase 3：广场分享功能（完成，Steam 风格）
+  - ✅ 数据库与 Storage：`smart-favorites-web/supabase/migrations/006_create_square_posts.sql`、`smart-favorites-web/supabase/migrations/009_create_square_storage.sql`
+  - ✅ Square API 与类型：`smart-favorites-web/app/api/square/`、`smart-favorites-web/types/index.ts`、`smart-favorites-web/lib/square.ts`
+  - ✅ 广场页面 UI：`smart-favorites-web/app/dashboard/square/page.tsx`、`smart-favorites-web/components/square/`
+- ⏳ Phase 4：浏览器扩展与 Web 联动（未开始）
 
-Phase 3: 广场分享功能 (UI 系列 - Steam 风格)
-├─ [ ] 数据库与 Storage               (预计: 2026-05-29)
-├─ [ ] Square API 与类型              (预计: 2026-05-31)
-└─ [ ] 广场页面 UI                    (预计: 2026-06-05)
-🟡 待开始 | 预计: 2026-06-05
+#### B. LLM-wiki 功能系列（平台主线）
+- 🟡 Phase 1：文件系统基础（待开始）
+- ⏳ Phase 2：RAG 系统增强（未开始）
+- ⏳ Phase 3：插件生态系统（未开始）
+- ⏳ Phase 4：AI 工具调用接口（未开始）
+- ⏳ Phase 5：优化、文档、发布（未开始）
 
-Phase 4: 浏览器扩展与 Web 联动 (UI 系列)
-├─ [ ] 扩展配置与 API 端点            (预计: 2026-06-12)
-├─ [ ] 扩展 OAuth 登录               (预计: 2026-06-15)
-└─ [ ] 扩展数据同步                   (预计: 2026-06-18)
-⏳ 未开始 | 预计: 2026-06-18
+### 里程碑记录（按时间倒序）
 
----
+#### 2026-05-15 - UI 系列 Phase 3 完成（广场分享功能）
+- ✅ 新增广场统计接口：`smart-favorites-web/app/api/square/stats/route.ts`
+- ✅ 完成广场媒体存储增强：`smart-favorites-web/supabase/migrations/009_create_square_storage.sql`
+- ✅ 新增广场通用常量与类型守卫：`smart-favorites-web/lib/square.ts`
+- ✅ 收敛广场 API 校验与媒体清理：`smart-favorites-web/app/api/square/route.ts`、`smart-favorites-web/app/api/square/[id]/route.ts`、`smart-favorites-web/app/api/square/[id]/media/route.ts`
+- ✅ 升级广场页面与发帖交互：`smart-favorites-web/app/dashboard/square/page.tsx`、`smart-favorites-web/components/square/create-post-modal.tsx`、`smart-favorites-web/components/square/post-card.tsx`
+- ✅ 归档提交：`eb48a0d feat(square): complete phase 3 feed stack`
 
-Phase 1: 文件系统基础 (LLM-wiki 功能系列)
-├─ [ ] 数据库扩展          (预计: 2026-05-22)
-├─ [ ] 文件上传 API        (预计: 2026-05-25)
-├─ [ ] 多格式解析器        (预计: 2026-06-01)
-├─ [ ] 异步处理管道        (预计: 2026-06-05)
-└─ [ ] UI 组件             (预计: 2026-06-08)
-🟡 待开始 | 预计: 2026-06-15
+#### 2026-05-09 - UI 系列 Phase 2 完成（个人资料设置）
+- ✅ Profiles 表、Profile API、头像上传、资料编辑与 Dashboard 展示完成
 
-Phase 2: RAG 系统增强
-├─ [ ] 统一搜索层          (预计: 2026-06-22)
-├─ [ ] 改进提示词          (预计: 2026-06-25)
-├─ [ ] 新增 RAG API        (预计: 2026-06-28)
-└─ [ ] 检索优化            (预计: 2026-07-01)
-⏳ 未开始 | 预计: 2026-07-05
+#### 2026-05-09 - UI 系列 Phase 1 完成（UI 深度打磨）
+- ✅ 主题切换、Skeleton 骨架屏、空状态动画、Bookmarks/Stars 页面打磨完成
 
-Phase 3: 插件生态系统
-├─ [ ] 插件规范设计        (预计: 2026-07-12)
-├─ [ ] 加载系统            (预计: 2026-07-19)
-├─ [ ] 插件市场            (预计: 2026-07-26)
-└─ [ ] 示例插件            (预计: 2026-08-02)
-⏳ 未开始 | 预计: 2026-08-09
+#### 2026-05-08 - UI 系列 Phase 0 完成（规划与研究）
+- ✅ LLM-wiki 研究、文件解析调研、数据库设计、插件规范、技术决策文档完成
 
-Phase 4: AI 工具调用接口
-├─ [ ] 接口设计            (预计: 2026-08-16)
-├─ [ ] OpenAI 集成         (预计: 2026-08-19)
-├─ [ ] 权限管理            (预计: 2026-08-22)
-└─ [ ] 集成示例            (预计: 2026-08-25)
-⏳ 未开始 | 预计: 2026-08-28
-
-Phase 5: 优化、文档、发布
-├─ [ ] 性能优化            (预计: 2026-09-04)
-├─ [ ] 文档完善            (预计: 2026-09-08)
-├─ [ ] 示例应用            (预计: 2026-09-12)
-└─ [ ] 社区发布            (预计: 2026-09-15)
-⏳ 未开始 | 预计: 2026-09-18
-```
-
----
-
-## 🔄 更新日志
-
-### 2026-05-09 - Phase 2 完成 (UI 系列 - 个人资料设置)
-- ✅ 创建 profiles 数据库表与 RLS 策略 → `supabase/migrations/005_create_profiles.sql`
-- ✅ 实现 Profile API 端点 → `app/api/profile/route.ts`
-- ✅ 实现头像上传功能 → `app/api/profile/avatar/route.ts`
-- ✅ 创建 DiceBear 头像库 → `lib/avatars.ts`
-- ✅ 完成 ProfileForm 编辑组件 → `components/profile-form.tsx`
-- ✅ 在 Dashboard layout 集成 Profile 显示 → `app/dashboard/layout.tsx`
-- ✅ Settings 页面展示个人资料卡片 → `app/dashboard/settings/page.tsx`
-- ✅ 创建 lib 目录基础工具库 → `lib/utils.ts`, `lib/supabase/client.ts`, `lib/supabase/admin.ts`, `lib/auth/get-user.ts`
-- 📝 支持自定义头像上传、DiceBear 头像库、头像风格切换
-- 🚀 Phase 3 (广场分享功能) 准备就绪
-
-### 2026-05-09 - Phase 1 完成 (UI 系列)
-- ✅ 完成 next-themes 集成与主题切换 → `components/theme-provider.tsx`, `components/theme-toggle.tsx`
-- ✅ 完成 Skeleton 骨架屏组件 → `components/ui/skeleton.tsx`
-- ✅ 完成 EmptyState 空状态组件与动画 → `components/empty-state.tsx`
-- ✅ 在 bookmarks 页面集成 Skeleton + EmptyState → `app/dashboard/bookmarks/page.tsx`
-- ✅ 在 stars 页面集成 Skeleton + EmptyState → `app/dashboard/stars/page.tsx`
-- ✅ 在 dashboard layout 添加 ThemeToggleCompact → header 区域
-- ✅ 所有卡片添加 transition-all 和 hover 动画
-- 📝 已应用 framer-motion 用于入场动画
-- 🚀 Phase 2 (个人资料设置页) 准备就绪
-
-### 2026-05-08 - Phase 0 完成 (规划与研究)
-- ✅ 完成 Karpathy LLM-wiki 设计思想研究 → `docs/KARPATHY_RESEARCH.md`
-- ✅ 完成文件解析库调研与技术选型 → `docs/FILE_PARSING_RESEARCH.md`
-- ✅ 完成数据库 Schema 详细设计 → `docs/DATABASE_SCHEMA_DESIGN.md`
-- ✅ 完成插件规范 v1.0 设计 → `docs/PLUGIN_SPEC.md`
-- ✅ 完成技术决策与架构权衡分析 → `docs/TECH_DECISIONS.md`
-- ✅ 创建完整的 BUILD.md 开发计划文档
-- 📝 核心决策已记录，可复用参考
-- 🚀 Phase 1 准备就绪
-
-### 2026-05-08 之前
-- ✅ 创建 BUILD.md 文档
-- ✅ 完成需求分析
-- ✅ 设计五个开发阶段
-- ✅ 创建详细的任务清单
-
-### 下次更新 (Phase 1 启动)
-- 创建数据库迁移脚本
-- 开始文件上传 API 开发
-- 集成第一个文件解析器 (PDF)
+### 下一个执行目标
+- UI 系列：启动 Phase 4（扩展配置与 API 端点、OAuth 登录、数据同步）
+- LLM-wiki 系列：按原规划启动 Phase 1（文件系统基础）
 
 ---
 
