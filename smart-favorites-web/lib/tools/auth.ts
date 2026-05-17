@@ -1,10 +1,8 @@
 import { createHash, randomBytes } from "crypto";
 import type { NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { ApiAuditLogRecord, ApiKeyRecord, ToolExecutionContext } from "@/types";
-
-const supabase = createAdminClient();
 
 const DEFAULT_TOOL_PERMISSIONS = [
   "knowledge:read",
@@ -32,10 +30,10 @@ export function hashApiKey(key: string) {
 export function maskApiKey(key: string) {
   const parts = key.split("_");
   if (parts.length < 3) {
-    return `••••${key.slice(-8)}`;
+    return `****${key.slice(-8)}`;
   }
 
-  return `${parts[0]}_${parts[1]}_••••${parts[2].slice(-4)}`;
+  return `${parts[0]}_${parts[1]}_****${parts[2].slice(-4)}`;
 }
 
 export function normalizePermissions(value: unknown): string[] {
@@ -72,6 +70,7 @@ export async function resolveToolAuth(
 }
 
 export async function resolveApiKey(token: string) {
+  const supabase = createAdminClient();
   const keyHash = hashApiKey(token);
   const { data, error } = await supabase
     .from("api_keys")
@@ -105,6 +104,7 @@ export async function resolveApiKey(token: string) {
 }
 
 export async function listApiKeys(userId: string) {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("api_keys")
     .select("*")
@@ -129,6 +129,7 @@ export async function createApiKeyRecord(
     expiresAt?: string | null;
   }
 ) {
+  const supabase = createAdminClient();
   const token = generateApiKey();
   const keyPrefix = token.split("_")[1] || "tool";
   const keyHash = hashApiKey(token);
@@ -140,7 +141,9 @@ export async function createApiKeyRecord(
       name: payload.name,
       key_hash: keyHash,
       key_prefix: keyPrefix,
-      permissions: payload.permissions?.length ? payload.permissions : buildDefaultToolPermissions(),
+      permissions: payload.permissions?.length
+        ? payload.permissions
+        : buildDefaultToolPermissions(),
       expires_at: payload.expiresAt || null,
     })
     .select("*")
@@ -169,6 +172,7 @@ export async function updateApiKeyRecord(
     expires_at: string | null;
   }>
 ) {
+  const supabase = createAdminClient();
   const payload: Record<string, unknown> = {};
 
   if (updates.name !== undefined) {
@@ -203,6 +207,7 @@ export async function updateApiKeyRecord(
 }
 
 export async function deleteApiKeyRecord(userId: string, keyId: string) {
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("api_keys")
     .delete()
@@ -215,6 +220,7 @@ export async function deleteApiKeyRecord(userId: string, keyId: string) {
 }
 
 export async function listApiAuditLogs(userId: string, limit = 50, offset = 0) {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("api_audit_logs")
     .select("*")
@@ -238,6 +244,7 @@ export async function recordApiAuditLog(entry: {
   responseMeta?: Record<string, unknown>;
   statusCode?: number | null;
 }) {
+  const supabase = createAdminClient();
   const { error } = await supabase.from("api_audit_logs").insert({
     user_id: entry.userId,
     api_key_id: entry.apiKeyId || null,

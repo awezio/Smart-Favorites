@@ -12,7 +12,9 @@ import type {
 } from "@/types";
 import type { ToolRegistration } from "./types";
 
-const supabase = createAdminClient();
+function getSupabaseAdmin() {
+  return createAdminClient();
+}
 
 function toNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -53,6 +55,7 @@ async function listDocumentRows(
   userId: string,
   options: { limit: number; offset: number; status?: string; fileType?: string }
 ) {
+  const supabase = getSupabaseAdmin();
   let query = supabase
     .from("documents")
     .select("*")
@@ -297,7 +300,7 @@ const registry: ToolRegistration[] = [
       const scope = toString(payload?.scope, "all") as "all" | "bookmarks" | "stars" | "documents";
       const topK = Math.min(20, Math.max(1, toNumber(payload?.top_k, 10)));
 
-      const results: Array<Record<string, unknown>> = [];
+      const results: unknown[] = [];
 
       if (scope === "all" || scope === "bookmarks" || scope === "stars") {
         const knowledgeResults = await searchAll(query, topK, 0.3, context.userId);
@@ -339,6 +342,7 @@ const registry: ToolRegistration[] = [
     },
     output_schema: { type: "object" },
     execute: async (_input, context) => {
+      const supabase = getSupabaseAdmin();
       const [bookmarkCount, starCount, documentCount, pendingDocumentCount, keyCount] = await Promise.all([
         supabase.from("bookmarks").select("id", { count: "exact", head: true }).eq("user_id", context.userId),
         supabase.from("github_stars").select("id", { count: "exact", head: true }).eq("user_id", context.userId),

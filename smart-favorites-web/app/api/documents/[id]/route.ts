@@ -3,17 +3,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { deleteDocument, getDocumentById, updateDocument } from "@/lib/db/documents";
 
+type RouteContext = { params: Promise<{ id: string }> };
+
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
     const { userId } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const document = await getDocumentById(context.params.id, userId);
+    const document = await getDocumentById(id, userId);
     if (!document) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
@@ -29,9 +32,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
     const { userId } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -52,7 +56,7 @@ export async function PATCH(
       updates.processing_error = body.processing_error;
     }
 
-    const document = await updateDocument(context.params.id, userId, updates);
+    const document = await updateDocument(id, userId, updates);
     return NextResponse.json({ document });
   } catch (error: any) {
     return NextResponse.json(
@@ -64,16 +68,17 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
     const { userId } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const supabase = createAdminClient();
-    const document = await getDocumentById(context.params.id, userId);
+    const document = await getDocumentById(id, userId);
 
     if (!document) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
@@ -89,7 +94,7 @@ export async function DELETE(
       }
     }
 
-    await deleteDocument(context.params.id, userId);
+    await deleteDocument(id, userId);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json(

@@ -35,8 +35,8 @@ export async function GET() {
       total_media: mediaResult.data?.length || 0,
       active_authors: profilesResult.data?.length || 0,
       latest_post_at: posts[0]?.created_at || null,
-      helpful_votes,
-      not_helpful_votes,
+      helpful_votes: helpfulVotes,
+      not_helpful_votes: notHelpfulVotes,
       posts_by_type: postsByType,
     };
 

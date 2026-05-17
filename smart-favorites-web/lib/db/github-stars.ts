@@ -10,13 +10,12 @@ type StarUpdate = Partial<Omit<GitHubStar, "id" | "user_id" | "created_at">> & {
   updated_at?: string;
 };
 
-const supabase = createAdminClient();
-
 export async function getStars(
   limit: number,
   offset: number,
   userId?: string
 ): Promise<GitHubStar[]> {
+  const supabase = createAdminClient();
   let query = supabase
     .from("github_stars")
     .select("*")
@@ -36,6 +35,7 @@ export async function getStars(
 }
 
 export async function createStar(payload: StarInsert): Promise<GitHubStar> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("github_stars")
     .insert(payload)
@@ -53,6 +53,7 @@ export async function updateStar(
   id: string,
   updates: StarUpdate
 ): Promise<GitHubStar> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("github_stars")
     .update(updates)
@@ -68,6 +69,7 @@ export async function updateStar(
 }
 
 export async function deleteStar(id: string): Promise<void> {
+  const supabase = createAdminClient();
   const { error } = await supabase.from("github_stars").delete().eq("id", id);
 
   if (error) {
@@ -80,6 +82,7 @@ export async function bulkInsertStars(payload: StarInsert[]): Promise<void> {
     return;
   }
 
+  const supabase = createAdminClient();
   const { error } = await supabase.from("github_stars").insert(payload);
   if (error) {
     throw new Error(error.message);

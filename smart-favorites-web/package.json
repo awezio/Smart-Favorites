@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:phase4": "node scripts/phase4-contract.test.mjs",
     "start": "next start",
     "lint": "eslint .",
     "deploy": "vercel --prod",

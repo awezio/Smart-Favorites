@@ -13,13 +13,12 @@ type DocumentUpdate = Partial<Omit<DocumentRecord, "id" | "user_id" | "created_a
   updated_at?: string;
 };
 
-const supabase = createAdminClient();
-
 export async function getDocuments(
   limit: number,
   offset: number,
   userId: string
 ): Promise<DocumentRecord[]> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("documents")
     .select("*")
@@ -38,6 +37,7 @@ export async function getDocumentById(
   id: string,
   userId: string
 ): Promise<DocumentRecord | null> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("documents")
     .select("*")
@@ -55,6 +55,7 @@ export async function getDocumentById(
 export async function createDocument(
   payload: DocumentInsert
 ): Promise<DocumentRecord> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("documents")
     .insert(payload)
@@ -73,6 +74,7 @@ export async function updateDocument(
   userId: string,
   updates: DocumentUpdate
 ): Promise<DocumentRecord> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("documents")
     .update(updates)
@@ -89,6 +91,7 @@ export async function updateDocument(
 }
 
 export async function deleteDocument(id: string, userId: string): Promise<void> {
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("documents")
     .delete()
@@ -101,6 +104,7 @@ export async function deleteDocument(id: string, userId: string): Promise<void> 
 }
 
 export async function listPendingDocuments(limit: number): Promise<DocumentRecord[]> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("documents")
     .select("*")

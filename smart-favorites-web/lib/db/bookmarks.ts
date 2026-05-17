@@ -10,13 +10,12 @@ type BookmarkUpdate = Partial<Omit<Bookmark, "id" | "user_id" | "created_at">> &
   updated_at?: string;
 };
 
-const supabase = createAdminClient();
-
 export async function getBookmarks(
   limit: number,
   offset: number,
   userId?: string
 ): Promise<Bookmark[]> {
+  const supabase = createAdminClient();
   let query = supabase
     .from("bookmarks")
     .select("*")
@@ -36,6 +35,7 @@ export async function getBookmarks(
 }
 
 export async function createBookmark(payload: BookmarkInsert): Promise<Bookmark> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("bookmarks")
     .insert(payload)
@@ -53,6 +53,7 @@ export async function updateBookmark(
   id: string,
   updates: BookmarkUpdate
 ): Promise<Bookmark> {
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("bookmarks")
     .update(updates)
@@ -68,6 +69,7 @@ export async function updateBookmark(
 }
 
 export async function deleteBookmark(id: string): Promise<void> {
+  const supabase = createAdminClient();
   const { error } = await supabase.from("bookmarks").delete().eq("id", id);
 
   if (error) {
@@ -80,6 +82,7 @@ export async function bulkInsertBookmarks(payload: BookmarkInsert[]): Promise<vo
     return;
   }
 
+  const supabase = createAdminClient();
   const { error } = await supabase.from("bookmarks").insert(payload);
   if (error) {
     throw new Error(error.message);

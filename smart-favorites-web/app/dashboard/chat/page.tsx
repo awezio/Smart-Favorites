@@ -1,31 +1,25 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Send,
-  Plus,
-  Trash2,
-  ExternalLink,
-  Globe,
-  Paperclip,
-  ChevronDown,
   Bot,
+  ChevronDown,
+  ExternalLink,
   Loader2,
   MessageSquare,
+  Plus,
+  Send,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
-import type { ChatSession, ChatMessage, SearchResult, LLMProvider } from "@/types";
-import {
-  CHAT_PROVIDER_OPTIONS,
-  supportsWebSearch,
-  supportsVision,
-} from "@/lib/chat-models";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
+import type { ChatMessage, ChatSession, LLMProvider, SearchResult } from "@/types";
+import { CHAT_PROVIDER_OPTIONS } from "@/lib/chat-models";
 
 export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -34,125 +28,108 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [selectedProvider, setSelectedProvider] = useState<LLMProvider | "">("");
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [showModelMenu, setShowModelMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Model selection: provider + optional model id (same provider can have multiple models)
-  const [selectedProvider, setSelectedProvider] = useState<LLMProvider | "">("");
-  const [selectedModelId, setSelectedModelId] = useState<string>("");
-  const [showModelMenu, setShowModelMenu] = useState(false);
-
-  // Feature toggles; 联网/附件 only effective when model supports (buttons disabled otherwise)
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-
-  const canWebSearch = supportsWebSearch(selectedProvider, selectedModelId || undefined);
-  const canVision = supportsVision(selectedProvider, selectedModelId || undefined);
-
-  /* ── Load sessions + auto-init ── */
   const loadSessions = useCallback(async (): Promise<ChatSession[]> => {
-    try {
-      const response = await fetch("/api/chat/sessions");
-      if (response.ok) {
-        const data = await response.json();
-        const list = data.sessions || [];
-        setSessions(list);
-        return list;
-      }
-    } catch (error) {
-      console.error("Failed to load sessions:", error);
+    const response = await fetch("/api/chat/sessions");
+    if (!response.ok) {
+      return [];
     }
-    return [];
+
+    const data = await response.json();
+    const list = (data.sessions || []) as ChatSession[];
+    setSessions(list);
+    return list;
   }, []);
 
   const createNewSession = useCallback(async (): Promise<ChatSession | null> => {
-    try {
-      const response = await fetch("/api/chat/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: `对话 ${new Date().toLocaleString("zh-CN")}`,
-        }),
-      });
+    const response = await fetch("/api/chat/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: `对话 ${new Date().toLocaleString("zh-CN")}`,
+      }),
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        const session = data.session;
-        setCurrentSession(session);
-        setMessages([]);
-        await loadSessions();
-        return session;
-      }
-    } catch (error) {
-      console.error("Failed to create session:", error);
+    if (!response.ok) {
       toast.error("创建会话失败");
+      return null;
     }
-    return null;
+
+    const data = await response.json();
+    const session = data.session as ChatSession;
+    setCurrentSession(session);
+    setMessages([]);
+    await loadSessions();
+    return session;
   }, [loadSessions]);
 
   useEffect(() => {
     async function init() {
       setInitializing(true);
       const list = await loadSessions();
-
-      if (list.length === 0) {
-        // New user: auto-create first session
-        await createNewSession();
+      if (list.length > 0) {
+        setCurrentSession(list[0]);
+        setMessages(list[0].messages || []);
       } else {
-        // Returning user: resume latest session
-        const latest = list[0]; // already sorted by updated_at DESC
-        setCurrentSession(latest);
-        setMessages(latest.messages || []);
+        await createNewSession();
       }
       setInitializing(false);
     }
+
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [createNewSession, loadSessions]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* ── Actions ── */
   const deleteSession = async (sessionId: string) => {
-    try {
-      await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE" });
-      const list = await loadSessions();
-      if (currentSession?.id === sessionId) {
-        if (list.length > 0) {
-          setCurrentSession(list[0]);
-          setMessages(list[0].messages || []);
-        } else {
-          await createNewSession();
-        }
-      }
-    } catch (error) {
-      console.error("Failed to delete session:", error);
+    await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE" });
+    const list = await loadSessions();
+    if (currentSession?.id !== sessionId) {
+      return;
+    }
+
+    if (list.length > 0) {
+      setCurrentSession(list[0]);
+      setMessages(list[0].messages || []);
+    } else {
+      await createNewSession();
     }
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !currentSession) return;
+    if (!input.trim() || !currentSession || loading) {
+      return;
+    }
 
     const userMessage: ChatMessage = {
       role: "user",
-      content: input,
+      content: input.trim(),
       timestamp: new Date().toISOString(),
     };
+    const nextMessages = [...messages, userMessage];
 
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    setMessages(nextMessages);
     setInput("");
     setLoading(true);
 
     try {
-      const body: any = {
-        query: input,
+      const body: Record<string, unknown> = {
+        query: userMessage.content,
         sessionId: currentSession.id,
         chatHistory: messages,
       };
+
       if (selectedProvider) {
         body.provider = selectedProvider;
-        if (selectedModelId) body.model = selectedModelId;
+      }
+      if (selectedModelId) {
+        body.model = selectedModelId;
       }
 
       const response = await fetch("/api/chat", {
@@ -161,66 +138,65 @@ export default function ChatPage() {
         body: JSON.stringify(body),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const assistantMessage: ChatMessage = {
-          role: "assistant",
-          content: data.answer,
-          sources: data.sources,
-          timestamp: new Date().toISOString(),
-        };
-
-        const newMessages = [...updatedMessages, assistantMessage];
-        setMessages(newMessages);
-
-        // Persist
-        await fetch(`/api/chat/sessions/${currentSession.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: newMessages }),
-        });
-      } else {
-        const err = await response.json().catch(() => null);
-        toast.error(err?.error || "获取回答失败，请检查AI配置");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "获取回答失败");
       }
-    } catch (error) {
-      console.error("Chat error:", error);
-      toast.error("网络错误");
+
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: data.answer,
+        sources: data.sources,
+        timestamp: new Date().toISOString(),
+      };
+      const savedMessages = [...nextMessages, assistantMessage];
+      setMessages(savedMessages);
+
+      await fetch(`/api/chat/sessions/${currentSession.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: savedMessages }),
+      });
+      await loadSessions();
+    } catch (error: any) {
+      toast.error(error.message || "网络错误");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNewChat = async () => {
-    await createNewSession();
-  };
+  const currentModelLabel = (() => {
+    if (!selectedProvider) {
+      return "默认模型";
+    }
 
-  /* ── Loading state ── */
+    const provider = CHAT_PROVIDER_OPTIONS.find((item) => item.id === selectedProvider);
+    const model = selectedModelId
+      ? provider?.models.find((item) => item.id === selectedModelId)
+      : provider?.models[0];
+    return model ? `${provider?.name} · ${model.label}` : provider?.name || selectedProvider;
+  })();
+
   if (initializing) {
     return (
       <div className="flex h-[calc(100vh-7rem)] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">加载对话...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
     <div className="flex h-[calc(100vh-7rem)] gap-4">
-      {/* Sessions Sidebar */}
-      <aside className="w-56 shrink-0 space-y-2 hidden md:flex md:flex-col">
-        <Button onClick={handleNewChat} className="w-full" size="sm">
-          <Plus className="h-4 w-4 mr-2" />
+      <aside className="hidden w-56 shrink-0 flex-col space-y-2 md:flex">
+        <Button onClick={createNewSession} size="sm">
+          <Plus className="mr-2 h-4 w-4" />
           新对话
         </Button>
-
         <div className="flex-1 space-y-1 overflow-y-auto">
           {sessions.map((session) => (
             <div
               key={session.id}
-              className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+              className={`group flex cursor-pointer items-center justify-between rounded-lg p-2 transition-colors ${
                 currentSession?.id === session.id
                   ? "bg-primary/10 text-primary"
                   : "hover:bg-accent"
@@ -230,16 +206,16 @@ export default function ChatPage() {
                 setMessages(session.messages || []);
               }}
             >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                <span className="text-sm truncate">{session.title}</span>
+                <span className="truncate text-sm">{session.title}</span>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={(event) => {
+                  event.stopPropagation();
                   deleteSession(session.id);
                 }}
               >
@@ -250,203 +226,116 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {!currentSession ? (
-          <div className="flex-1 flex items-center justify-center">
-            <EmptyState
-              icon={MessageSquare}
-              title="选择或创建一个对话"
-              description="从左侧选择已有的对话，或创建一个新对话开始"
-              action={
-                <Button onClick={handleNewChat}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  新对话
-                </Button>
-              }
-            />
-          </div>
-        ) : (
-          <>
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1">
-              {messages.length === 0 && (
-                <div className="flex items-center justify-center h-full">
-                  <EmptyState
-                    icon={Bot}
-                    title="智能收藏助手"
-                    description="问我关于你的书签和 GitHub Stars 的任何问题，我会通过 AI 语义搜索帮你找到答案。"
-                  />
-                </div>
-              )}
-              {messages.map((message, index) => (
-                <MessageBubble key={index} message={message} />
-              ))}
-              {loading && (
-                <div className="flex justify-start">
-                  <Card className="max-w-[80%]">
-                    <CardContent className="pt-4">
-                      <div className="flex gap-1.5">
-                        <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" />
-                        <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce [animation-delay:0.15s]" />
-                        <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce [animation-delay:0.3s]" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="mb-4 flex-1 space-y-4 overflow-y-auto pr-1">
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center">
+              <EmptyState
+                icon={Bot}
+                title="智能收藏助手"
+                description="询问你的书签、GitHub Stars 和文档内容，系统会基于个人知识库回答。"
+              />
             </div>
+          ) : (
+            messages.map((message, index) => (
+              <MessageBubble key={`${message.timestamp}-${index}`} message={message} />
+            ))
+          )}
+          {loading && (
+            <Card className="max-w-[80%]">
+              <CardContent className="pt-4 text-sm text-muted-foreground">
+                正在检索知识库...
+              </CardContent>
+            </Card>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-            {/* Input area with toolbar */}
-            <div className="space-y-2">
-              {/* Toolbar */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Model selector: provider + model */}
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs gap-1.5 min-w-[120px]"
-                    onClick={() => setShowModelMenu(!showModelMenu)}
-                  >
-                    <Bot className="h-3.5 w-3.5" />
-                    {selectedProvider ? (
-                      (() => {
-                        const po = CHAT_PROVIDER_OPTIONS.find((p) => p.id === selectedProvider);
-                        const mo = selectedModelId
-                          ? po?.models.find((m) => m.id === selectedModelId)
-                          : po?.models[0];
-                        return mo ? `${po?.name} · ${mo.label}` : po?.name ?? selectedProvider;
-                      })()
-                    ) : (
-                      "默认模型"
-                    )}
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                  {showModelMenu && (
-                    <div className="absolute bottom-full left-0 mb-1 w-56 max-h-80 overflow-y-auto rounded-lg border bg-popover p-1 shadow-md z-50">
+        <div className="space-y-2">
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setShowModelMenu((value) => !value)}
+            >
+              <Bot className="h-3.5 w-3.5" />
+              {currentModelLabel}
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+            {showModelMenu && (
+              <div className="absolute bottom-full left-0 z-50 mb-1 max-h-80 w-60 overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
+                <button
+                  className={`w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-accent ${
+                    !selectedProvider ? "bg-accent font-medium" : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedProvider("");
+                    setSelectedModelId("");
+                    setShowModelMenu(false);
+                  }}
+                >
+                  默认模型
+                </button>
+                {CHAT_PROVIDER_OPTIONS.map((provider) => (
+                  <div key={provider.id} className="mt-1">
+                    <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                      {provider.name}
+                    </div>
+                    {provider.models.map((model) => (
                       <button
-                        className={`w-full text-left text-sm px-3 py-1.5 rounded-md hover:bg-accent ${
-                          !selectedProvider ? "bg-accent font-medium" : ""
-                        }`}
+                        key={model.id}
+                        className="w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-accent"
                         onClick={() => {
-                          setSelectedProvider("");
-                          setSelectedModelId("");
+                          setSelectedProvider(provider.id);
+                          setSelectedModelId(model.id);
                           setShowModelMenu(false);
                         }}
                       >
-                        默认 (自动选择)
+                        {model.label}
                       </button>
-                      {CHAT_PROVIDER_OPTIONS.map((po) => (
-                        <div key={po.id} className="mt-1">
-                          <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                            {po.name}
-                          </div>
-                          {po.models.map((m) => {
-                            const isActive =
-                              selectedProvider === po.id &&
-                              (selectedModelId ? selectedModelId === m.id : m.id === po.models[0]?.id);
-                            return (
-                              <button
-                                key={m.id}
-                                className={`w-full text-left text-sm px-3 py-1.5 rounded-md hover:bg-accent ${
-                                  isActive ? "bg-accent font-medium" : ""
-                                }`}
-                                onClick={() => {
-                                  setSelectedProvider(po.id);
-                                  setSelectedModelId(m.id);
-                                  setShowModelMenu(false);
-                                }}
-                              >
-                                {m.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Web search: enabled only when model supports, no toast when toggling */}
-                <Button
-                  variant={webSearchEnabled ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  disabled={!supportsWebSearch(selectedProvider, selectedModelId || undefined)}
-                  onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                  title={
-                    supportsWebSearch(selectedProvider, selectedModelId || undefined)
-                      ? "联网搜索"
-                      : "当前模型不支持联网"
-                  }
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  联网
-                </Button>
-
-                {/* Attachment: disabled when model does not support vision, no toast when disabled */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  disabled={!supportsVision(selectedProvider, selectedModelId || undefined)}
-                  onClick={() => {
-                    if (supportsVision(selectedProvider, selectedModelId || undefined)) {
-                      toast.info("附件上传即将推出");
-                    }
-                  }}
-                  title={
-                    supportsVision(selectedProvider, selectedModelId || undefined)
-                      ? "上传附件 (多模态)"
-                      : "当前模型不支持附件"
-                  }
-                >
-                  <Paperclip className="h-3.5 w-3.5" />
-                  附件
-                </Button>
+                    ))}
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
 
-              {/* Input row */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="输入问题... 例如：帮我找跟 AI 相关的书签"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && !e.shiftKey && handleSend()
-                  }
-                  disabled={loading}
-                  className="text-base"
-                />
-                <Button
-                  onClick={handleSend}
-                  disabled={loading || !input.trim()}
-                  size="icon"
-                  className="shrink-0"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+          <div className="flex gap-2">
+            <Input
+              placeholder="输入问题，例如：帮我找 AI 相关的收藏"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  handleSend();
+                }
+              }}
+              disabled={loading}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={loading || !input.trim()}
+              size="icon"
+              className="shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ── Message bubble with markdown ── */
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[85%] ${isUser ? "" : "w-full max-w-[85%]"}`}>
-        <Card
-          className={`${isUser ? "bg-primary text-primary-foreground" : ""}`}
-        >
+      <div className={`max-w-[85%] ${isUser ? "" : "w-full"}`}>
+        <Card className={isUser ? "bg-primary text-primary-foreground" : ""}>
           <CardContent className="pt-4">
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
@@ -455,29 +344,27 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             )}
 
             {message.sources && message.sources.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-border/30 space-y-1.5">
-                <p className="text-xs font-semibold opacity-60">引用来源：</p>
+              <div className="mt-4 space-y-1.5 border-t border-border/30 pt-3">
+                <p className="text-xs font-semibold opacity-70">引用来源</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {message.sources.map(
-                    (source: SearchResult, idx: number) => (
-                      <a
-                        key={idx}
-                        href={source.bookmark?.url || source.star?.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-muted/50 hover:bg-muted transition-colors"
-                      >
-                        <ExternalLink className="h-3 w-3 shrink-0" />
-                        <span className="truncate max-w-[200px]">
-                          {source.bookmark?.title ||
-                            `${source.star?.owner}/${source.star?.repo}`}
-                        </span>
-                        <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                          {Math.round((source.similarity || 0) * 100)}%
-                        </Badge>
-                      </a>
-                    )
-                  )}
+                  {message.sources.map((source: SearchResult, index: number) => (
+                    <a
+                      key={`${source.id}-${index}`}
+                      href={source.bookmark?.url || source.star?.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-1 text-xs transition-colors hover:bg-muted"
+                    >
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                      <span className="max-w-[200px] truncate">
+                        {source.bookmark?.title ||
+                          `${source.star?.owner}/${source.star?.repo}`}
+                      </span>
+                      <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                        {Math.round((source.similarity || 0) * 100)}%
+                      </Badge>
+                    </a>
+                  ))}
                 </div>
               </div>
             )}

@@ -1,6 +1,6 @@
 # Smart Favorites - LLM Wiki 平台建设计划
 
-**最后更新**: 2026-05-09  
+**最后更新**: 2026-05-17
 **项目版本**: v2.1 开发中  
 **定位**: 个人知识库 + 学习研究工具 + AI 应用平台
 
@@ -1309,14 +1309,14 @@ docs/
 > 本节为本文件唯一有效的进度来源，已统合：完整开发路线图、实时进度追踪、更新日志。
 
 ### 审查快照（基于 git status）
-- 仓库状态：`main...origin/main [ahead 1]`
+- 仓库状态：`main...origin/main [ahead 4]`
 - 工作区状态：无未提交变更（clean working tree）
-- 最新里程碑提交：`eb48a0d`（Phase 3 广场功能主干）
+- 最新里程碑提交：本次提交（Phase 4 扩展联动与工具 API 收敛）
 
 ### 当前总体状态
-- **当前状态**: ✅ UI 系列 Phase 3（广场分享功能）已完成并提交
-- **下一步**: 🟡 UI 系列 Phase 4（浏览器扩展与 Web 联动）
-- **总体完成率（UI 系列）**: 75%（Phase 0-3 完成，共 4/5）
+- **当前状态**: ✅ UI 系列 Phase 4（浏览器扩展与 Web 联动 + 工具 API 收敛）已完成并提交
+- **下一步**: 🟡 LLM-wiki 功能系列 Phase 1（文件系统基础）或 UI 系列后续发布收尾
+- **总体完成率（UI 系列）**: 100%（Phase 0-4 完成，共 5/5）
 - **总体完成率（LLM-wiki 功能系列）**: 0%（Phase 1-5 尚未启动）
 
 ### 路线图状态（合并后）
@@ -1329,7 +1329,11 @@ docs/
   - ✅ 数据库与 Storage：`smart-favorites-web/supabase/migrations/006_create_square_posts.sql`、`smart-favorites-web/supabase/migrations/009_create_square_storage.sql`
   - ✅ Square API 与类型：`smart-favorites-web/app/api/square/`、`smart-favorites-web/types/index.ts`、`smart-favorites-web/lib/square.ts`
   - ✅ 广场页面 UI：`smart-favorites-web/app/dashboard/square/page.tsx`、`smart-favorites-web/components/square/`
-- ⏳ Phase 4：浏览器扩展与 Web 联动（未开始）
+- ✅ Phase 4：浏览器扩展与 Web 联动（完成）
+  - ✅ 扩展 Token 认证：`smart-favorites-web/app/api/settings/extension-token/route.ts`、`smart-favorites-web/lib/auth/get-user.ts`
+  - ✅ 工具 API 契约与审计：`smart-favorites-web/app/api/tools/`、`smart-favorites-web/lib/tools/`
+  - ✅ API Key 管理：`smart-favorites-web/app/api/keys/`、`smart-favorites-web/supabase/migrations/010_create_api_keys_and_audit_logs.sql`
+  - ✅ 三方集成文档：`docs/API_REFERENCE.md`、`docs/TOOLS_INTEGRATION.md`
 
 #### B. LLM-wiki 功能系列（平台主线）
 - 🟡 Phase 1：文件系统基础（待开始）
@@ -1339,6 +1343,15 @@ docs/
 - ⏳ Phase 5：优化、文档、发布（未开始）
 
 ### 里程碑记录（按时间倒序）
+
+#### 2026-05-17 - UI 系列 Phase 4 完成（扩展联动与工具 API 收敛）
+- ✅ 修复扩展 Token Bearer 认证，浏览器扩展可通过 `/api/bookmarks/sync` 等 Web API 绑定用户数据
+- ✅ 收敛工具执行契约：`POST /api/tools` 与 `POST /api/tools/{tool}` 均支持 `{ input }` 包装，并写入 `api_audit_logs`
+- ✅ 补齐 API Key 管理、工具权限过滤、OpenAI/Claude/DeepSeek schema 适配的文档说明
+- ✅ 修复 Next.js 15 动态路由类型、Supabase 客户端构建期初始化、缺失 i18n/chat-models 模块等构建阻断
+- ✅ 新增 Phase 4 契约测试：`npm run test:phase4`
+- ✅ 验证：`npm run test:phase4`、`npx tsc --noEmit`、`npm run lint`、`npm run build`
+- ✅ 归档提交：`feat(phase4): complete extension and tools integration`
 
 #### 2026-05-15 - UI 系列 Phase 3 完成（广场分享功能）
 - ✅ 新增广场统计接口：`smart-favorites-web/app/api/square/stats/route.ts`
@@ -1358,7 +1371,7 @@ docs/
 - ✅ LLM-wiki 研究、文件解析调研、数据库设计、插件规范、技术决策文档完成
 
 ### 下一个执行目标
-- UI 系列：启动 Phase 4（扩展配置与 API 端点、OAuth 登录、数据同步）
+- UI 系列：进入发布/打磨收尾，优先清理历史 lint warning（图片 alt、`next/image`、Hook 依赖）
 - LLM-wiki 系列：按原规划启动 Phase 1（文件系统基础）
 
 ---
@@ -1420,5 +1433,5 @@ docs/
 ---
 
 **文档维护者**: Smart Favorites 开发团队  
-**最后更新**: 2026-05-08  
+**最后更新**: 2026-05-17
 **下次计划更新**: 每两周一次

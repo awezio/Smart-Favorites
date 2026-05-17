@@ -19,8 +19,8 @@ export function parseBookmarksHtml(htmlContent: string): ParsedBookmark[] {
 
   const results: ParsedBookmark[] = [];
 
-  function walkDl(dl: cheerio.Cheerio, basePath: string) {
-    dl.children("dt").each((_, dt) => {
+  function walkDl(dl: cheerio.Cheerio<any>, basePath: string) {
+    dl.children("dt").each((_: number, dt: any) => {
       const dtNode = $(dt);
       const h3 = dtNode.children("h3").first();
       const link = dtNode.children("a").first();

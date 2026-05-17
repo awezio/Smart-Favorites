@@ -2,14 +2,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import type { SearchResult } from "@/types";
 
-const supabase = createAdminClient();
-
 export async function searchBookmarks(
   query: string,
   topK: number,
   threshold: number,
   userId?: string
 ): Promise<SearchResult[]> {
+  const supabase = createAdminClient();
   const embedding = await generateEmbedding(query);
   const { data, error } = await supabase.rpc("match_bookmarks", {
     query_embedding: embedding,
@@ -49,6 +48,7 @@ export async function searchStars(
   threshold: number,
   userId?: string
 ): Promise<SearchResult[]> {
+  const supabase = createAdminClient();
   const embedding = await generateEmbedding(query);
   const { data, error } = await supabase.rpc("match_stars", {
     query_embedding: embedding,
