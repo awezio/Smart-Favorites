@@ -2,7 +2,7 @@
 
 /* eslint-disable react/no-unescaped-entities */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Save,
   Check,
@@ -117,11 +117,7 @@ export default function SettingsPage() {
   const [extensionTokenGenerated, setExtensionTokenGenerated] = useState<string | null>(null);
   const [extensionTokenLoading, setExtensionTokenLoading] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadExtensionTokenStatus = async () => {
+  const loadExtensionTokenStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/extension-token");
       if (res.ok) {
@@ -131,7 +127,7 @@ export default function SettingsPage() {
     } catch (e) {
       console.error("Failed to load extension token status:", e);
     }
-  };
+  }, []);
 
   const handleGenerateExtensionToken = async () => {
     setExtensionTokenLoading(true);
@@ -163,7 +159,7 @@ export default function SettingsPage() {
     }
   };
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/settings");
@@ -191,7 +187,11 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadExtensionTokenStatus]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async () => {
     setSaving(true);

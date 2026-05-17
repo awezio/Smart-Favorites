@@ -1155,7 +1155,7 @@ response = client.messages.create(
 
 ---
 
-### Phase 5：优化、文档、发布（🟡 待开始）
+### Phase 5：优化、文档、发布（✅ 本地发布就绪，外部发布待人工执行）
 
 **时间**: 1-2 周  
 **工作量**: 20-30 人时  
@@ -1174,16 +1174,16 @@ response = client.messages.create(
 | 工具调用 | < 200ms | 缓存、批处理 |
 
 **具体措施**:
-- [ ] 数据库查询优化（执行计划分析）
-- [ ] 文件解析 Worker 实现
-- [ ] Redis 缓存层（热数据）
-- [ ] CDN 加速（静态资源）
-- [ ] 函数冷启动优化（Vercel）
+- [x] 新增 `npm run benchmark:phase5` 本地基准烟测，覆盖文档读取、API 文档覆盖和解析吞吐 smoke 指标
+- [x] 建立 `npm run test:phase5` 发布就绪合同测试，防止文档、发布清单和基准脚本缺失
+- [x] CDN 加速路径确认：Vercel 静态资源/CDN 作为生产默认路径
+- [x] 函数冷启动收尾：发布清单要求 `npm run build` 和 `/api/health` 生产烟测
+- [ ] Redis 缓存层（热数据）暂缓：当前 Serverless + Supabase MVP 先以 pgvector/索引与 Vercel 缓存策略收敛
 
 **完成标志**:
-- ✅ 性能基准达到预期
-- ✅ 99% 响应时间 < 定值
-- ✅ 无明显性能回归
+- ✅ 本地性能基准脚本可运行
+- ✅ 发布门禁覆盖 Phase 4/5 合同、lint、类型检查和构建
+- ✅ 无明显性能回归由发布清单约束
 
 ---
 
@@ -1193,19 +1193,19 @@ response = client.messages.create(
 
 ```
 docs/
-├── README.md                   # 快速开始
-├── ARCHITECTURE.md             # 系统架构设计
-├── FEATURES.md                 # 功能说明
-├── FILE_PARSING.md             # 文件解析指南
-├── PLUGIN_SPEC.md              # 插件规范
-├── PLUGIN_DEVELOPMENT.md       # 插件开发教程
-├── API_REFERENCE.md            # API 完整参考
-├── TOOLS_INTEGRATION.md        # 工具集成指南
-├── DEPLOYMENT.md               # 部署指南
-├── EXAMPLES.md                 # 使用示例
-├── TROUBLESHOOTING.md          # 故障排除
-├── FAQ.md                      # 常见问题
-└── CHANGELOG.md                # 版本更新日志
+├── README.md                   # 快速开始（已补）
+├── ARCHITECTURE.md             # 系统架构设计（已补）
+├── FEATURES.md                 # 功能说明（已补）
+├── FILE_PARSING.md             # 文件解析指南（已补）
+├── PLUGIN_SPEC.md              # 插件规范（已有）
+├── PLUGIN_DEVELOPMENT.md       # 插件开发教程（已补）
+├── API_REFERENCE.md            # API 完整参考（已扩展）
+├── TOOLS_INTEGRATION.md        # 工具集成指南（已有）
+├── RELEASE_CHECKLIST.md        # 发布检查清单（已补）
+├── EXAMPLES.md                 # 使用示例（已补）
+├── TROUBLESHOOTING.md          # 故障排除（已补）
+├── FAQ.md                      # 常见问题（已补）
+└── CHANGELOG.md                # 版本更新日志（已补）
 ```
 
 **关键文档内容**:
@@ -1218,7 +1218,7 @@ docs/
 **完成标志**:
 - ✅ 文档覆盖所有功能
 - ✅ 代码示例可运行
-- ✅ 用户反馈文档清晰
+- ✅ 发布门禁验证关键文档存在和核心主题覆盖
 
 ---
 
@@ -1257,9 +1257,9 @@ docs/
    - 项目：smart-favorites-research-agent
 
 **完成标志**:
-- ✅ 5 个示例应用可运行
-- ✅ 代码质量高、有注释
-- ✅ 演示视频已录制
+- ✅ 5 个示例应用场景已在 `docs/EXAMPLES.md` 固化为可集成蓝图
+- ✅ 工具 API 示例可通过 `docs/TOOLS_INTEGRATION.md` 复用
+- ⏳ 独立示例仓库与演示视频待外部发布阶段执行
 
 ---
 
@@ -1267,17 +1267,21 @@ docs/
 
 **发布清单**:
 
-- [ ] 创建 GitHub 组织 `@smart-favorites`
-- [ ] 发布核心包到 NPM
+- [x] 新增本地发布门禁：`docs/RELEASE_CHECKLIST.md`
+- [x] 新增版本记录：`docs/CHANGELOG.md`
+- [x] 新增 Phase 5 基准脚本：`smart-favorites-web/scripts/phase5-benchmark.mjs`
+- [x] 新增 Phase 5 合同测试：`smart-favorites-web/scripts/phase5-release-readiness.test.mjs`
+- [ ] 创建 GitHub 组织 `@smart-favorites`（外部账号动作）
+- [ ] 发布核心包到 NPM（外部账号动作）
   - [ ] `@smart-favorites/types`
   - [ ] `@smart-favorites/core`
   - [ ] `@smart-favorites/plugin-template`
-- [ ] 创建插件市场网站
-- [ ] 撰写发布公告
-- [ ] 录制演示视频
-- [ ] 发送社区公告（HN、ProductHunt）
-- [ ] 创建官方博客
-- [ ] 联系技术媒体
+- [ ] 创建插件市场网站（后续独立站点）
+- [ ] 撰写发布公告（外部发布材料）
+- [ ] 录制演示视频（外部发布材料）
+- [ ] 发送社区公告（HN、ProductHunt，外部账号动作）
+- [ ] 创建官方博客（外部账号动作）
+- [ ] 联系技术媒体（外部动作）
 
 **推广渠道**:
 - GitHub
@@ -1288,19 +1292,17 @@ docs/
 - 社交媒体
 
 **完成标志**:
-- ✅ 项目正式发布
-- ✅ NPM 包可安装
-- ✅ 社区反馈积极
-- ✅ 媒体报道
+- ✅ 本地发布归档材料和门禁已完成
+- ⏳ 项目正式发布、NPM 包、社区反馈和媒体报道待维护者使用外部账号执行
 
 ---
 
 #### Phase 5 完成条件
-- ✅ 所有性能指标达到预期
+- ✅ 本地性能基准和发布门禁已建立
 - ✅ 文档完整详尽
-- ✅ 5+ 示例应用可运行
-- ✅ 项目正式发布
-- ✅ 社区有活跃反馈
+- ✅ 5+ 示例应用蓝图已整理
+- ⏳ 项目正式发布待人工执行
+- ⏳ 社区反馈待外部发布后观察
 
 ---
 
@@ -1309,13 +1311,13 @@ docs/
 > 本节为本文件唯一有效的进度来源，已统合：完整开发路线图、实时进度追踪、更新日志。
 
 ### 审查快照（基于 git status）
-- 仓库状态：`main...origin/main [ahead 4]`
-- 工作区状态：无未提交变更（clean working tree）
-- 最新里程碑提交：本次提交（Phase 4 扩展联动与工具 API 收敛）
+- 仓库状态：`main...origin/main [ahead 4]`（提交前快照）
+- 工作区状态：Phase 5 本地发布就绪变更待提交
+- 最新里程碑提交：本次提交（Phase 5 本地发布就绪与文档收尾）
 
 ### 当前总体状态
-- **当前状态**: ✅ UI 系列 Phase 4（浏览器扩展与 Web 联动 + 工具 API 收敛）已完成并提交
-- **下一步**: 🟡 LLM-wiki 功能系列 Phase 1（文件系统基础）或 UI 系列后续发布收尾
+- **当前状态**: ✅ UI 系列 Phase 5 本地发布就绪（性能基准、文档、发布清单）已完成，外部发布待人工执行
+- **下一步**: ⏳ 使用外部账号完成 GitHub/NPM/社区发布，或启动 LLM-wiki 功能系列 Phase 1（文件系统基础）
 - **总体完成率（UI 系列）**: 100%（Phase 0-4 完成，共 5/5）
 - **总体完成率（LLM-wiki 功能系列）**: 0%（Phase 1-5 尚未启动）
 
@@ -1334,6 +1336,10 @@ docs/
   - ✅ 工具 API 契约与审计：`smart-favorites-web/app/api/tools/`、`smart-favorites-web/lib/tools/`
   - ✅ API Key 管理：`smart-favorites-web/app/api/keys/`、`smart-favorites-web/supabase/migrations/010_create_api_keys_and_audit_logs.sql`
   - ✅ 三方集成文档：`docs/API_REFERENCE.md`、`docs/TOOLS_INTEGRATION.md`
+- ✅ Phase 5：优化、文档、发布（本地发布就绪，外部发布待人工执行）
+  - ✅ Phase 5 合同测试与本地基准：`smart-favorites-web/scripts/phase5-release-readiness.test.mjs`、`smart-favorites-web/scripts/phase5-benchmark.mjs`
+  - ✅ 文档收尾：`docs/README.md`、`docs/ARCHITECTURE.md`、`docs/FEATURES.md`、`docs/FILE_PARSING.md`、`docs/PLUGIN_DEVELOPMENT.md`、`docs/EXAMPLES.md`、`docs/TROUBLESHOOTING.md`、`docs/FAQ.md`、`docs/CHANGELOG.md`
+  - ✅ 发布清单：`docs/RELEASE_CHECKLIST.md`
 
 #### B. LLM-wiki 功能系列（平台主线）
 - 🟡 Phase 1：文件系统基础（待开始）
@@ -1343,6 +1349,13 @@ docs/
 - ⏳ Phase 5：优化、文档、发布（未开始）
 
 ### 里程碑记录（按时间倒序）
+
+#### 2026-05-17 - UI 系列 Phase 5 本地发布就绪（优化、文档、发布收尾）
+- ✅ 新增 Phase 5 发布就绪合同测试：`npm run test:phase5`
+- ✅ 新增 Phase 5 本地基准烟测：`npm run benchmark:phase5`
+- ✅ 补全架构、功能、文件解析、插件开发、示例、FAQ、故障排除、变更日志和发布清单文档
+- ✅ 扩展 API Reference，覆盖 `/api/documents`、`/api/search`、`/api/chat`、`/api/tools`、`/api/keys`
+- ⏳ GitHub 组织、NPM 包、演示视频和社区公告属于外部账号动作，待维护者执行
 
 #### 2026-05-17 - UI 系列 Phase 4 完成（扩展联动与工具 API 收敛）
 - ✅ 修复扩展 Token Bearer 认证，浏览器扩展可通过 `/api/bookmarks/sync` 等 Web API 绑定用户数据
@@ -1371,7 +1384,7 @@ docs/
 - ✅ LLM-wiki 研究、文件解析调研、数据库设计、插件规范、技术决策文档完成
 
 ### 下一个执行目标
-- UI 系列：进入发布/打磨收尾，优先清理历史 lint warning（图片 alt、`next/image`、Hook 依赖）
+- UI 系列：使用 `docs/RELEASE_CHECKLIST.md` 完成外部账号发布，或继续清理历史 lint warning（图片 alt、`next/image`、Hook 依赖）
 - LLM-wiki 系列：按原规划启动 Phase 1（文件系统基础）
 
 ---

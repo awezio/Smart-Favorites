@@ -1,5 +1,84 @@
 # Smart Favorites API Reference
 
+All user-facing routes require an authenticated Supabase session unless the section explicitly documents API-key authentication.
+
+## Health
+
+`GET /api/health`
+
+Returns database connectivity, current model provider, bookmark count, star count, and timestamp. Use this as a production smoke check after Vercel deployment.
+
+## Documents
+
+`GET /api/documents`
+
+Query parameters:
+
+- `limit`: default `50`
+- `offset`: default `0`
+
+Response:
+
+```json
+{
+  "documents": [],
+  "count": 0
+}
+```
+
+`POST /api/documents`
+
+Accepts `multipart/form-data` with:
+
+- `file`: PDF, DOCX, XLSX, XLS, TXT, Markdown, HTML, or HTM, up to 100 MB.
+- `title`: optional document title.
+- `tags`: optional repeated tag fields.
+
+The file is stored in the private Supabase `documents` bucket and a pending document record is returned.
+
+`GET /api/documents/{id}`
+
+Returns one document owned by the current user.
+
+`PATCH /api/documents/{id}`
+
+Updates metadata fields such as title, status, and custom metadata.
+
+`DELETE /api/documents/{id}`
+
+Deletes the document record and associated chunks.
+
+## Search
+
+`POST /api/search`
+
+```json
+{
+  "query": "vector database",
+  "type": "all",
+  "topK": 10,
+  "threshold": 0.3
+}
+```
+
+`type` can be `all`, `bookmarks`, or `stars`.
+
+## Chat
+
+`POST /api/chat`
+
+```json
+{
+  "query": "What did I save about RAG?",
+  "sessionId": "optional-session-id",
+  "chatHistory": [],
+  "provider": "deepseek",
+  "model": "deepseek-chat"
+}
+```
+
+Returns an answer, source list, and session id.
+
 ## Tool Discovery
 
 `GET /api/tools`

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search,
@@ -15,7 +16,7 @@ import {
   User,
   Globe,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -43,7 +44,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const getUser = async () => {
@@ -74,7 +75,7 @@ export default function DashboardLayout({
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -151,13 +152,16 @@ export default function DashboardLayout({
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary overflow-hidden">
                 {profile?.avatar_url ? (
-                  <img
+                  <Image
                     src={profile.avatar_url}
                     alt="Avatar"
+                    width={32}
+                    height={32}
+                    unoptimized
                     className="h-8 w-8 rounded-full object-cover"
                   />
                 ) : profile?.avatar_seed ? (
-                  <img
+                  <Image
                     src={getDiceBearUrl(
                       profile.avatar_seed.includes(":")
                         ? profile.avatar_seed.split(":")[0]
@@ -168,12 +172,18 @@ export default function DashboardLayout({
                       32
                     )}
                     alt="Avatar"
+                    width={32}
+                    height={32}
+                    unoptimized
                     className="h-8 w-8 rounded-full"
                   />
                 ) : user.user_metadata?.avatar_url ? (
-                  <img
+                  <Image
                     src={user.user_metadata.avatar_url}
                     alt="Avatar"
+                    width={32}
+                    height={32}
+                    unoptimized
                     className="h-8 w-8 rounded-full object-cover"
                   />
                 ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Globe, Plus, Loader2, Sparkles, Users, Image as ImageIcon, ThumbsUp, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ export default function SquarePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Get current user
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function SquarePage() {
       setCurrentUserId(user?.id);
     };
     getUser();
-  }, []);
+  }, [supabase]);
 
   const fetchPosts = useCallback(
     async (pageNum: number, append = false) => {

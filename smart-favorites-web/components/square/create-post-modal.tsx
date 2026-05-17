@@ -1,7 +1,8 @@
 "use client";
 
+import ImagePreview from "next/image";
 import { useState, useRef, useCallback } from "react";
-import { Star, X, Upload, Image, Film, Loader2 } from "lucide-react";
+import { Star, X, Upload, Film, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -407,9 +408,12 @@ export function CreatePostModal({
                     className="relative group rounded-lg overflow-hidden border aspect-video bg-muted"
                   >
                     {media.type === "image" ? (
-                      <img
+                      <ImagePreview
                         src={media.preview}
                         alt=""
+                        fill
+                        sizes="(max-width: 640px) 33vw, 160px"
+                        unoptimized
                         className="h-full w-full object-cover"
                       />
                     ) : (

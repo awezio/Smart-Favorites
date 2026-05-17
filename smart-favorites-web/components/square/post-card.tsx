@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import {
   Star,
@@ -9,7 +10,7 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  Image,
+  Image as ImageIcon,
   Film,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -92,9 +93,12 @@ export function PostCard({
         <CardContent className="p-5">
           {/* Header */}
           <div className="flex items-center gap-3 mb-3">
-            <img
+            <Image
               src={avatarUrl}
               alt="avatar"
+              width={32}
+              height={32}
+              unoptimized
               className="h-8 w-8 rounded-full object-cover bg-muted"
             />
             <div className="flex-1 min-w-0">
@@ -122,7 +126,7 @@ export function PostCard({
             )}
             {mediaCount > 0 && (
               <Badge variant="outline" className="text-xs gap-1">
-                {images.length > 0 && <Image className="h-3 w-3" />}
+                {images.length > 0 && <ImageIcon className="h-3 w-3" />}
                 {videos.length > 0 && !images.length && <Film className="h-3 w-3" />}
                 {mediaCount} 个媒体
               </Badge>
@@ -210,9 +214,12 @@ export function PostCard({
                       onClick={() => setLightboxUrl(img.url)}
                       className="relative overflow-hidden rounded-lg border bg-muted aspect-video"
                     >
-                      <img
+                      <Image
                         src={img.url}
-                        alt=""
+                        alt={post.title ? `${post.title} media` : "Square post media"}
+                        fill
+                        sizes="(max-width: 768px) 33vw, 240px"
+                        unoptimized
                         className="h-full w-full object-cover hover:scale-105 transition-transform duration-200"
                       />
                     </button>
@@ -313,9 +320,12 @@ export function PostCard({
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setLightboxUrl(null)}
         >
-          <img
+          <Image
             src={lightboxUrl}
-            alt=""
+            alt={post.title ? `${post.title} media preview` : "Square post media preview"}
+            width={1200}
+            height={800}
+            unoptimized
             className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />

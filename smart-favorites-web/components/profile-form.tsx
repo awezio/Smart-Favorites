@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import {
   Save,
@@ -189,9 +190,12 @@ export function ProfileForm() {
         {/* Avatar */}
         <div className="flex items-center gap-6">
           <div className="relative group">
-            <img
+            <Image
               src={currentAvatarDisplay}
               alt="头像"
+              width={80}
+              height={80}
+              unoptimized
               className="h-20 w-20 rounded-full border-2 border-border bg-muted object-cover"
             />
             {uploading && (
@@ -237,7 +241,14 @@ export function ProfileForm() {
                     avatarStyle === style.id && !avatarUrl ? "border-primary bg-primary/5" : "border-transparent hover:border-border"
                   )}
                 >
-                  <img src={style.url} alt={style.name} className="h-14 w-14 rounded-lg bg-muted" loading="lazy" />
+                  <Image
+                    src={style.url}
+                    alt={style.name}
+                    width={56}
+                    height={56}
+                    unoptimized
+                    className="h-14 w-14 rounded-lg bg-muted"
+                  />
                   <span className="text-[10px] truncate w-full text-center">{style.name}</span>
                 </button>
               ))}
