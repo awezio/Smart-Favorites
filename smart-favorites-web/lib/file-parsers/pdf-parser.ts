@@ -1,3 +1,17 @@
+import { splitIntoChunks } from './chunk-splitter';
+import type { ParsedDocument } from './types';
+
+export async function parsePDF(buffer: Buffer): Promise<ParsedDocument> {
+  // Minimal smoke parser: treat buffer as utf-8 text when PDF parsing lib not available.
+  const text = buffer.toString('utf8').replace(/\s+/g, ' ');
+  const chunks = splitIntoChunks(text);
+  return {
+    title: 'pdf-document',
+    content: text,
+    chunks,
+    metadata: { approx: true, bytes: buffer.byteLength },
+  };
+}
 import { splitIntoChunks } from "@/lib/file-parsers/chunk-splitter";
 import type { ParsedDocument } from "@/lib/file-parsers/types";
 
