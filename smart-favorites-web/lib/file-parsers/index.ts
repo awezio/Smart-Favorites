@@ -1,29 +1,3 @@
-import { parsePDF } from './pdf-parser';
-import { parseOffice } from './office-parser';
-import type { ParsedDocument } from './types';
-
-export async function parseDocument(payload: { name?: string; buffer: Buffer; mime?: string }): Promise<ParsedDocument> {
-  const name = payload.name || '';
-  const ext = name.split('.').pop()?.toLowerCase() || '';
-  try {
-    if (ext === 'pdf') return await parsePDF(payload.buffer);
-    if (ext === 'docx' || ext === 'xlsx' || ext === 'xls') return await parseOffice(payload.buffer);
-    // fallback: treat as text
-    return {
-      title: name || 'document',
-      content: payload.buffer.toString('utf8'),
-      chunks: (await import('./chunk-splitter')).splitIntoChunks(payload.buffer.toString('utf8')),
-      metadata: { fallback: true, bytes: payload.buffer.byteLength },
-    };
-  } catch (err) {
-    return {
-      title: name || 'document',
-      content: '',
-      chunks: [],
-      metadata: { error: String(err) },
-    };
-  }
-}
 import type { ParsedDocument } from "@/lib/file-parsers/types";
 import { parseTextFile } from "@/lib/file-parsers/text-parser";
 import { parseHtmlFile } from "@/lib/file-parsers/html-parser";

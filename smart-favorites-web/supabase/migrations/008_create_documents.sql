@@ -47,8 +47,39 @@ CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx ON document_chunks USIN
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE document_chunks ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow all operations on documents" ON documents FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all operations on document_chunks" ON document_chunks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users can view own documents"
+  ON documents FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own documents"
+  ON documents FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own documents"
+  ON documents FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own documents"
+  ON documents FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own chunks"
+  ON document_chunks FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own chunks"
+  ON document_chunks FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own chunks"
+  ON document_chunks FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own chunks"
+  ON document_chunks FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- Triggers
 CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents

@@ -1,21 +1,3 @@
-import type { DocumentChunk } from './types';
-
-export function splitIntoChunks(text: string, chunkSize = 800, overlap = 200): DocumentChunk[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const chunks: DocumentChunk[] = [];
-  let i = 0;
-  let index = 0;
-  while (i < words.length) {
-    const slice = words.slice(i, i + chunkSize).join(' ');
-    chunks.push({ text: slice, index, page: undefined });
-    index += 1;
-    i += chunkSize - overlap;
-  }
-  if (chunks.length === 0) {
-    chunks.push({ text, index: 0 });
-  }
-  return chunks;
-}
 import type { DocumentChunk } from "@/lib/file-parsers/types";
 
 type SplitOptions = {

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { cwd } from "node:process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = cwd();
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = join(root, "..");
 
 function readRepo(path) {

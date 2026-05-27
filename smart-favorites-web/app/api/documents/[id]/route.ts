@@ -1,16 +1,3 @@
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const id = url.pathname.split('/').pop();
-  // Minimal stub: return empty document info
-  return new Response(JSON.stringify({ id, title: `document-${id}`, status: 'pending' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-}
-
-export async function DELETE(req: Request) {
-  const url = new URL(req.url);
-  const id = url.pathname.split('/').pop();
-  // In a full implementation: delete storage and DB rows
-  return new Response(JSON.stringify({ id, deleted: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-}
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/get-user";

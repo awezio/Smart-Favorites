@@ -1,16 +1,3 @@
-import { splitIntoChunks } from './chunk-splitter';
-import type { ParsedDocument } from './types';
-
-export async function parseOffice(buffer: Buffer): Promise<ParsedDocument> {
-  const text = buffer.toString('utf8').replace(/\s+/g, ' ');
-  const chunks = splitIntoChunks(text);
-  return {
-    title: 'office-document',
-    content: text,
-    chunks,
-    metadata: { approx: true, bytes: buffer.byteLength },
-  };
-}
 import { splitIntoChunks } from "@/lib/file-parsers/chunk-splitter";
 import type { ParsedDocument } from "@/lib/file-parsers/types";
 

@@ -1,21 +1,3 @@
-export async function GET() {
-  return new Response(JSON.stringify({ documents: [], count: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-}
-
-export async function POST(req: Request) {
-  // Minimal POST handler: accept JSON with `title` and `content` for now.
-  try {
-    const body = await req.json().catch(() => ({}));
-    const id = `doc-${Date.now()}`;
-    // In a full implementation: store to Supabase Storage and create DB record.
-    return new Response(JSON.stringify({ document_id: id, status: 'pending', received: { title: body.title || null } }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
-  }
-}
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/get-user";

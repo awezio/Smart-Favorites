@@ -1,15 +1,3 @@
-export interface DocumentChunk {
-  text: string;
-  index: number;
-  page?: number;
-}
-
-export interface ParsedDocument {
-  title: string;
-  content: string;
-  chunks: DocumentChunk[];
-  metadata: Record<string, any>;
-}
 export type DocumentChunk = {
   content: string;
   chunk_index: number;

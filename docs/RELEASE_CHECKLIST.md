@@ -3,6 +3,7 @@
 ## Local Gate
 
 - [ ] `npm run test:phase4`
+- [ ] `npm run test:phase1`
 - [ ] `npm run test:phase5`
 - [ ] `npm run benchmark:phase5`
 - [ ] `npm run lint`
