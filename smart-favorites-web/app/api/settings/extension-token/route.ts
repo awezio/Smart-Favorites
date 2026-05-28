@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { randomUUID } from "crypto";
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
     const { data } = await supabase
       .from("user_settings")
       .select("extension_token")
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newToken = randomUUID();
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const { error } = await supabase
       .from("user_settings")

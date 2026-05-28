@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSquareTargetType } from "@/lib/square";
 import type {
   SquarePost,
@@ -19,9 +19,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
 
     // Try to get current user (optional)
-    const { userId } = await getAuthUser();
+    const { userId } = await getAuthUser(request);
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Fetch the post
     const { data: post, error } = await supabase
@@ -128,7 +128,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const { userId } = await getAuthUser();
+    const { userId } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -136,7 +136,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Check post exists and belongs to user
     const { data: existing, error: fetchError } = await supabase
@@ -244,7 +244,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const { userId } = await getAuthUser();
+    const { userId } = await getAuthUser(_request);
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -252,7 +252,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Check post exists and belongs to user
     const { data: existing, error: fetchError } = await supabase

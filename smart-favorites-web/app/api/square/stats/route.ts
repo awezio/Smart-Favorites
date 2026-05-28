@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import type { SquareFeedStats, SquareTargetType } from "@/types";
 
 const TARGET_TYPES: SquareTargetType[] = ["bookmark", "star", "general"];
 
 export async function GET() {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const [postsResult, mediaResult, votesResult, profilesResult] =
       await Promise.all([

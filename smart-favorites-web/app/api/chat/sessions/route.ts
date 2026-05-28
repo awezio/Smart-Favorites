@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function GET(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const { data: sessions, error } = await supabase
       .from("chat_sessions")
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const { data: session, error } = await supabase
       .from("chat_sessions")

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { SQUARE_MEDIA_BUCKET } from "@/lib/square";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id: postId } = await context.params;
 
-    const { userId } = await getAuthUser();
+    const { userId } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Verify post exists and belongs to user
     const { data: post, error: postError } = await supabase

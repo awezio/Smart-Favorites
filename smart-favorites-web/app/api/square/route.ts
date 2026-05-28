@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSquareTargetType } from "@/lib/square";
 import type {
   SquarePost,
@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // Try to get current user (optional — for fetching their votes)
-    const { userId } = await getAuthUser();
+    const { userId } = await getAuthUser(request);
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Build query for posts
     let query = supabase
@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const insertData: Record<string, unknown> = {
       user_id: userId,

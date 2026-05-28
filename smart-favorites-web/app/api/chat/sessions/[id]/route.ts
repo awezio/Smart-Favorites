@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
     }
 
     const { id } = await params;
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const { data: session, error } = await supabase
       .from("chat_sessions")
@@ -44,7 +44,7 @@ export async function PATCH(
     const body = await request.json();
     const { title, messages } = body;
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const updates: any = {};
     if (title !== undefined) updates.title = title;
@@ -77,7 +77,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     const { error } = await supabase
       .from("chat_sessions")

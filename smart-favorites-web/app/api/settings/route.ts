@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Get user settings
     const { data: userSettings } = await supabase
@@ -89,7 +89,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Build update data
     const updateData: any = { user_id: userId };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import type { Profile } from "@/types";
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Try to fetch existing profile
     const { data: profile, error } = await supabase
@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const supabase = createAdminClient();
+    const supabase = await createServerSupabaseClient();
 
     // Build update payload — only include fields that were provided
     const updateData: Partial<Pick<Profile, "display_name" | "bio" | "avatar_url" | "avatar_seed">> = {};
