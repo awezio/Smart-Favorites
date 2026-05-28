@@ -1,7 +1,18 @@
 import type { NextRequest } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-async function resolveBearerUser(token: string) {
+type ExtensionTokenUser = { id: string; auth_type: "extension_token" };
+type AuthUser = User | ExtensionTokenUser;
+
+const anonymousUser = {
+  userId: "",
+  user: null,
+};
+
+async function resolveBearerUser(
+  token: string
+): Promise<{ userId: string; user: AuthUser } | null> {
   const supabase = createAdminClient();
   const { data: authData } = await supabase.auth.getUser(token);
   if (authData.user) {
@@ -24,14 +35,16 @@ async function resolveBearerUser(token: string) {
   if (data?.user_id) {
     return {
       userId: data.user_id as string,
-      user: { id: data.user_id, auth_type: "extension_token" },
+      user: { id: data.user_id as string, auth_type: "extension_token" },
     };
   }
 
   return null;
 }
 
-export async function getAuthUser(request?: NextRequest) {
+export async function getAuthUser(
+  request?: NextRequest
+): Promise<{ userId: string; user: AuthUser | null }> {
   try {
     if (request) {
       const authHeader = request.headers.get("authorization");
@@ -44,14 +57,14 @@ export async function getAuthUser(request?: NextRequest) {
       }
     }
 
-    const { createClient } = await import("@/lib/supabase/client");
-    const supabase = createClient();
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      throw new Error("No authenticated user");
+      return anonymousUser;
     }
 
     return {
@@ -60,6 +73,6 @@ export async function getAuthUser(request?: NextRequest) {
     };
   } catch (error) {
     console.error("getAuthUser error:", error);
-    throw error;
+    return anonymousUser;
   }
 }

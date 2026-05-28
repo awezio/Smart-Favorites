@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const tools = listToolDefinitions(context.permissions);
     return NextResponse.json({ tools });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
   }
 }
 
@@ -63,6 +63,6 @@ export async function POST(request: NextRequest) {
         console.error("[POST /api/tools] audit failed", auditError);
       });
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
   }
 }

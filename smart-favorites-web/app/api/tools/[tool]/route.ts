@@ -48,6 +48,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
         console.error("[POST /api/tools/[tool]] audit failed", auditError);
       });
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
   }
 }

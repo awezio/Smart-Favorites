@@ -8,6 +8,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const updated = await updateApiKeyRecord(userId, id, body);
     return NextResponse.json({ key: updated });
@@ -20,6 +24,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     await deleteApiKeyRecord(userId, id);
     return NextResponse.json({ success: true });
   } catch (err: any) {

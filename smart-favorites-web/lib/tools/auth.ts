@@ -62,6 +62,10 @@ export async function resolveToolAuth(
   }
 
   const { userId } = await getAuthUser(request);
+  if (!userId) {
+    throw Object.assign(new Error("Authentication required"), { status: 401 });
+  }
+
   return {
     userId,
     authType: "session",

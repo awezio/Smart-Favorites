@@ -5,6 +5,10 @@ import { createApiKeyRecord, listApiKeys } from "@/lib/tools/auth";
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const keys = await listApiKeys(userId);
     return NextResponse.json({ keys });
   } catch (err: any) {
@@ -15,6 +19,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await getAuthUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const name = body.name || `Key ${new Date().toISOString()}`;
     const permissions = Array.isArray(body.permissions) ? body.permissions : undefined;
