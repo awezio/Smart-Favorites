@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
   section_title TEXT,
   char_start_pos INTEGER,
   char_end_pos INTEGER,
-  embedding vector(384) NOT NULL,
+  embedding extensions.vector(384) NOT NULL,
   char_count INTEGER,
   estimated_token_count INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS documents_user_id_idx ON documents(user_id);
 CREATE INDEX IF NOT EXISTS documents_status_idx ON documents(status);
 CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx ON document_chunks(document_id, chunk_index);
 CREATE INDEX IF NOT EXISTS document_chunks_user_id_idx ON document_chunks(user_id);
-CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx ON document_chunks USING ivfflat (embedding extensions.vector_cosine_ops) WITH (lists = 100);
 
 -- Enable RLS
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
@@ -86,8 +86,10 @@ CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Search function for document chunks
+SET search_path = public, extensions;
+
 CREATE OR REPLACE FUNCTION match_document_chunks(
-  query_embedding vector(384),
+  query_embedding extensions.vector(384),
   user_id_param UUID,
   match_count INT DEFAULT 10,
   similarity_threshold FLOAT DEFAULT 0.3

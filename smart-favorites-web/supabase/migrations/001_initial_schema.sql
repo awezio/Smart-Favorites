@@ -1,5 +1,6 @@
 -- Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
+SET search_path = public, extensions;
 
 -- Create bookmarks table
 CREATE TABLE IF NOT EXISTS bookmarks (
@@ -11,7 +12,7 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   folder_path TEXT,
   add_date TIMESTAMPTZ,
   icon TEXT,
-  embedding vector(384),
+  embedding extensions.vector(384),
   source_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS github_stars (
   stars INTEGER DEFAULT 0,
   forks INTEGER DEFAULT 0,
   updated TIMESTAMPTZ NOT NULL,
-  embedding vector(384),
+  embedding extensions.vector(384),
   source_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -48,11 +49,11 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 -- Create indexes
 CREATE INDEX IF NOT EXISTS bookmarks_user_id_idx ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS bookmarks_url_idx ON bookmarks(url);
-CREATE INDEX IF NOT EXISTS bookmarks_embedding_idx ON bookmarks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS bookmarks_embedding_idx ON bookmarks USING ivfflat (embedding extensions.vector_cosine_ops) WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS github_stars_user_id_idx ON github_stars(user_id);
 CREATE INDEX IF NOT EXISTS github_stars_url_idx ON github_stars(url);
-CREATE INDEX IF NOT EXISTS github_stars_embedding_idx ON github_stars USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS github_stars_embedding_idx ON github_stars USING ivfflat (embedding extensions.vector_cosine_ops) WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS chat_sessions_user_id_idx ON chat_sessions(user_id);
 

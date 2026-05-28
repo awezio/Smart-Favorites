@@ -1,6 +1,8 @@
+SET search_path = public, extensions;
+
 -- Function to search bookmarks by embedding
 CREATE OR REPLACE FUNCTION match_bookmarks(
-  query_embedding vector(384),
+  query_embedding extensions.vector(384),
   match_threshold float DEFAULT 0.3,
   match_count int DEFAULT 10
 )
@@ -35,7 +37,7 @@ $$;
 
 -- Function to search github stars by embedding
 CREATE OR REPLACE FUNCTION match_stars(
-  query_embedding vector(384),
+  query_embedding extensions.vector(384),
   match_threshold float DEFAULT 0.3,
   match_count int DEFAULT 10
 )
@@ -76,7 +78,7 @@ $$;
 
 -- Function to search across both bookmarks and stars
 CREATE OR REPLACE FUNCTION match_all_items(
-  query_embedding vector(384),
+  query_embedding extensions.vector(384),
   match_threshold float DEFAULT 0.3,
   match_count int DEFAULT 10
 )
