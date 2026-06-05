@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Github, Mail, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { getSupabaseHostname, usesDefaultSupabaseCloudDomain } from "@/lib/supabase/url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,6 +79,8 @@ function LoginForm() {
   // Captcha state
   const [captcha, setCaptcha] = useState(() => generateCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
+  const supabaseHost = getSupabaseHostname();
+  const usesSupabaseCloudHost = usesDefaultSupabaseCloudDomain();
 
   const refreshCaptcha = useCallback(() => {
     setCaptcha(generateCaptcha());
@@ -191,6 +194,13 @@ function LoginForm() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* OAuth Buttons */}
+          {usesSupabaseCloudHost && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              当前社交登录会跳转到 {supabaseHost}。如果你的网络无法访问
+              supabase.co，GitHub/Google 登录会在授权前失败；请在 Supabase
+              配置自定义域名后，把 NEXT_PUBLIC_SUPABASE_URL 切换到该域名。
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"

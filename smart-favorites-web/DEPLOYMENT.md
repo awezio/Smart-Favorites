@@ -140,6 +140,34 @@ http://localhost:3000/auth/callback
 
 用户在设置页输入的 AI Provider API Key 会在服务端用 `USER_API_KEY_ENCRYPTION_SECRET` 加密后存入 Supabase；Vercel 中应把该变量作为 Production/Preview/Development 的加密环境变量保存，并保持长期不变。
 
+**受限网络下的 GitHub/Google 登录：**
+
+如果用户网络无法访问 `*.supabase.co`，GitHub/Google 登录会停在 Supabase Auth 授权地址，例如：
+
+```text
+https://<project-ref>.supabase.co/auth/v1/authorize?provider=github...
+```
+
+这是 Supabase 托管 Social Login 的正常跳转链路，不是 Vercel 前端挂掉。要让 OAuth 在这类网络里可用，需要给 Supabase 项目启用 Custom Domain：
+
+1. 在 Supabase Dashboard > Project Settings > General > Custom Domains 添加子域名，例如 `api.example.com`。
+2. 在 DNS 中添加 CNAME：`api.example.com -> <project-ref>.supabase.co`。
+3. 按 Supabase 提示添加 `_acme-challenge.api.example.com` 的 TXT 记录并完成验证。
+4. 在 GitHub OAuth App 和 Google OAuth Client 中额外加入新的 Supabase Auth callback URL：
+
+```text
+https://api.example.com/auth/v1/callback
+```
+
+5. 激活 Supabase Custom Domain。
+6. 在 Vercel 环境变量中把 Supabase URL 切换为自定义域名并重新部署：
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://api.example.com
+```
+
+保留原来的 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY`。Custom Domain 激活后，Supabase Auth 会在 OAuth 流程中使用自定义域名作为 callback，浏览器不再需要访问随机项目域名。
+
 #### 5. 重新部署
 
 ```bash

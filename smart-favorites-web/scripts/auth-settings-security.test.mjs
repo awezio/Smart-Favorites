@@ -50,6 +50,20 @@ const checks = [
     file: ".env.local.example",
     assert: (content) => content.includes("USER_API_KEY_ENCRYPTION_SECRET"),
   },
+  {
+    name: "deployment docs explain Supabase custom domain for OAuth",
+    file: "DEPLOYMENT.md",
+    assert: (content) =>
+      content.includes("Supabase Custom Domain") &&
+      content.includes("https://api.example.com/auth/v1/callback"),
+  },
+  {
+    name: "login page warns when OAuth uses default Supabase cloud host",
+    file: "app/login/page.tsx",
+    assert: (content) =>
+      content.includes("usesDefaultSupabaseCloudDomain") &&
+      content.includes("NEXT_PUBLIC_SUPABASE_URL"),
+  },
 ];
 
 const failures = checks.filter((check) => {
