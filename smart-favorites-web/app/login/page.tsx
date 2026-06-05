@@ -66,6 +66,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
+  const authError = searchParams.get("error");
 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -87,6 +88,12 @@ function LoginForm() {
   useEffect(() => {
     refreshCaptcha();
   }, [isLogin, refreshCaptcha]);
+
+  useEffect(() => {
+    if (authError) {
+      toast.error(authError);
+    }
+  }, [authError]);
 
   const supabase = createClient();
 
@@ -152,27 +159,10 @@ function LoginForm() {
   };
 
   const handleOAuthLogin = async (provider: "github" | "google") => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirect=${redirectTo}`,
-      },
-    });
-
-    if (error) {
-      const msg = error.message || "";
-      const notEnabled =
-        msg.includes("not enabled") ||
-        msg.includes("Unsupported provider") ||
-        (error as any).error_code === "validation_failed";
-      if (notEnabled) {
-        toast.error(
-          `${provider} 登录未在后台开启。请在 Supabase 控制台 → Authentication → Providers 中启用 ${provider} 并配置 Client ID/Secret。`
-        );
-      } else {
-        toast.error(msg || `${provider} 登录失败`);
-      }
-    }
+    setLoading(true);
+    const loginUrl = new URL(`/auth/sign-in/${provider}`, window.location.origin);
+    loginUrl.searchParams.set("redirect", redirectTo);
+    window.location.href = loginUrl.toString();
   };
 
   return (

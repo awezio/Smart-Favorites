@@ -108,6 +108,7 @@ vercel --prod
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx...
 SUPABASE_SERVICE_ROLE_KEY=eyJxxx...
+USER_API_KEY_ENCRYPTION_SECRET=生成一个长期稳定的随机密钥
 DEEPSEEK_API_KEY=sk-xxx
 DEFAULT_LLM_PROVIDER=deepseek
 ```
@@ -119,6 +120,25 @@ GITHUB_TOKEN=ghp_xxx
 OPENAI_API_KEY=sk-xxx
 EMBEDDING_MODEL=Xenova/all-MiniLM-L6-v2
 ```
+
+**OAuth 登录配置：**
+
+在 Supabase Dashboard > Authentication > Providers 中分别启用 GitHub 和 Google，并配置各自的 Client ID/Secret。GitHub/Google 开发者后台的 OAuth callback URL 使用 Supabase 项目的回调地址：
+
+```text
+https://<your-project-ref>.supabase.co/auth/v1/callback
+```
+
+在 Supabase Authentication > URL Configuration 中配置：
+
+```text
+Site URL: https://your-app.vercel.app
+Redirect URLs:
+https://your-app.vercel.app/auth/callback
+http://localhost:3000/auth/callback
+```
+
+用户在设置页输入的 AI Provider API Key 会在服务端用 `USER_API_KEY_ENCRYPTION_SECRET` 加密后存入 Supabase；Vercel 中应把该变量作为 Production/Preview/Development 的加密环境变量保存，并保持长期不变。
 
 #### 5. 重新部署
 

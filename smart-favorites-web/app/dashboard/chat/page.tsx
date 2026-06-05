@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import type { ChatMessage, ChatSession, LLMProvider, SearchResult } from "@/types";
-import { CHAT_PROVIDER_OPTIONS } from "@/lib/chat-models";
+import { CHAT_PROVIDER_OPTIONS, type ChatModelOption } from "@/lib/chat-models";
 
 export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -31,7 +31,12 @@ export default function ChatPage() {
   const [selectedProvider, setSelectedProvider] = useState<LLMProvider | "">("");
   const [selectedModelId, setSelectedModelId] = useState("");
   const [showModelMenu, setShowModelMenu] = useState(false);
+  const [providerModels, setProviderModels] = useState<
+    Partial<Record<LLMProvider, ChatModelOption[]>>
+  >({});
+  const [modelLoadStates, setModelLoadStates] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const requestedModelsRef = useRef<Set<string>>(new Set());
 
   const loadSessions = useCallback(async (): Promise<ChatSession[]> => {
     const response = await fetch("/api/chat/sessions");
@@ -86,6 +91,42 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const loadProviderModels = useCallback(async (provider: LLMProvider) => {
+    if (requestedModelsRef.current.has(provider)) {
+      return;
+    }
+
+    requestedModelsRef.current.add(provider);
+    setModelLoadStates((current) => ({ ...current, [provider]: true }));
+
+    try {
+      const response = await fetch(`/api/settings/models?provider=${provider}`);
+      const data = await response.json();
+      if (data.success && Array.isArray(data.models) && data.models.length > 0) {
+        setProviderModels((current) => ({
+          ...current,
+          [provider]: data.models,
+        }));
+      } else {
+        requestedModelsRef.current.delete(provider);
+      }
+    } catch {
+      requestedModelsRef.current.delete(provider);
+    } finally {
+      setModelLoadStates((current) => ({ ...current, [provider]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showModelMenu) {
+      return;
+    }
+
+    CHAT_PROVIDER_OPTIONS.forEach((provider) => {
+      loadProviderModels(provider.id);
+    });
+  }, [loadProviderModels, showModelMenu]);
 
   const deleteSession = async (sessionId: string) => {
     await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE" });
@@ -170,12 +211,21 @@ export default function ChatPage() {
       return "默认模型";
     }
 
-    const provider = CHAT_PROVIDER_OPTIONS.find((item) => item.id === selectedProvider);
+    const providerOptions = CHAT_PROVIDER_OPTIONS.map((provider) => ({
+      ...provider,
+      models: providerModels[provider.id] || provider.models,
+    }));
+    const provider = providerOptions.find((item) => item.id === selectedProvider);
     const model = selectedModelId
       ? provider?.models.find((item) => item.id === selectedModelId)
       : provider?.models[0];
     return model ? `${provider?.name} · ${model.label}` : provider?.name || selectedProvider;
   })();
+
+  const providerOptions = CHAT_PROVIDER_OPTIONS.map((provider) => ({
+    ...provider,
+    models: providerModels[provider.id] || provider.models,
+  }));
 
   if (initializing) {
     return (
@@ -277,10 +327,13 @@ export default function ChatPage() {
                 >
                   默认模型
                 </button>
-                {CHAT_PROVIDER_OPTIONS.map((provider) => (
+                {providerOptions.map((provider) => (
                   <div key={provider.id} className="mt-1">
-                    <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                    <div className="flex items-center justify-between px-2 py-1 text-xs font-medium text-muted-foreground">
                       {provider.name}
+                      {modelLoadStates[provider.id] && (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      )}
                     </div>
                     {provider.models.map((model) => (
                       <button

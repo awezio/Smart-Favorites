@@ -1,27 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { LLMProvider } from "@/types";
-
-const PROVIDER_ENDPOINTS: Record<string, { baseURL: string; defaultModel: string; style: string }> = {
-  openai: { baseURL: "https://api.openai.com/v1", defaultModel: "gpt-4o-mini", style: "openai" },
-  deepseek: { baseURL: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat", style: "openai" },
-  kimi: { baseURL: "https://api.moonshot.cn/v1", defaultModel: "moonshot-v1-8k", style: "openai" },
-  qwen: { baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", defaultModel: "qwen-turbo", style: "openai" },
-  claude: { baseURL: "https://api.anthropic.com/v1", defaultModel: "claude-3-5-sonnet-20241022", style: "anthropic" },
-  gemini: { baseURL: "https://generativelanguage.googleapis.com/v1beta", defaultModel: "gemini-1.5-flash", style: "gemini" },
-  glm: { baseURL: "https://open.bigmodel.cn/api/paas/v4", defaultModel: "glm-4-flash", style: "openai" },
-};
-
-const ENV_KEY_MAP: Record<string, string> = {
-  openai: "OPENAI_API_KEY",
-  deepseek: "DEEPSEEK_API_KEY",
-  kimi: "KIMI_API_KEY",
-  qwen: "QWEN_API_KEY",
-  claude: "CLAUDE_API_KEY",
-  gemini: "GEMINI_API_KEY",
-  glm: "GLM_API_KEY",
-};
+import {
+  getEnvProviderKey,
+  isSupportedProvider,
+  PROVIDER_ENDPOINTS,
+} from "@/lib/ai/provider-config";
+import { decryptSecret } from "@/lib/server/secrets";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +18,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { provider, apiKey } = body;
 
-    if (!provider || !PROVIDER_ENDPOINTS[provider]) {
+    if (!provider || !isSupportedProvider(provider)) {
       return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
     }
 
@@ -46,10 +31,11 @@ export async function POST(request: NextRequest) {
         .select("api_keys")
         .eq("user_id", userId)
         .single();
-      resolvedKey = data?.api_keys?.[provider];
+      const savedKey = data?.api_keys?.[provider];
+      resolvedKey = savedKey ? decryptSecret(savedKey) : "";
     }
     if (!resolvedKey) {
-      resolvedKey = process.env[ENV_KEY_MAP[provider] || ""] || "";
+      resolvedKey = getEnvProviderKey(provider);
     }
 
     if (!resolvedKey) {

@@ -82,6 +82,7 @@ const PROVIDERS: {
 ];
 
 type TestState = "idle" | "testing" | "success" | "error";
+type ModelOption = { id: string; label: string };
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -94,6 +95,9 @@ export default function SettingsPage() {
   const [testStates, setTestStates] = useState<Record<string, TestState>>({});
   const [testErrors, setTestErrors] = useState<Record<string, string>>({});
   const [testLatencies, setTestLatencies] = useState<Record<string, number>>({});
+  const [modelStates, setModelStates] = useState<Record<string, TestState>>({});
+  const [modelErrors, setModelErrors] = useState<Record<string, string>>({});
+  const [providerModels, setProviderModels] = useState<Record<string, ModelOption[]>>({});
   const [providerStatus, setProviderStatus] = useState<
     Record<string, { configured: boolean; source: string }>
   >({});
@@ -262,6 +266,40 @@ export default function SettingsPage() {
     }
   };
 
+  const loadProviderModels = async (provider: string) => {
+    setModelStates((s) => ({ ...s, [provider]: "testing" }));
+    setModelErrors((s) => ({ ...s, [provider]: "" }));
+
+    try {
+      const key = apiKeys[provider];
+      const body: any = { provider };
+      if (key && !key.startsWith("••••")) {
+        body.apiKey = key;
+      }
+
+      const res = await fetch("/api/settings/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setProviderModels((current) => ({
+          ...current,
+          [provider]: data.models || [],
+        }));
+        setModelStates((s) => ({ ...s, [provider]: "success" }));
+      } else {
+        setModelStates((s) => ({ ...s, [provider]: "error" }));
+        setModelErrors((s) => ({ ...s, [provider]: data.error || "获取模型失败" }));
+      }
+    } catch {
+      setModelStates((s) => ({ ...s, [provider]: "error" }));
+      setModelErrors((s) => ({ ...s, [provider]: "网络错误" }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -393,6 +431,8 @@ export default function SettingsPage() {
           {PROVIDERS.map((p) => {
             const status = providerStatus[p.id];
             const ts = testStates[p.id] || "idle";
+            const ms = modelStates[p.id] || "idle";
+            const models = providerModels[p.id] || [];
 
             return (
               <div
@@ -426,29 +466,49 @@ export default function SettingsPage() {
                       </Badge>
                     )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => testProvider(p.id)}
-                    disabled={ts === "testing"}
-                    className="h-8"
-                  >
-                    {ts === "testing" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                    ) : ts === "success" ? (
-                      <Check className="h-3.5 w-3.5 text-green-500 mr-1" />
-                    ) : ts === "error" ? (
-                      <X className="h-3.5 w-3.5 text-red-500 mr-1" />
-                    ) : (
-                      <TestTube className="h-3.5 w-3.5 mr-1" />
-                    )}
-                    测试
-                    {ts === "success" && testLatencies[p.id] && (
-                      <span className="ml-1 text-green-600">
-                        {testLatencies[p.id]}ms
-                      </span>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadProviderModels(p.id)}
+                      disabled={ms === "testing"}
+                      className="h-8"
+                    >
+                      {ms === "testing" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      ) : ms === "success" ? (
+                        <Check className="h-3.5 w-3.5 text-green-500 mr-1" />
+                      ) : ms === "error" ? (
+                        <X className="h-3.5 w-3.5 text-red-500 mr-1" />
+                      ) : (
+                        <TestTube className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      模型
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testProvider(p.id)}
+                      disabled={ts === "testing"}
+                      className="h-8"
+                    >
+                      {ts === "testing" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      ) : ts === "success" ? (
+                        <Check className="h-3.5 w-3.5 text-green-500 mr-1" />
+                      ) : ts === "error" ? (
+                        <X className="h-3.5 w-3.5 text-red-500 mr-1" />
+                      ) : (
+                        <TestTube className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      测试
+                      {ts === "success" && testLatencies[p.id] && (
+                        <span className="ml-1 text-green-600">
+                          {testLatencies[p.id]}ms
+                        </span>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -486,10 +546,32 @@ export default function SettingsPage() {
 
                 <p className="text-xs text-muted-foreground">{p.hint}</p>
 
+                {models.length > 0 && (
+                  <div className="rounded-md border bg-muted/30 p-2">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                      API 返回的可用模型 ({models.length})
+                    </p>
+                    <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
+                      {models.slice(0, 24).map((model) => (
+                        <Badge key={model.id} variant="secondary" className="text-[10px]">
+                          {model.label || model.id}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {ts === "error" && testErrors[p.id] && (
                   <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 dark:bg-red-950/20 p-2 rounded">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span className="break-all">{testErrors[p.id]}</span>
+                  </div>
+                )}
+
+                {ms === "error" && modelErrors[p.id] && (
+                  <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span className="break-all">{modelErrors[p.id]}</span>
                   </div>
                 )}
               </div>

@@ -8,6 +8,7 @@
     "test:phase1": "node scripts/phase1-document-pipeline.test.mjs",
     "test:phase4": "node scripts/phase4-contract.test.mjs",
     "test:phase5": "node scripts/phase5-release-readiness.test.mjs",
+    "test:auth-settings": "node scripts/auth-settings-security.test.mjs",
     "benchmark:phase5": "node scripts/phase5-benchmark.mjs",
     "start": "next start",
     "lint": "eslint .",
