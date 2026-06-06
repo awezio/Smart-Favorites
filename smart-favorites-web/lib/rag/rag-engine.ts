@@ -1,4 +1,4 @@
-import { searchAll } from "@/lib/rag/search";
+import { searchAll, type SupabaseQueryClient } from "@/lib/rag/search";
 import type { SearchResult, LLMMessage } from "@/types";
 
 type RagResponse = {
@@ -12,9 +12,10 @@ export async function ragChat(
   topK: number,
   userId: string,
   provider?: string,
-  model?: string
+  model?: string,
+  client?: SupabaseQueryClient
 ): Promise<RagResponse> {
-  const sources = await searchAll(query, topK, 0.3, userId);
+  const sources = await searchAll(query, topK, 0.3, userId, client);
   const answer = buildFallbackAnswer(query, sources, chatHistory);
 
   return {

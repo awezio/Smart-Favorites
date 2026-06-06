@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ragChat } from "@/lib/rag/rag-engine";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import type { LLMProvider } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -31,7 +32,16 @@ export async function POST(request: NextRequest) {
     const modelOverride =
       typeof model === "string" && model.trim() ? model.trim() : undefined;
 
-    const result = await ragChat(query, chatHistory, 5, userId, providerOverride, modelOverride);
+    const supabase = await createServerSupabaseClient();
+    const result = await ragChat(
+      query,
+      chatHistory,
+      5,
+      userId,
+      providerOverride,
+      modelOverride,
+      supabase
+    );
 
     return NextResponse.json({
       answer: result.answer,

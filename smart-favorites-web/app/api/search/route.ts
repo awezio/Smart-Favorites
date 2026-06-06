@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchAll, searchBookmarks, searchStars } from "@/lib/rag/search";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,17 +21,18 @@ export async function POST(request: NextRequest) {
     }
 
     let results;
+    const supabase = await createServerSupabaseClient();
 
     switch (type) {
       case "bookmarks":
-        results = await searchBookmarks(query, topK, threshold, userId);
+        results = await searchBookmarks(query, topK, threshold, userId, supabase);
         break;
       case "stars":
-        results = await searchStars(query, topK, threshold, userId);
+        results = await searchStars(query, topK, threshold, userId, supabase);
         break;
       case "all":
       default:
-        results = await searchAll(query, topK, threshold, userId);
+        results = await searchAll(query, topK, threshold, userId, supabase);
         break;
     }
 

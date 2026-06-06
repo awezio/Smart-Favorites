@@ -18,6 +18,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [searchType, setSearchType] = useState<"all" | "bookmarks" | "stars">(
     "all"
   );
@@ -26,6 +27,7 @@ export default function SearchPage() {
     if (!query.trim()) return;
 
     setLoading(true);
+    setError("");
     try {
       const response = await fetch("/api/search", {
         method: "POST",
@@ -36,9 +38,15 @@ export default function SearchPage() {
       if (response.ok) {
         const data = await response.json();
         setResults(data.results || []);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setResults([]);
+        setError(data.error || "搜索失败，请稍后重试");
       }
     } catch (error) {
       console.error("Search error:", error);
+      setResults([]);
+      setError("搜索失败，请检查网络后重试");
     } finally {
       setLoading(false);
     }
@@ -85,6 +93,14 @@ export default function SearchPage() {
       </Card>
 
       <div className="space-y-4">
+        {error && (
+          <Card>
+            <CardContent className="py-6 text-center text-destructive">
+              {error}
+            </CardContent>
+          </Card>
+        )}
+
         {results.length > 0 && (
           <p className="text-sm text-muted-foreground">
             找到 {results.length} 个结果
@@ -95,7 +111,7 @@ export default function SearchPage() {
           <ResultCard key={index} result={result} />
         ))}
 
-        {results.length === 0 && query && !loading && (
+        {results.length === 0 && query && !loading && !error && (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               未找到相关结果
