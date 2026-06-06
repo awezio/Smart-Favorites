@@ -175,7 +175,7 @@ export default function BookmarksPage() {
 
   const openExtensionGuide = () => {
     window.open(
-      "https://github.com/nichuanfang/Smart-Favorites/tree/main/extension",
+      "https://github.com/awezio/Smart-Favorites/tree/main/extension",
       "_blank",
       "noopener,noreferrer"
     );

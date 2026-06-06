@@ -21,9 +21,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { translations, type Locale } from "@/lib/i18n";
 
-const GITHUB_URL = "https://github.com/nichuanfang/Smart-Favorites";
+const GITHUB_URL = "https://github.com/awezio/Smart-Favorites";
 const EXTENSION_URL =
-  "https://github.com/nichuanfang/Smart-Favorites/tree/main/extension";
+  "https://github.com/awezio/Smart-Favorites/tree/main/extension";
 
 export default function LandingPage() {
   const [locale, setLocale] = useState<Locale>("zh");

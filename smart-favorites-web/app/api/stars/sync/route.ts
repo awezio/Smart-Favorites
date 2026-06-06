@@ -8,7 +8,6 @@ import { bulkInsertStars, getStars, updateStar, deleteStar } from "@/lib/db/gith
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { decryptSecret, hasStoredSecret } from "@/lib/server/secrets";
 
 type GitHubSyncCredentials = {
   username?: string;
@@ -152,16 +151,13 @@ async function resolveGitHubSyncCredentials({
 
   const { data: settings } = await supabase
     .from("user_settings")
-    .select("github_username, github_token")
+    .select("github_username")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const providerToken =
-    typeof session?.provider_token === "string" ? session.provider_token : "";
-  const storedToken = hasStoredSecret(settings?.github_token)
-    ? decryptSecret(settings?.github_token)
-    : "";
-  const token = requestToken || providerToken || storedToken || process.env.GITHUB_TOKEN || "";
+  const providerToken = sanitizeGitHubToken(session?.provider_token);
+  const explicitToken = sanitizeGitHubToken(requestToken);
+  const token = explicitToken || providerToken;
   const metadata = user && "user_metadata" in user ? user.user_metadata || {} : {};
   const metadataUsername =
     metadata.user_name ||
@@ -176,4 +172,26 @@ async function resolveGitHubSyncCredentials({
     token,
     useAuthenticatedUser: !requestUsername && Boolean(providerToken),
   };
+}
+
+function sanitizeGitHubToken(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const token = value.trim().replace(/^Bearer\s+/i, "");
+  return isUsableGitHubToken(token) ? token : "";
+}
+
+function isUsableGitHubToken(token: string): boolean {
+  if (!token) return false;
+
+  const lowered = token.toLowerCase();
+  if (
+    lowered === "undefined" ||
+    lowered === "null" ||
+    lowered.includes("your_token") ||
+    lowered.includes("github_token")
+  ) {
+    return false;
+  }
+
+  return /^(github_pat_|gh[opusr]_)[A-Za-z0-9_]+$/.test(token);
 }

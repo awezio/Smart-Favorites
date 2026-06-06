@@ -50,7 +50,8 @@ async function fetchStarsFromGitHub(
     });
 
     if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status}`);
+      const message = await readGitHubErrorMessage(response);
+      throw new Error(`GitHub API error: ${response.status}${message ? ` - ${message}` : ""}`);
     }
 
     const data = (await response.json()) as GitHubRepo[];
@@ -132,6 +133,21 @@ export function diffStars(
     modified,
     unchanged_count: unchangedCount,
   };
+}
+
+async function readGitHubErrorMessage(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+    if (typeof data?.message === "string") return data.message;
+  } catch {
+    try {
+      return await response.text();
+    } catch {
+      return "";
+    }
+  }
+
+  return "";
 }
 
 function buildGitHubHeaders(token?: string): HeadersInit {

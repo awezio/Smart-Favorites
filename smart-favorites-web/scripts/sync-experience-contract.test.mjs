@@ -7,6 +7,7 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (...segments) => readFileSync(join(repoRoot, ...segments), "utf8");
 
 const bookmarksPage = read("app", "dashboard", "bookmarks", "page.tsx");
+const landingPage = read("app", "page.tsx");
 const starsPage = read("app", "dashboard", "stars", "page.tsx");
 const starsSyncRoute = read("app", "api", "stars", "sync", "route.ts");
 const githubStarsParser = read("lib", "parsers", "github-stars.ts");
@@ -33,6 +34,21 @@ assert.match(
   bookmarksPage,
   /网页无法直接读取浏览器收藏夹/,
   "Bookmarks page should explain why direct web-page bookmark access is not possible."
+);
+assert.doesNotMatch(
+  `${landingPage}\n${bookmarksPage}`,
+  /nichuanfang\/Smart-Favorites/,
+  "Extension sync entry points must not point at the old repository path."
+);
+assert.match(
+  landingPage,
+  /https:\/\/github\.com\/awezio\/Smart-Favorites\/tree\/main\/extension/,
+  "Landing page extension entry point should target the current extension source."
+);
+assert.match(
+  bookmarksPage,
+  /https:\/\/github\.com\/awezio\/Smart-Favorites\/tree\/main\/extension/,
+  "Bookmarks extension sync entry point should target the current extension source."
 );
 
 assert.doesNotMatch(
@@ -62,6 +78,16 @@ assert.match(
   "Stars sync API should use the Supabase GitHub provider token when available."
 );
 assert.match(
+  starsSyncRoute,
+  /isUsableGitHubToken/,
+  "Stars sync API should ignore placeholder or legacy invalid GitHub tokens during automatic sync."
+);
+assert.match(
+  starsSyncRoute,
+  /sanitizeGitHubToken/,
+  "Stars sync API should sanitize GitHub tokens before sending them to GitHub."
+);
+assert.match(
   githubStarsParser,
   /fetchAuthenticatedUserStars/,
   "GitHub parser should support the authenticated /user/starred endpoint."
@@ -70,6 +96,11 @@ assert.match(
   githubStarsParser,
   /https:\/\/api\.github\.com\/user\/starred/,
   "Authenticated GitHub sync should call /user/starred."
+);
+assert.match(
+  githubStarsParser,
+  /readGitHubErrorMessage/,
+  "GitHub parser should surface GitHub's response body for sync diagnostics."
 );
 
 assert.match(
