@@ -1,4 +1,7 @@
 import { searchAll, type SupabaseQueryClient } from "@/lib/rag/search";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { callProviderChat, getEnvProviderKey, isSupportedProvider } from "@/lib/ai/provider-config";
+import { decryptSecret } from "@/lib/server/secrets";
 import type { SearchResult, LLMMessage } from "@/types";
 
 type RagResponse = {
@@ -16,12 +19,125 @@ export async function ragChat(
   client?: SupabaseQueryClient
 ): Promise<RagResponse> {
   const sources = await searchAll(query, topK, 0.3, userId, client);
-  const answer = buildFallbackAnswer(query, sources, chatHistory);
+  const fallback = buildFallbackAnswer(query, sources, chatHistory);
+  const selectedProvider = provider && isSupportedProvider(provider) ? provider : await getDefaultProvider(userId);
 
-  return {
-    answer,
-    sources,
-  };
+  try {
+    const apiKey = await resolveProviderKey(userId, selectedProvider);
+    const prompt = buildRagPrompt(query, sources);
+    const response = await callProviderChat({
+      provider: selectedProvider,
+      apiKey,
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are Smart Favorites, a concise personal knowledge assistant. Answer from the provided bookmarks, GitHub stars, and documents. If evidence is thin, say so.",
+        },
+        ...chatHistory.slice(-8),
+        { role: "user", content: prompt },
+      ],
+    });
+
+    await logAiCall({
+      userId,
+      provider: selectedProvider,
+      model: response.model,
+      status: "success",
+      usage: response.usage,
+    });
+
+    const answer = response.content?.trim() || fallback;
+    return { answer, sources };
+  } catch (error: any) {
+    await logAiCall({
+      userId,
+      provider: selectedProvider,
+      model: model || "",
+      status: "error",
+      error: error.message,
+    });
+    const answer = `${fallback}\n\n(Model call failed: ${error.message})`;
+    return { answer, sources };
+  }
+
+}
+
+async function getDefaultProvider(userId: string) {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("user_settings")
+    .select("default_llm_provider")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const provider = data?.default_llm_provider || process.env.DEFAULT_LLM_PROVIDER || "deepseek";
+  return isSupportedProvider(provider) ? provider : "deepseek";
+}
+
+async function resolveProviderKey(userId: string, provider: string) {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("user_settings")
+    .select("api_keys")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const saved = data?.api_keys?.[provider];
+  if (saved) {
+    return decryptSecret(saved);
+  }
+
+  return getEnvProviderKey(provider);
+}
+
+function buildRagPrompt(query: string, sources: SearchResult[]) {
+  const evidence = sources.slice(0, 8).map((source, index) => {
+    if (source.type === "bookmark" && source.bookmark) {
+      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nDescription: ${source.bookmark.description || ""}`;
+    }
+
+    if (source.type === "star" && source.star) {
+      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description || ""}`;
+    }
+
+    return `${index + 1}. ${source.id}`;
+  });
+
+  return `Question: ${query}\n\nPersonal knowledge evidence:\n${evidence.join("\n\n") || "No matching evidence."}\n\nAnswer in the user's language. Include concrete item names and URLs when useful.`;
+}
+
+async function logAiCall({
+  userId,
+  provider,
+  model,
+  status,
+  usage,
+  error,
+}: {
+  userId: string;
+  provider: string;
+  model: string;
+  status: "success" | "error";
+  usage?: any;
+  error?: string;
+}) {
+  try {
+    const supabase = createAdminClient();
+    await supabase.from("ai_call_logs").insert({
+      user_id: userId,
+      provider,
+      model,
+      status,
+      prompt_tokens: usage?.prompt_tokens || usage?.input_tokens || 0,
+      completion_tokens: usage?.completion_tokens || usage?.output_tokens || 0,
+      total_tokens: usage?.total_tokens || 0,
+      error_message: error ? String(error).slice(0, 500) : null,
+    });
+  } catch {
+    // Metrics should never break chat.
+  }
 }
 
 function buildFallbackAnswer(

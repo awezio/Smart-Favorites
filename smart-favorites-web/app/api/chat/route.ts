@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ragChat } from "@/lib/rag/rag-engine";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import type { LLMProvider } from "@/types";
+import { isSupportedProvider } from "@/lib/ai/provider-config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,11 +24,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validProviders: LLMProvider[] = [
-      "openai", "deepseek", "kimi", "qwen", "claude", "gemini", "glm", "ollama",
-    ];
     const providerOverride =
-      provider && validProviders.includes(provider) ? provider : undefined;
+      typeof provider === "string" && isSupportedProvider(provider) ? provider : undefined;
     const modelOverride =
       typeof model === "string" && model.trim() ? model.trim() : undefined;
 

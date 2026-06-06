@@ -3,7 +3,7 @@
  * Handles side panel, auto-sync, scheduled sync, and bookmark change monitoring
  */
 
-let API_BASE_URL = 'https://smart-favorites-web.vercel.app';
+let API_BASE_URL = 'https://smart-favorites.vercel.app';
 
 // Load API URL from storage
 chrome.storage.local.get(['backendUrl']).then(settings => {
@@ -15,7 +15,7 @@ chrome.storage.local.get(['backendUrl']).then(settings => {
 // Listen for storage changes to update API_BASE_URL dynamically
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && changes.backendUrl) {
-    API_BASE_URL = changes.backendUrl.newValue || 'https://smart-favorites-web.vercel.app';
+    API_BASE_URL = changes.backendUrl.newValue || 'https://smart-favorites.vercel.app';
   }
 });
 
@@ -324,7 +324,7 @@ async function searchBookmarks(query) {
     const response = await fetch(`${url}/api/search`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ query, top_k: 10 })
+      body: JSON.stringify({ query, topK: 10, type: 'all' })
     });
     
     if (!response.ok) throw new Error('Search failed');
@@ -342,7 +342,7 @@ async function sendChatMessage(message) {
     const response = await fetch(`${url}/api/chat`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ message, include_sources: true })
+      body: JSON.stringify({ query: message, chatHistory: [] })
     });
     
     if (!response.ok) throw new Error('Chat failed');

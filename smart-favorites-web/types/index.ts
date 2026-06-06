@@ -125,15 +125,7 @@ export interface DiffResult<T> {
 }
 
 // LLM Provider types
-export type LLMProvider =
-  | "openai"
-  | "deepseek"
-  | "kimi"
-  | "qwen"
-  | "claude"
-  | "gemini"
-  | "glm"
-  | "ollama";
+export type LLMProvider = string;
 
 export interface AIConfig {
   provider: LLMProvider;

@@ -11,6 +11,7 @@
     "test:chat-sessions": "node scripts/chat-session-opening.test.mjs",
     "test:sync-experience": "node scripts/sync-experience-contract.test.mjs",
     "test:search-experience": "node scripts/search-experience-contract.test.mjs",
+    "test:provider-admin": "node scripts/provider-admin-contract.test.mjs",
     "test:favicon": "node scripts/favicon-contract.test.mjs",
     "test:auth-settings": "node scripts/auth-settings-security.test.mjs",
     "benchmark:phase5": "node scripts/phase5-benchmark.mjs",

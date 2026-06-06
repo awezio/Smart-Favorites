@@ -4,7 +4,7 @@
  */
 
 // Configuration - will be loaded from storage
-let API_BASE_URL = 'https://smart-favorites-web.vercel.app';
+let API_BASE_URL = 'https://smart-favorites.vercel.app';
 
 // Helper: fetch with auth token
 async function fetchWithAuth(url, options = {}) {
@@ -13,7 +13,12 @@ async function fetchWithAuth(url, options = {}) {
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
-  return fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    await chrome.storage.local.remove(['authToken', 'extensionToken', 'supabaseRefreshToken', 'supabaseExpiresAt']);
+    checkExtensionAuthStatus();
+  }
+  return response;
 }
 
 // State
@@ -244,7 +249,8 @@ async function checkConnection() {
     });
     
     if (response.ok) {
-      const data = await response.json();
+      const payload = await response.json();
+      const data = payload.session || payload;
       const modelName = data.model || '--';
       
       // Update current provider from backend
@@ -577,7 +583,7 @@ async function searchBookmarks(query) {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/api/search`, {
         method: 'POST',
-        body: JSON.stringify({ query, top_k: 10 }),
+        body: JSON.stringify({ query, topK: 10, type: 'all' }),
       });
 
       if (response.ok) {
@@ -659,7 +665,8 @@ async function loadChatSessions() {
     
     const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions`);
     if (response.ok) {
-      chatSessions = await response.json();
+      const payload = await response.json();
+      chatSessions = payload.sessions || payload;
       console.log('Loaded sessions:', chatSessions.length, 'Last session:', lastSessionId);
       renderChatSessions();
       
@@ -990,13 +997,14 @@ async function sendChatMessage(message) {
   // Ensure we have a valid backend session before sending message
   if (!currentSessionId || currentSessionId.startsWith('local-')) {
     try {
-      const sessionResponse = await fetch(`${API_BASE_URL}/api/chat/sessions`, {
+      const sessionResponse = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '新会话' })
       });
       if (sessionResponse.ok) {
-        const session = await sessionResponse.json();
+        const payload = await sessionResponse.json();
+        const session = payload.session || payload;
         chatSessions.unshift(session);
         currentSessionId = session.id;
         renderChatSessions();
@@ -1023,10 +1031,10 @@ async function sendChatMessage(message) {
   try {
     // Prepare request body
     const requestBody = { 
-      message, 
-      include_sources: true,
-      session_id: currentSessionId,
-      web_search: webSearchEnabled,
+      query: message,
+      sessionId: currentSessionId,
+      chatHistory: [],
+      webSearch: webSearchEnabled,
       provider: currentProvider
     };
     
@@ -1036,14 +1044,13 @@ async function sendChatMessage(message) {
         type: a.type,
         content: a.content,
         filename: a.name,
-        mime_type: a.mimeType
+        mimeType: a.mimeType
       }));
     }
     
-    console.log('Sending chat with session_id:', currentSessionId);
-    const response = await fetch(`${API_BASE_URL}/api/chat`, {
+    console.log('Sending chat with sessionId:', currentSessionId);
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
     });
     
@@ -1062,12 +1069,12 @@ async function sendChatMessage(message) {
     const data = await response.json();
     document.getElementById(loadingId)?.remove();
     
-    if (!data.response) {
+    if (!data.answer && !data.response) {
       throw new Error('后端返回的数据格式不正确');
     }
     
     // Render response with Markdown
-    let responseContent = data.response;
+    let responseContent = data.answer || data.response;
     
     // Add sources section if available
     let sourcesHtml = '';
@@ -1120,7 +1127,7 @@ async function sendChatMessage(message) {
       const newTitle = message.slice(0, 20) + (message.length > 20 ? '...' : '');
       session.title = newTitle;
       renderChatSessions();
-      fetch(`${API_BASE_URL}/api/chat/sessions/${currentSessionId}`, {
+      fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${currentSessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle })

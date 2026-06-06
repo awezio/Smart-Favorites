@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hashExtensionToken, isExtensionToken } from "@/lib/auth/extension-token";
 
 type ExtensionTokenUser = { id: string; auth_type: "extension_token" };
 type AuthUser = User | ExtensionTokenUser;
@@ -20,6 +21,31 @@ async function resolveBearerUser(
       userId: authData.user.id,
       user: authData.user,
     };
+  }
+
+  if (isExtensionToken(token)) {
+    const { data: session, error: sessionError } = await supabase
+      .from("extension_sessions")
+      .select("user_id")
+      .eq("token_hash", hashExtensionToken(token))
+      .is("revoked_at", null)
+      .maybeSingle();
+
+    if (sessionError) {
+      throw new Error(sessionError.message);
+    }
+
+    if (session?.user_id) {
+      await supabase
+        .from("extension_sessions")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("token_hash", hashExtensionToken(token));
+
+      return {
+        userId: session.user_id as string,
+        user: { id: session.user_id as string, auth_type: "extension_token" },
+      };
+    }
   }
 
   const { data, error } = await supabase

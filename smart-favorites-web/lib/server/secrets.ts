@@ -11,6 +11,7 @@ export type EncryptedSecret = {
 };
 
 const ENCRYPTION_SECRET_ENV = "USER_API_KEY_ENCRYPTION_SECRET";
+export const MASKED_SECRET_PREFIX = "••••";
 
 function getEncryptionKey() {
   const secret =
@@ -97,8 +98,8 @@ export function maskSecret(value: unknown) {
 
   try {
     const plain = decryptSecret(value);
-    return plain ? `••••${plain.slice(-4)}` : "••••";
+    return plain ? `${MASKED_SECRET_PREFIX}${plain.slice(-4)}` : MASKED_SECRET_PREFIX;
   } catch {
-    return "••••";
+    return MASKED_SECRET_PREFIX;
   }
 }

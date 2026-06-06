@@ -28,8 +28,8 @@ const checks = [
     name: "settings API encrypts stored user provider keys",
     file: "app/api/settings/route.ts",
     assert: (content) =>
-      content.includes("encryptSecret(v)") &&
-      content.includes("maskSecret(v)") &&
+      content.includes("encryptSecret(value)") &&
+      content.includes("maskSecret(value)") &&
       !content.includes("newKeys[k] = v;"),
   },
   {
@@ -42,8 +42,9 @@ const checks = [
     name: "provider config fetches provider model lists",
     file: "lib/ai/provider-config.ts",
     assert: (content) =>
-      content.includes('`${config.baseURL}/models`') &&
-      content.includes('`${config.baseURL}/models?key=${apiKey}`'),
+      content.includes("fetchProviderModels") &&
+      content.includes("getProviderDefinition") &&
+      content.includes("definition.modelsEndpoint"),
   },
   {
     name: "deployment docs require a stable encryption secret",

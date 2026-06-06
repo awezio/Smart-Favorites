@@ -175,7 +175,7 @@
       <h2>🌐 后端服务配置</h2>
       <div class="form-group">
         <label for="backend-url">后端服务地址</label>
-        <input type="text" id="backend-url" value="https://smart-favorites-web.vercel.app" placeholder="https://smart-favorites-web.vercel.app">
+        <input type="text" id="backend-url" value="https://smart-favorites.vercel.app" placeholder="https://smart-favorites.vercel.app">
         <p class="hint">输入 Web 端地址（Vercel 部署地址或本地 http://localhost:3000）</p>
       </div>
       <button id="test-connection" class="btn btn-secondary">测试连接</button>
@@ -325,7 +325,7 @@
         return;
       }
       try {
-        const backendUrl = document.getElementById('backend-url').value || 'https://smart-favorites-web.vercel.app';
+        const backendUrl = document.getElementById('backend-url').value || 'https://smart-favorites.vercel.app';
         const response = await fetch(`${backendUrl}/api/profile`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -368,7 +368,7 @@
 
     // Login via Web (OAuth flow)
     document.getElementById('login-via-web').addEventListener('click', () => {
-      const backendUrl = document.getElementById('backend-url').value || 'https://smart-favorites-web.vercel.app';
+      const backendUrl = document.getElementById('backend-url').value || 'https://smart-favorites.vercel.app';
       const base = backendUrl.replace(/\/$/, '');
       const url = base + '/auth/extension?ext_id=' + chrome.runtime.id;
       chrome.tabs.create({ url });

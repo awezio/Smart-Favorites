@@ -17,6 +17,17 @@ const bookmarksDb = read("lib", "db", "bookmarks.ts");
 const githubStarsDb = read("lib", "db", "github-stars.ts");
 const dashboardLayout = read("app", "dashboard", "layout.tsx");
 const manifest = read("..", "extension", "manifest.json");
+const extensionBackground = read("..", "extension", "background", "background.js");
+const extensionSidepanel = read("..", "extension", "sidepanel", "sidepanel.js");
+const extensionOptions = read("..", "extension", "options", "options.html");
+const extensionAuthCallback = read("..", "extension", "auth-callback.js");
+const extensionSources = [
+  extensionBackground,
+  extensionSidepanel,
+  extensionOptions,
+  extensionAuthCallback,
+].join("\n");
+const releaseUrl = "https://github.com/awezio/Smart-Favorites/releases/latest";
 
 assert.match(
   manifest,
@@ -40,19 +51,49 @@ assert.match(
   "Bookmarks page should explain why direct web-page bookmark access is not possible."
 );
 assert.doesNotMatch(
-  `${landingPage}\n${bookmarksPage}`,
-  /nichuanfang\/Smart-Favorites/,
-  "Extension sync entry points must not point at the old repository path."
+  `${landingPage}\n${bookmarksPage}\n${extensionSources}`,
+  /smart-favorites-web\.vercel\.app|nichuanfang\/Smart-Favorites/,
+  "Extension sync entry points must not point at old deployments or repository paths."
 );
 assert.match(
   landingPage,
-  /https:\/\/github\.com\/awezio\/Smart-Favorites\/tree\/main\/extension/,
-  "Landing page extension entry point should target the current extension source."
+  new RegExp(releaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  "Landing page extension entry point should target the latest GitHub Release."
 );
 assert.match(
   bookmarksPage,
-  /https:\/\/github\.com\/awezio\/Smart-Favorites\/tree\/main\/extension/,
-  "Bookmarks extension sync entry point should target the current extension source."
+  new RegExp(releaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  "Bookmarks extension sync entry point should target the latest GitHub Release."
+);
+assert.match(
+  extensionSources,
+  /https:\/\/smart-favorites\.vercel\.app/,
+  "Extension should default to the production web app domain."
+);
+assert.match(
+  extensionSidepanel,
+  /\/auth\/extension\?ext_id=/,
+  "Extension login should use the web-to-extension auth bridge."
+);
+assert.match(
+  extensionSources,
+  /topK:\s*10/,
+  "Extension search requests should use the current Web API topK field."
+);
+assert.doesNotMatch(
+  extensionSources,
+  /top_k|include_sources|session_id/,
+  "Extension requests should not use legacy Python-style API payload fields."
+);
+assert.match(
+  extensionSources,
+  /body:\s*JSON\.stringify\(\{\s*query/,
+  "Extension chat/search requests should send query-based payloads."
+);
+assert.match(
+  extensionAuthCallback,
+  /extensionToken/,
+  "Extension callback should persist an extension-scoped token."
 );
 
 assert.doesNotMatch(

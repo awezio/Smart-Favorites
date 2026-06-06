@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 /**
  * Extension Connect Page
- * When user visits with ?ext_id=xxx, if logged in, redirects to extension with session tokens.
+ * When user visits with ?ext_id=xxx, if logged in, redirects to extension with an extension-scoped token.
  * If not logged in, redirects to /login with return URL.
  */
 function ExtensionAuthContent() {
@@ -30,11 +30,21 @@ function ExtensionAuthContent() {
         return;
       }
 
+      const tokenResponse = await fetch("/api/auth/extension/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extensionId: extId }),
+      });
+
+      if (!tokenResponse.ok) {
+        router.replace(`/login?redirect=${encodeURIComponent(`/auth/extension?ext_id=${extId}`)}`);
+        return;
+      }
+
+      const { token } = await tokenResponse.json();
       const callbackUrl = `chrome-extension://${extId}/auth-callback.html`;
       const hash = new URLSearchParams({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: String(session.expires_at ?? 0),
+        extensionToken: token,
       }).toString();
 
       window.location.href = `${callbackUrl}#${hash}`;

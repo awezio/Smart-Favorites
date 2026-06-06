@@ -1,20 +1,18 @@
 /**
- * Extension auth callback - receives tokens from Web OAuth redirect and stores them.
+ * Extension auth callback - receives an extension-scoped token from Web and stores it.
  */
 (function () {
   const hash = window.location.hash.slice(1);
   const params = new URLSearchParams(hash);
+  const extensionToken = params.get('extensionToken');
   const accessToken = params.get('access_token');
-  const refreshToken = params.get('refresh_token');
-  const expiresAt = params.get('expires_at');
 
-  if (accessToken && refreshToken) {
+  if (extensionToken || accessToken) {
     chrome.storage.local.set({
-      authToken: accessToken,
-      supabaseRefreshToken: refreshToken,
-      supabaseExpiresAt: expiresAt || '0',
+      authToken: extensionToken || accessToken,
+      extensionToken: extensionToken || accessToken,
     }, () => {
-      console.log('Extension auth: session stored');
+      console.log('Extension auth: extensionToken stored');
       setTimeout(() => window.close(), 800);
     });
   } else {
