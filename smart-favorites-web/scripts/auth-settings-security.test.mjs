@@ -58,11 +58,12 @@ const checks = [
       content.includes("https://api.example.com/auth/v1/callback"),
   },
   {
-    name: "login page warns when OAuth uses default Supabase cloud host",
+    name: "login page keeps Supabase OAuth infrastructure guidance out of the visible form",
     file: "app/login/page.tsx",
     assert: (content) =>
-      content.includes("usesDefaultSupabaseCloudDomain") &&
-      content.includes("NEXT_PUBLIC_SUPABASE_URL"),
+      !content.includes("usesDefaultSupabaseCloudDomain") &&
+      !content.includes("NEXT_PUBLIC_SUPABASE_URL") &&
+      !content.includes("当前社交登录会跳转"),
   },
 ];
 

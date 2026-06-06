@@ -20,17 +20,34 @@ export async function fetchUserStars(
   username: string,
   token?: string
 ): Promise<ParsedStar[]> {
+  return fetchStarsFromGitHub(
+    `https://api.github.com/users/${encodeURIComponent(username)}/starred`,
+    token
+  );
+}
+
+export async function fetchAuthenticatedUserStars(
+  token: string
+): Promise<ParsedStar[]> {
+  return fetchStarsFromGitHub("https://api.github.com/user/starred", token);
+}
+
+async function fetchStarsFromGitHub(
+  baseUrl: string,
+  token?: string
+): Promise<ParsedStar[]> {
   const results: ParsedStar[] = [];
   let page = 1;
   const perPage = 100;
 
   while (page <= 10) {
-    const response = await fetch(
-      `https://api.github.com/users/${encodeURIComponent(username)}/starred?per_page=${perPage}&page=${page}`,
-      {
-        headers: buildGitHubHeaders(token),
-      }
-    );
+    const url = new URL(baseUrl);
+    url.searchParams.set("per_page", String(perPage));
+    url.searchParams.set("page", String(page));
+
+    const response = await fetch(url, {
+      headers: buildGitHubHeaders(token),
+    });
 
     if (!response.ok) {
       throw new Error(`GitHub API error: ${response.status}`);

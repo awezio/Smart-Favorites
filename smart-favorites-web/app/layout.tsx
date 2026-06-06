@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: "Smart Favorites - 智能收藏夹",
   description:
     "基于 AI 的智能书签和 GitHub Stars 管理系统。使用语义搜索，在收藏中找到一切。",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
   openGraph: {
     title: "Smart Favorites - 智能收藏夹",
     description:

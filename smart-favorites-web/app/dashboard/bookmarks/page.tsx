@@ -173,6 +173,14 @@ export default function BookmarksPage() {
     }
   };
 
+  const openExtensionGuide = () => {
+    window.open(
+      "https://github.com/nichuanfang/Smart-Favorites/tree/main/extension",
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
   /* ── Computed data ── */
   const folders = useMemo(() => {
     const set = new Set<string>();
@@ -421,6 +429,27 @@ export default function BookmarksPage() {
         </Button>
       </div>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">浏览器扩展自动同步</CardTitle>
+          <CardDescription>
+            网页无法直接读取浏览器收藏夹。安装 Smart Favorites 浏览器扩展后，扩展会通过浏览器授权的 bookmarks API 读取收藏夹，并支持手动或自动同步。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button onClick={openExtensionGuide}>
+            <ExternalLink className="h-4 w-4 mr-2" />
+            安装/打开扩展同步
+          </Button>
+          <label>
+            <Button variant="outline" disabled={loading} asChild>
+              <span><Upload className="h-4 w-4 mr-2" />备用：导入 HTML</span>
+            </Button>
+            <input type="file" accept=".html" className="hidden" onChange={handleImport} />
+          </label>
+        </CardContent>
+      </Card>
+
       {/* Statistics Panel */}
       {bookmarks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -474,6 +503,10 @@ export default function BookmarksPage() {
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex gap-2 flex-wrap">
+            <Button onClick={openExtensionGuide}>
+              <ExternalLink className="h-4 w-4 mr-2" />浏览器扩展自动同步
+            </Button>
+
             <label>
               <Button variant="outline" disabled={loading} asChild>
                 <span><Upload className="h-4 w-4 mr-2" />导入 HTML</span>
@@ -604,14 +637,19 @@ export default function BookmarksPage() {
         <EmptyState
           icon={BookmarkIcon}
           title="还没有书签"
-          description="点击「导入 HTML」从浏览器导入你的书签，或手动添加"
+          description="安装浏览器扩展可直接同步收藏夹；HTML 导入作为备用方式。"
           action={
-            <label>
-              <Button variant="outline" asChild>
-                <span><Upload className="h-4 w-4 mr-2" />导入 HTML</span>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" onClick={openExtensionGuide}>
+                <ExternalLink className="h-4 w-4 mr-2" />浏览器扩展自动同步
               </Button>
-              <input type="file" accept=".html" className="hidden" onChange={handleImport} />
-            </label>
+              <label>
+                <Button variant="outline" asChild>
+                  <span><Upload className="h-4 w-4 mr-2" />导入 HTML</span>
+                </Button>
+                <input type="file" accept=".html" className="hidden" onChange={handleImport} />
+              </label>
+            </div>
           }
         />
       ) : filteredBookmarks.length === 0 ? (

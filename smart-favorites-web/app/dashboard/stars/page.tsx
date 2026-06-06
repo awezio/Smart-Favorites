@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable react/no-unescaped-entities */
-
 import { useState, useEffect, useMemo } from "react";
 import {
   RefreshCw,
@@ -15,6 +13,7 @@ import {
   AlertCircle,
   Pencil,
   Check,
+  Github,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -135,7 +134,6 @@ export default function StarsPage() {
   const [stars, setStars] = useState<GitHubStar[]>([]);
   const [filter, setFilter] = useState("");
   const [username, setUsername] = useState("");
-  const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -173,17 +171,13 @@ export default function StarsPage() {
   };
 
   const handleSync = async () => {
-    if (!username.trim()) {
-      toast.error("请输入 GitHub 用户名");
-      return;
-    }
     setLoading(true);
     toast.loading("正在同步 GitHub Stars...", { id: "sync-stars" });
     try {
       const response = await fetch("/api/stars/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, token: token || undefined }),
+        body: JSON.stringify({ username: username.trim() || undefined }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -390,30 +384,23 @@ export default function StarsPage() {
       {/* Sync Card */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">同步 Stars</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Github className="h-4 w-4" />
+            一键同步 GitHub Stars
+          </CardTitle>
           <CardDescription className="flex items-start gap-1.5">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500" />
-            同步需要 GitHub Token，请在"设置"页面配置
+            使用 GitHub 登录后可直接同步；未用 GitHub 登录时，可临时填写公开用户名。
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex-1 min-w-[200px]">
-              <Label className="text-xs">GitHub 用户名 *</Label>
+              <Label className="text-xs">GitHub 用户名（可选）</Label>
               <Input
-                placeholder="输入用户名"
+                placeholder="留空使用 GitHub 登录账号"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex-1 min-w-[200px]">
-              <Label className="text-xs">Token (留空则使用设置中的)</Label>
-              <Input
-                type="password"
-                placeholder="ghp_..."
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
                 className="mt-1"
               />
             </div>

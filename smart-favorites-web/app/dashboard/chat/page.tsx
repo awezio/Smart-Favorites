@@ -50,6 +50,34 @@ export default function ChatPage() {
     return list;
   }, []);
 
+  const openSession = useCallback(async (session: ChatSession) => {
+    const fallbackMessages = normalizeChatMessages(session.messages);
+    setCurrentSession({ ...session, messages: fallbackMessages });
+    setMessages(fallbackMessages);
+
+    try {
+      const response = await fetch(`/api/chat/sessions/${session.id}`);
+      if (!response.ok) {
+        throw new Error("Failed to load chat session");
+      }
+
+      const data = await response.json();
+      const fullSession = (data.session || session) as ChatSession;
+      const hydratedSession = {
+        ...fullSession,
+        messages: normalizeChatMessages(fullSession.messages),
+      };
+
+      setCurrentSession(hydratedSession);
+      setMessages(hydratedSession.messages);
+      setSessions((current) =>
+        current.map((item) => (item.id === hydratedSession.id ? hydratedSession : item))
+      );
+    } catch {
+      toast.error("打开会话失败");
+    }
+  }, []);
+
   const createNewSession = useCallback(async (): Promise<ChatSession | null> => {
     const response = await fetch("/api/chat/sessions", {
       method: "POST",
@@ -77,8 +105,7 @@ export default function ChatPage() {
       setInitializing(true);
       const list = await loadSessions();
       if (list.length > 0) {
-        setCurrentSession(list[0]);
-        setMessages(list[0].messages || []);
+        await openSession(list[0]);
       } else {
         await createNewSession();
       }
@@ -86,7 +113,7 @@ export default function ChatPage() {
     }
 
     init();
-  }, [createNewSession, loadSessions]);
+  }, [createNewSession, loadSessions, openSession]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -136,8 +163,7 @@ export default function ChatPage() {
     }
 
     if (list.length > 0) {
-      setCurrentSession(list[0]);
-      setMessages(list[0].messages || []);
+      await openSession(list[0]);
     } else {
       await createNewSession();
     }
@@ -252,8 +278,7 @@ export default function ChatPage() {
                   : "hover:bg-accent"
               }`}
               onClick={() => {
-                setCurrentSession(session);
-                setMessages(session.messages || []);
+                openSession(session);
               }}
             >
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -380,6 +405,48 @@ export default function ChatPage() {
       </div>
     </div>
   );
+}
+
+function normalizeChatMessages(messages: unknown): ChatMessage[] {
+  const rawMessages: unknown[] = (() => {
+    if (Array.isArray(messages)) {
+      return messages;
+    }
+
+    if (typeof messages === "string") {
+      try {
+        const parsed = JSON.parse(messages);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    if (messages && typeof messages === "object") {
+      const maybeWrappedMessages = (messages as { messages?: unknown }).messages;
+      return Array.isArray(maybeWrappedMessages) ? maybeWrappedMessages : [];
+    }
+
+    return [];
+  })();
+
+  return rawMessages
+    .filter((message): message is Record<string, unknown> => {
+      return (
+        Boolean(message) &&
+        typeof message === "object" &&
+        (message as Record<string, unknown>).content !== undefined
+      );
+    })
+    .map((message) => {
+      const role = message.role === "assistant" ? "assistant" : "user";
+      return {
+        role,
+        content: String(message.content ?? ""),
+        sources: Array.isArray(message.sources) ? (message.sources as SearchResult[]) : undefined,
+        timestamp: typeof message.timestamp === "string" ? message.timestamp : "",
+      };
+    });
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {

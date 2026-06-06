@@ -61,6 +61,7 @@ export async function GET(
       provider: provider as Provider,
       options: {
         redirectTo: callbackUrl.toString(),
+        scopes: provider === "github" ? "read:user user:email" : undefined,
       },
     });
     data = result.data;
