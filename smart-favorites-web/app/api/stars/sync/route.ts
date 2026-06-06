@@ -56,13 +56,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = await createServerSupabaseClient();
     const fetchedStars =
       credentials.useAuthenticatedUser && credentials.token
         ? await fetchAuthenticatedUserStars(credentials.token)
         : await fetchUserStars(credentials.username!, credentials.token);
 
     // Get existing stars for this user
-    const existingStars = await getStars(10000, 0, userId);
+    const existingStars = await getStars(10000, 0, userId, supabase);
 
     // Perform diff
     const diff = diffStars(existingStars, fetchedStars);
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (addedWithEmbeddings.length > 0) {
-      await bulkInsertStars(addedWithEmbeddings as any);
+      await bulkInsertStars(addedWithEmbeddings as any, supabase);
     }
 
     // Process modifications
@@ -97,22 +98,27 @@ export async function POST(request: NextRequest) {
       const textToEmbed = `${newStar.owner}/${newStar.repo} ${newStar.description || ""} ${newStar.language || ""}`;
       const embedding = await generateEmbedding(textToEmbed);
 
-      await updateStar(oldStar.id, {
-        owner: newStar.owner,
-        repo: newStar.repo,
-        url: newStar.url,
-        description: newStar.description,
-        language: newStar.language,
-        stars: newStar.stars,
-        forks: newStar.forks,
-        updated: newStar.updated,
-        embedding,
-      });
+      await updateStar(
+        oldStar.id,
+        {
+          owner: newStar.owner,
+          repo: newStar.repo,
+          url: newStar.url,
+          description: newStar.description,
+          language: newStar.language,
+          stars: newStar.stars,
+          forks: newStar.forks,
+          updated: newStar.updated,
+          embedding,
+        },
+        userId,
+        supabase
+      );
     }
 
     // Process removals
     for (const star of diff.removed) {
-      await deleteStar(star.id);
+      await deleteStar(star.id, userId, supabase);
     }
 
     return NextResponse.json({

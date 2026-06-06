@@ -4,6 +4,7 @@ import { updateBookmark } from "@/lib/db/bookmarks";
 import { updateStar } from "@/lib/db/github-stars";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { type, item, batch = false } = body;
+    const supabase = await createServerSupabaseClient();
 
     if (!type || !item) {
       return NextResponse.json(
@@ -28,10 +30,15 @@ export async function POST(request: NextRequest) {
       const textToEmbed = `${item.title} ${description} ${item.url}`;
       const embedding = await generateEmbedding(textToEmbed);
 
-      await updateBookmark(item.id, {
-        description,
-        embedding,
-      });
+      await updateBookmark(
+        item.id,
+        {
+          description,
+          embedding,
+        },
+        userId,
+        supabase
+      );
 
       return NextResponse.json({
         success: true,
@@ -41,9 +48,14 @@ export async function POST(request: NextRequest) {
       const textToEmbed = `${item.owner}/${item.repo} ${item.description || ""} ${item.language || ""}`;
       const embedding = await generateEmbedding(textToEmbed);
 
-      await updateStar(item.id, {
-        embedding,
-      });
+      await updateStar(
+        item.id,
+        {
+          embedding,
+        },
+        userId,
+        supabase
+      );
 
       return NextResponse.json({
         success: true,

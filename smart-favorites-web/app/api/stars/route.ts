@@ -2,15 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStars, createStar, updateStar, deleteStar } from "@/lib/db/github-stars";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const supabase = await createServerSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get("limit") || "100");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    const stars = await getStars(limit, offset, userId || undefined);
+    const stars = await getStars(limit, offset, userId, supabase);
 
     return NextResponse.json({
       stars,
@@ -40,6 +46,7 @@ export async function POST(request: NextRequest) {
 
     const textToEmbed = `${owner}/${repo} ${description || ""} ${language || ""}`;
     const embedding = await generateEmbedding(textToEmbed);
+    const supabase = await createServerSupabaseClient();
 
     const star = await createStar({
       user_id: userId,
@@ -53,7 +60,7 @@ export async function POST(request: NextRequest) {
       updated,
       embedding,
       updated_at: new Date().toISOString(),
-    });
+    }, supabase);
 
     return NextResponse.json({ star }, { status: 201 });
   } catch (error: any) {
@@ -90,7 +97,8 @@ export async function PUT(request: NextRequest) {
       updates.embedding = await generateEmbedding(textToEmbed);
     }
 
-    const star = await updateStar(id, updates);
+    const supabase = await createServerSupabaseClient();
+    const star = await updateStar(id, updates, userId, supabase);
 
     return NextResponse.json({ star });
   } catch (error: any) {
@@ -124,8 +132,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "At least one ID is required" }, { status: 400 });
     }
 
+    const supabase = await createServerSupabaseClient();
     for (const id of ids) {
-      await deleteStar(id);
+      await deleteStar(id, userId, supabase);
     }
 
     return NextResponse.json({ success: true, deleted: ids.length });

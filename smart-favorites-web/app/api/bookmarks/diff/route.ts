@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseBookmarksHtml, diffBookmarks, toBookmarkRecord } from "@/lib/parsers/bookmark-parser";
 import { getBookmarks } from "@/lib/db/bookmarks";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +22,8 @@ export async function POST(request: NextRequest) {
     }
 
     const parsedBookmarks = parseBookmarksHtml(htmlContent);
-    const existingBookmarks = await getBookmarks(10000, 0, userId);
+    const supabase = await createServerSupabaseClient();
+    const existingBookmarks = await getBookmarks(10000, 0, userId, supabase);
 
     const newBookmarks = parsedBookmarks.map(pb => ({
       ...toBookmarkRecord(pb),

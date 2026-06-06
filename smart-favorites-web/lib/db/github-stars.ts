@@ -1,6 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GitHubStar } from "@/types";
 
+type SupabaseQueryClient = {
+  from: ReturnType<typeof createAdminClient>["from"];
+};
+
 type StarInsert = Omit<GitHubStar, "id" | "created_at" | "updated_at"> & {
   created_at?: string;
   updated_at?: string;
@@ -13,9 +17,10 @@ type StarUpdate = Partial<Omit<GitHubStar, "id" | "user_id" | "created_at">> & {
 export async function getStars(
   limit: number,
   offset: number,
-  userId?: string
+  userId?: string,
+  client?: SupabaseQueryClient
 ): Promise<GitHubStar[]> {
-  const supabase = createAdminClient();
+  const supabase = client || createAdminClient();
   let query = supabase
     .from("github_stars")
     .select("*")
@@ -34,8 +39,11 @@ export async function getStars(
   return data as GitHubStar[];
 }
 
-export async function createStar(payload: StarInsert): Promise<GitHubStar> {
-  const supabase = createAdminClient();
+export async function createStar(
+  payload: StarInsert,
+  client?: SupabaseQueryClient
+): Promise<GitHubStar> {
+  const supabase = client || createAdminClient();
   const { data, error } = await supabase
     .from("github_stars")
     .insert(payload)
@@ -51,15 +59,21 @@ export async function createStar(payload: StarInsert): Promise<GitHubStar> {
 
 export async function updateStar(
   id: string,
-  updates: StarUpdate
+  updates: StarUpdate,
+  userId?: string,
+  client?: SupabaseQueryClient
 ): Promise<GitHubStar> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const supabase = client || createAdminClient();
+  let query = supabase
     .from("github_stars")
     .update(updates)
-    .eq("id", id)
-    .select("*")
-    .single();
+    .eq("id", id);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query.select("*").single();
 
   if (error) {
     throw new Error(error.message);
@@ -68,21 +82,34 @@ export async function updateStar(
   return data as GitHubStar;
 }
 
-export async function deleteStar(id: string): Promise<void> {
-  const supabase = createAdminClient();
-  const { error } = await supabase.from("github_stars").delete().eq("id", id);
+export async function deleteStar(
+  id: string,
+  userId?: string,
+  client?: SupabaseQueryClient
+): Promise<void> {
+  const supabase = client || createAdminClient();
+  let query = supabase.from("github_stars").delete().eq("id", id);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     throw new Error(error.message);
   }
 }
 
-export async function bulkInsertStars(payload: StarInsert[]): Promise<void> {
+export async function bulkInsertStars(
+  payload: StarInsert[],
+  client?: SupabaseQueryClient
+): Promise<void> {
   if (payload.length === 0) {
     return;
   }
 
-  const supabase = createAdminClient();
+  const supabase = client || createAdminClient();
   const { error } = await supabase.from("github_stars").insert(payload);
   if (error) {
     throw new Error(error.message);

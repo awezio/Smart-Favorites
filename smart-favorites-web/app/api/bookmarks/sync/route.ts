@@ -3,6 +3,7 @@ import { parseBookmarksHtml, diffBookmarks } from "@/lib/parsers/bookmark-parser
 import { bulkInsertBookmarks, getBookmarks, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,9 +24,10 @@ export async function POST(request: NextRequest) {
 
     // Parse HTML
     const parsedBookmarks = parseBookmarksHtml(htmlContent);
+    const supabase = await createServerSupabaseClient();
 
     // Get existing bookmarks for this user
-    const existingBookmarks = await getBookmarks(10000, 0, userId);
+    const existingBookmarks = await getBookmarks(10000, 0, userId, supabase);
 
     // Convert parsed bookmarks to Bookmark format for diff
     const newBookmarks = parsedBookmarks.map(pb => ({
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (addedWithEmbeddings.length > 0) {
-      await bulkInsertBookmarks(addedWithEmbeddings as any);
+      await bulkInsertBookmarks(addedWithEmbeddings as any, supabase);
     }
 
     // Process modifications
@@ -72,18 +74,23 @@ export async function POST(request: NextRequest) {
       const textToEmbed = `${newBookmark.title} ${newBookmark.description || ""} ${newBookmark.url}`;
       const embedding = await generateEmbedding(textToEmbed);
 
-      await updateBookmark(oldBookmark.id, {
-        title: newBookmark.title,
-        url: newBookmark.url,
-        description: newBookmark.description,
-        folder_path: newBookmark.folder_path,
-        embedding,
-      });
+      await updateBookmark(
+        oldBookmark.id,
+        {
+          title: newBookmark.title,
+          url: newBookmark.url,
+          description: newBookmark.description,
+          folder_path: newBookmark.folder_path,
+          embedding,
+        },
+        userId,
+        supabase
+      );
     }
 
     // Process removals
     for (const bookmark of diff.removed) {
-      await deleteBookmark(bookmark.id);
+      await deleteBookmark(bookmark.id, userId, supabase);
     }
 
     const totalImported = diff.added.length + diff.modified.length;

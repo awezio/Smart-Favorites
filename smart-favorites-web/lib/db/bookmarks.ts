@@ -1,6 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Bookmark } from "@/types";
 
+type SupabaseQueryClient = {
+  from: ReturnType<typeof createAdminClient>["from"];
+};
+
 type BookmarkInsert = Omit<Bookmark, "id" | "created_at" | "updated_at"> & {
   created_at?: string;
   updated_at?: string;
@@ -13,9 +17,10 @@ type BookmarkUpdate = Partial<Omit<Bookmark, "id" | "user_id" | "created_at">> &
 export async function getBookmarks(
   limit: number,
   offset: number,
-  userId?: string
+  userId?: string,
+  client?: SupabaseQueryClient
 ): Promise<Bookmark[]> {
-  const supabase = createAdminClient();
+  const supabase = client || createAdminClient();
   let query = supabase
     .from("bookmarks")
     .select("*")
@@ -34,8 +39,11 @@ export async function getBookmarks(
   return data as Bookmark[];
 }
 
-export async function createBookmark(payload: BookmarkInsert): Promise<Bookmark> {
-  const supabase = createAdminClient();
+export async function createBookmark(
+  payload: BookmarkInsert,
+  client?: SupabaseQueryClient
+): Promise<Bookmark> {
+  const supabase = client || createAdminClient();
   const { data, error } = await supabase
     .from("bookmarks")
     .insert(payload)
@@ -51,15 +59,21 @@ export async function createBookmark(payload: BookmarkInsert): Promise<Bookmark>
 
 export async function updateBookmark(
   id: string,
-  updates: BookmarkUpdate
+  updates: BookmarkUpdate,
+  userId?: string,
+  client?: SupabaseQueryClient
 ): Promise<Bookmark> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const supabase = client || createAdminClient();
+  let query = supabase
     .from("bookmarks")
     .update(updates)
-    .eq("id", id)
-    .select("*")
-    .single();
+    .eq("id", id);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query.select("*").single();
 
   if (error) {
     throw new Error(error.message);
@@ -68,21 +82,34 @@ export async function updateBookmark(
   return data as Bookmark;
 }
 
-export async function deleteBookmark(id: string): Promise<void> {
-  const supabase = createAdminClient();
-  const { error } = await supabase.from("bookmarks").delete().eq("id", id);
+export async function deleteBookmark(
+  id: string,
+  userId?: string,
+  client?: SupabaseQueryClient
+): Promise<void> {
+  const supabase = client || createAdminClient();
+  let query = supabase.from("bookmarks").delete().eq("id", id);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     throw new Error(error.message);
   }
 }
 
-export async function bulkInsertBookmarks(payload: BookmarkInsert[]): Promise<void> {
+export async function bulkInsertBookmarks(
+  payload: BookmarkInsert[],
+  client?: SupabaseQueryClient
+): Promise<void> {
   if (payload.length === 0) {
     return;
   }
 
-  const supabase = createAdminClient();
+  const supabase = client || createAdminClient();
   const { error } = await supabase.from("bookmarks").insert(payload);
   if (error) {
     throw new Error(error.message);

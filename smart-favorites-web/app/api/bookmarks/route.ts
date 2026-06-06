@@ -2,15 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBookmarks, createBookmark, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await getAuthUser();
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const supabase = await createServerSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get("limit") || "100");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    const bookmarks = await getBookmarks(limit, offset, userId || undefined);
+    const bookmarks = await getBookmarks(limit, offset, userId, supabase);
 
     return NextResponse.json({
       bookmarks,
@@ -40,6 +46,7 @@ export async function POST(request: NextRequest) {
 
     const textToEmbed = `${title} ${description || ""} ${url}`;
     const embedding = await generateEmbedding(textToEmbed);
+    const supabase = await createServerSupabaseClient();
 
     const bookmark = await createBookmark({
       user_id: userId,
@@ -49,7 +56,7 @@ export async function POST(request: NextRequest) {
       folder_path,
       embedding,
       updated_at: new Date().toISOString(),
-    });
+    }, supabase);
 
     return NextResponse.json({ bookmark }, { status: 201 });
   } catch (error: any) {
@@ -82,7 +89,8 @@ export async function PUT(request: NextRequest) {
       updates.embedding = await generateEmbedding(textToEmbed);
     }
 
-    const bookmark = await updateBookmark(id, updates);
+    const supabase = await createServerSupabaseClient();
+    const bookmark = await updateBookmark(id, updates, userId, supabase);
 
     return NextResponse.json({ bookmark });
   } catch (error: any) {
@@ -117,8 +125,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "At least one ID is required" }, { status: 400 });
     }
 
+    const supabase = await createServerSupabaseClient();
     for (const id of ids) {
-      await deleteBookmark(id);
+      await deleteBookmark(id, userId, supabase);
     }
 
     return NextResponse.json({ success: true, deleted: ids.length });

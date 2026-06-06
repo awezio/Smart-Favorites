@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchUserStars, diffStars } from "@/lib/parsers/github-stars";
 import { getStars } from "@/lib/db/github-stars";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +25,8 @@ export async function POST(request: NextRequest) {
     const newStars = await fetchUserStars(username, token);
 
     // Get existing stars for this user
-    const existingStars = await getStars(10000, 0, userId);
+    const supabase = await createServerSupabaseClient();
+    const existingStars = await getStars(10000, 0, userId, supabase);
 
     // Perform diff
     const diff = diffStars(existingStars, newStars);

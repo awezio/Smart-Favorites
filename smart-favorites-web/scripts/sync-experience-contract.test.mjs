@@ -11,6 +11,10 @@ const landingPage = read("app", "page.tsx");
 const starsPage = read("app", "dashboard", "stars", "page.tsx");
 const starsSyncRoute = read("app", "api", "stars", "sync", "route.ts");
 const githubStarsParser = read("lib", "parsers", "github-stars.ts");
+const bookmarksRoute = read("app", "api", "bookmarks", "route.ts");
+const bookmarksSyncRoute = read("app", "api", "bookmarks", "sync", "route.ts");
+const bookmarksDb = read("lib", "db", "bookmarks.ts");
+const githubStarsDb = read("lib", "db", "github-stars.ts");
 const dashboardLayout = read("app", "dashboard", "layout.tsx");
 const manifest = read("..", "extension", "manifest.json");
 
@@ -101,6 +105,22 @@ assert.match(
   githubStarsParser,
   /readGitHubErrorMessage/,
   "GitHub parser should surface GitHub's response body for sync diagnostics."
+);
+
+assert.match(
+  `${bookmarksRoute}\n${bookmarksSyncRoute}\n${starsPage}\n${starsSyncRoute}`,
+  /createServerSupabaseClient/,
+  "User-facing bookmark and GitHub Stars APIs should use the logged-in Supabase session instead of requiring the service role key."
+);
+assert.match(
+  `${bookmarksDb}\n${githubStarsDb}`,
+  /type SupabaseQueryClient/,
+  "Bookmark and GitHub Stars database helpers should accept an injected Supabase query client."
+);
+assert.match(
+  `${bookmarksDb}\n${githubStarsDb}`,
+  /\.eq\("user_id", userId\)/,
+  "Bookmark and GitHub Stars mutations should constrain updates/deletes to the current user."
 );
 
 assert.match(
