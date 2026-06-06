@@ -6,20 +6,20 @@ import assert from "node:assert/strict";
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (...segments) => readFileSync(join(repoRoot, ...segments), "utf8");
 
-const iconPath = join(repoRoot, "app", "icon.svg");
+const iconPath = join(repoRoot, "public", "favicon.svg");
 const layout = read("app", "layout.tsx");
 
 assert.equal(
   existsSync(iconPath),
   true,
-  "Smart Favorites should provide an app/icon.svg favicon asset."
+  "Smart Favorites should provide a public/favicon.svg browser favicon asset."
 );
 
-const icon = read("app", "icon.svg");
+const icon = read("public", "favicon.svg");
 
 assert.match(
   layout,
-  /icons:\s*\{[\s\S]*url:\s*"\/icon\.svg"[\s\S]*type:\s*"image\/svg\+xml"/,
+  /icons:\s*\{[\s\S]*url:\s*"\/favicon\.svg"[\s\S]*type:\s*"image\/svg\+xml"/,
   "Root metadata should explicitly point browsers at the SVG favicon."
 );
 assert.match(
