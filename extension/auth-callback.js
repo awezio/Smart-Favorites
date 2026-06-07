@@ -13,6 +13,7 @@
       extensionToken: extensionToken || accessToken,
     }, () => {
       console.log('Extension auth: extensionToken stored');
+      chrome.runtime.sendMessage({ action: 'extensionAuthChanged' }).catch(() => {});
       setTimeout(() => window.close(), 800);
     });
   } else {

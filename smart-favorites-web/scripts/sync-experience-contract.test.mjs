@@ -13,6 +13,8 @@ const starsSyncRoute = read("app", "api", "stars", "sync", "route.ts");
 const githubStarsParser = read("lib", "parsers", "github-stars.ts");
 const bookmarksRoute = read("app", "api", "bookmarks", "route.ts");
 const bookmarksSyncRoute = read("app", "api", "bookmarks", "sync", "route.ts");
+const profileRoute = read("app", "api", "profile", "route.ts");
+const settingsRoute = read("app", "api", "settings", "route.ts");
 const bookmarksDb = read("lib", "db", "bookmarks.ts");
 const githubStarsDb = read("lib", "db", "github-stars.ts");
 const dashboardLayout = read("app", "dashboard", "layout.tsx");
@@ -154,6 +156,16 @@ assert.match(
   "User-facing bookmark and GitHub Stars APIs should use the logged-in Supabase session instead of requiring the service role key."
 );
 assert.match(
+  `${profileRoute}\n${settingsRoute}\n${bookmarksSyncRoute}`,
+  /isExtensionAuthUser/,
+  "Extension-authenticated requests should switch data access away from cookie-only Supabase sessions."
+);
+assert.match(
+  `${profileRoute}\n${settingsRoute}\n${bookmarksSyncRoute}`,
+  /createAdminClient/,
+  "Extension token routes should use a trusted server client after token-to-user resolution and explicit user_id constraints."
+);
+assert.match(
   `${bookmarksDb}\n${githubStarsDb}`,
   /type SupabaseQueryClient/,
   "Bookmark and GitHub Stars database helpers should accept an injected Supabase query client."
@@ -191,6 +203,32 @@ assert.match(
   dashboardLayout,
   /账户/,
   "The sidebar should label the separate profile/settings group as account-related."
+);
+
+assert.match(
+  extensionSidepanel,
+  /async function readApiError/,
+  "Extension sync should surface API error details instead of hiding every failure behind a generic backend message."
+);
+assert.match(
+  extensionSidepanel,
+  /fetchWithAuth\(`\$\{API_BASE_URL\}\/api\/settings`/,
+  "Extension settings should load through the authenticated Web settings API."
+);
+assert.doesNotMatch(
+  extensionSidepanel,
+  /\/api\/settings\/(?:provider|apikey)/,
+  "Extension settings should not call legacy settings endpoints that do not exist in the Next.js API."
+);
+assert.match(
+  extensionSidepanel,
+  /extensionAuthChanged/,
+  "Extension auth callback/status flow should notify other extension contexts after storing a token."
+);
+assert.doesNotMatch(
+  read("app", "dashboard", "settings", "page.tsx"),
+  /github_token|Personal Access Token|showGithubToken|setGithubToken/,
+  "GitHub/Copilot-style sync should use GitHub OAuth login or account binding, not manual token entry in settings."
 );
 
 console.log("sync experience contract passed");

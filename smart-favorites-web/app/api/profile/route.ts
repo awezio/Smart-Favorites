@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import type { Profile } from "@/types";
 
 /**
@@ -17,7 +18,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = isExtensionAuthUser(user)
+      ? createAdminClient()
+      : await createServerSupabaseClient();
 
     // Try to fetch existing profile
     const { data: profile, error } = await supabase
@@ -74,7 +77,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -83,7 +86,9 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const supabase = await createServerSupabaseClient();
+    const supabase = isExtensionAuthUser(user)
+      ? createAdminClient()
+      : await createServerSupabaseClient();
 
     // Build update payload — only include fields that were provided
     const updateData: Partial<Pick<Profile, "display_name" | "bio" | "avatar_url" | "avatar_seed">> = {};

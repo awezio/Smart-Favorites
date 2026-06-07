@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseBookmarksHtml, diffBookmarks } from "@/lib/parsers/bookmark-parser";
 import { bulkInsertBookmarks, getBookmarks, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
 import { generateEmbedding } from "@/lib/rag/embedding";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
@@ -24,7 +25,9 @@ export async function POST(request: NextRequest) {
 
     // Parse HTML
     const parsedBookmarks = parseBookmarksHtml(htmlContent);
-    const supabase = await createServerSupabaseClient();
+    const supabase = isExtensionAuthUser(user)
+      ? createAdminClient()
+      : await createServerSupabaseClient();
 
     // Get existing bookmarks for this user
     const existingBookmarks = await getBookmarks(10000, 0, userId, supabase);

@@ -102,3 +102,7 @@ export async function getAuthUser(
     return anonymousUser;
   }
 }
+
+export function isExtensionAuthUser(user: AuthUser | null): user is ExtensionTokenUser {
+  return Boolean(user && "auth_type" in user && user.auth_type === "extension_token");
+}

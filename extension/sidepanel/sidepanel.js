@@ -21,6 +21,26 @@ async function fetchWithAuth(url, options = {}) {
   return response;
 }
 
+async function readApiError(response, fallback = 'Request failed') {
+  try {
+    const data = await response.json();
+    return data.error || data.message || fallback;
+  } catch (error) {
+    try {
+      const text = await response.text();
+      return text || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+async function getCurrentApiBaseUrl() {
+  const { backendUrl } = await chrome.storage.local.get(['backendUrl']);
+  API_BASE_URL = backendUrl || API_BASE_URL;
+  return API_BASE_URL.replace(/\/$/, '');
+}
+
 // State
 let isConnected = false;
 let currentModel = '--';
@@ -379,6 +399,14 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && (changes.authToken || changes.backendUrl)) {
     if (changes.backendUrl) API_BASE_URL = changes.backendUrl.newValue || API_BASE_URL;
     checkExtensionAuthStatus();
+    checkConnection();
+  }
+});
+
+chrome.runtime.onMessage.addListener((request) => {
+  if (request.action === 'extensionAuthChanged') {
+    checkExtensionAuthStatus();
+    checkConnection();
   }
 });
 
@@ -469,12 +497,15 @@ async function syncBookmarks(showAlert = true) {
     const htmlContent = convertBookmarkTreeToHtml(bookmarkTree);
     const allBookmarks = flattenBookmarks(bookmarkTree);
     
-    const response = await fetchWithAuth(`${API_BASE_URL}/api/bookmarks/sync`, {
+    const apiBase = await getCurrentApiBaseUrl();
+    const response = await fetchWithAuth(`${apiBase}/api/bookmarks/sync`, {
       method: 'POST',
       body: JSON.stringify({ htmlContent })
     });
     
-    if (!response.ok) throw new Error('Sync failed');
+    if (!response.ok) {
+      throw new Error(await readApiError(response, `Sync failed (${response.status})`));
+    }
     
     const data = await response.json();
     const count = data.total_imported || data.totalImported || 0;
@@ -495,7 +526,7 @@ async function syncBookmarks(showAlert = true) {
   } catch (error) {
     console.error('Sync error:', error);
     if (showAlert) {
-      alert('同步失败，请检查后端服务是否运行');
+      alert(`同步失败：${error.message}`);
     }
   } finally {
     syncBtn.disabled = false;
@@ -1570,10 +1601,10 @@ async function changeProvider(provider) {
   if (provider === currentProvider) return;
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/settings/provider`, {
-      method: 'POST',
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/settings`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider })
+      body: JSON.stringify({ default_llm_provider: provider })
     });
     
     if (response.ok) {
@@ -1825,15 +1856,22 @@ async function loadSettingsFromBackend() {
   settingsErrorAlert.style.display = 'none';
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/settings`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/settings`);
     if (response.ok) {
       const data = await response.json();
       
       // Set default provider
-      settingsDefaultProvider.value = data.default_provider || 'deepseek';
+      settingsDefaultProvider.value = data.defaultProvider || 'deepseek';
       
       // Render API keys grid
-      renderApiKeysGrid(data.providers || []);
+      const providerStatus = data.providers || {};
+      const userApiKeys = data.userApiKeys || {};
+      renderApiKeysGrid(PROVIDERS.map((provider) => ({
+        id: provider.id,
+        name: provider.name,
+        configured: Boolean(providerStatus[provider.id]?.configured),
+        masked_key: userApiKeys[provider.id] || ''
+      })));
       
       // Hide error alert on success
       settingsErrorAlert.style.display = 'none';
@@ -1902,20 +1940,19 @@ function renderApiKeysGrid(providers) {
       btn.disabled = true;
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/settings/apikey`, {
-          method: 'POST',
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/settings`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider, api_key: apiKey })
+          body: JSON.stringify({ api_keys: { [provider]: apiKey } })
         });
         
         if (response.ok) {
-          const data = await response.json();
           // Update status dot
           const statusDot = btn.closest('.api-key-item').querySelector('.status-dot');
           statusDot.classList.add('configured');
           // Clear input and show masked key
           input.value = '';
-          input.placeholder = data.masked_key || '已配置';
+          input.placeholder = '已配置';
           btn.textContent = '✓';
           setTimeout(() => { btn.textContent = '保存'; }, 1500);
         } else {
@@ -1980,10 +2017,10 @@ async function saveSettings() {
     
     // Save default provider to backend
     try {
-      const response = await fetch(`${API_BASE_URL}/api/settings/provider`, {
-        method: 'POST',
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/settings`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: defaultProvider })
+        body: JSON.stringify({ default_llm_provider: defaultProvider })
       });
       
       if (!response.ok) {
