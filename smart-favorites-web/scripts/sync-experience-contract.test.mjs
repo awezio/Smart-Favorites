@@ -78,6 +78,26 @@ assert.match(
   "Extension login should use the web-to-extension auth bridge."
 );
 assert.match(
+  extensionSidepanel,
+  /detectSmartFavoritesOriginFromActiveTab/,
+  "Extension should detect the currently open Smart Favorites web app origin instead of sticking to stale backend URLs."
+);
+assert.match(
+  extensionSidepanel,
+  /ensureExtensionAuthenticated/,
+  "Extension sync should require an extension auth token before posting browser bookmarks."
+);
+assert.match(
+  extensionSidepanel,
+  /maybeAutoConnectFromActiveWebSession/,
+  "Extension should try the auth bridge when opened on an already logged-in Smart Favorites web page."
+);
+assert.match(
+  extensionSidepanel,
+  /openExtensionLogin\(\)/,
+  "Unauthenticated extension sync should open the web-to-extension auth bridge."
+);
+assert.match(
   extensionSources,
   /topK:\s*10/,
   "Extension search requests should use the current Web API topK field."
@@ -209,6 +229,21 @@ assert.match(
   extensionSidepanel,
   /async function readApiError/,
   "Extension sync should surface API error details instead of hiding every failure behind a generic backend message."
+);
+assert.match(
+  bookmarksSyncRoute,
+  /total_bookmarks:\s*parsedBookmarks\.length/,
+  "Bookmarks sync API should return the parsed bookmark total, not only added or modified rows."
+);
+assert.match(
+  extensionSidepanel,
+  /localBookmarkCount/,
+  "Extension sync should compare browser-read bookmark count with server parsed count."
+);
+assert.match(
+  extensionSidepanel,
+  /data\.total_bookmarks/,
+  "Extension sync success display should use server parsed bookmark total when available."
 );
 assert.match(
   extensionSidepanel,

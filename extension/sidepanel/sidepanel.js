@@ -5,6 +5,13 @@
 
 // Configuration - will be loaded from storage
 let API_BASE_URL = 'https://smart-favorites.vercel.app';
+const SMART_FAVORITES_HOSTS = new Set([
+  'smart-favorites.vercel.app',
+  'www.smart-favorites.cc.cd',
+  'smart-favorites.cc.cd',
+  'localhost',
+  '127.0.0.1'
+]);
 
 // Helper: fetch with auth token
 async function fetchWithAuth(url, options = {}) {
@@ -36,9 +43,63 @@ async function readApiError(response, fallback = 'Request failed') {
 }
 
 async function getCurrentApiBaseUrl() {
+  const activeOrigin = await detectSmartFavoritesOriginFromActiveTab();
+  if (activeOrigin) {
+    API_BASE_URL = activeOrigin;
+    await chrome.storage.local.set({ backendUrl: activeOrigin });
+    return activeOrigin;
+  }
+
   const { backendUrl } = await chrome.storage.local.get(['backendUrl']);
-  API_BASE_URL = backendUrl || API_BASE_URL;
+  API_BASE_URL = (backendUrl || API_BASE_URL).replace(/\/$/, '');
   return API_BASE_URL.replace(/\/$/, '');
+}
+
+async function detectSmartFavoritesOriginFromActiveTab() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tabs[0]?.url;
+    if (!url) return '';
+
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    if (!SMART_FAVORITES_HOSTS.has(parsed.hostname)) return '';
+
+    return parsed.origin;
+  } catch (error) {
+    console.warn('Failed to detect active Smart Favorites tab:', error);
+    return '';
+  }
+}
+
+async function ensureExtensionAuthenticated(showAlert = true) {
+  const { authToken } = await chrome.storage.local.get(['authToken']);
+  if (authToken) return true;
+
+  if (showAlert) {
+    alert('请先授权浏览器扩展。即将打开 Smart Favorites 扩展连接页面，完成后再点击同步。');
+  }
+  openExtensionLogin();
+  return false;
+}
+
+async function maybeAutoConnectFromActiveWebSession() {
+  const { authToken, autoConnectAttemptedAt } = await chrome.storage.local.get([
+    'authToken',
+    'autoConnectAttemptedAt'
+  ]);
+  if (authToken) return;
+
+  const activeOrigin = await detectSmartFavoritesOriginFromActiveTab();
+  if (!activeOrigin) return;
+
+  const now = Date.now();
+  if (autoConnectAttemptedAt && now - autoConnectAttemptedAt < 5 * 60 * 1000) {
+    return;
+  }
+
+  await chrome.storage.local.set({ autoConnectAttemptedAt: now });
+  openExtensionLogin();
 }
 
 // State
@@ -264,7 +325,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 async function checkConnection() {
   try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/api/health`, {
+    const apiBase = await getCurrentApiBaseUrl();
+    const response = await fetchWithAuth(`${apiBase}/api/health`, {
       method: 'GET'
     });
     
@@ -324,8 +386,8 @@ function setConnected(connected, model = '--') {
 async function checkExtensionAuthStatus() {
   if (!userArea || !userAvatar || !userName) return;
   
-  const { authToken, backendUrl } = await chrome.storage.local.get(['authToken', 'backendUrl']);
-  const apiBase = backendUrl || API_BASE_URL;
+  const { authToken } = await chrome.storage.local.get(['authToken']);
+  const apiBase = await getCurrentApiBaseUrl();
   
   if (!authToken) {
     userName.textContent = '未登录';
@@ -364,22 +426,18 @@ async function checkExtensionAuthStatus() {
 /**
  * Open Web login/connect page for extension auth
  */
-function openExtensionLogin() {
-  chrome.storage.local.get(['backendUrl'], (stored) => {
-    const base = stored.backendUrl || API_BASE_URL;
-    const url = base.replace(/\/$/, '') + '/auth/extension?ext_id=' + chrome.runtime.id;
-    chrome.tabs.create({ url });
-  });
+async function openExtensionLogin() {
+  const base = await getCurrentApiBaseUrl();
+  const url = base.replace(/\/$/, '') + '/auth/extension?ext_id=' + chrome.runtime.id;
+  chrome.tabs.create({ url });
 }
 
 /**
  * Open Web dashboard (profile or home)
  */
-function openWebDashboard() {
-  chrome.storage.local.get(['backendUrl'], (stored) => {
-    const base = stored.backendUrl || API_BASE_URL;
-    chrome.tabs.create({ url: base.replace(/\/$/, '') + '/dashboard/profile' });
-  });
+async function openWebDashboard() {
+  const base = await getCurrentApiBaseUrl();
+  chrome.tabs.create({ url: base.replace(/\/$/, '') + '/dashboard/profile' });
 }
 
 // User area click: login or open profile
@@ -493,9 +551,18 @@ async function syncBookmarks(showAlert = true) {
   syncBtn.innerHTML = '<div class="loading"></div> 同步中...';
   
   try {
+    const authenticated = await ensureExtensionAuthenticated(showAlert);
+    if (!authenticated) {
+      return;
+    }
+
     const bookmarkTree = await getBookmarksFromBrowser();
     const htmlContent = convertBookmarkTreeToHtml(bookmarkTree);
     const allBookmarks = flattenBookmarks(bookmarkTree);
+    const localBookmarkCount = allBookmarks.length;
+    if (localBookmarkCount === 0) {
+      throw new Error('浏览器没有返回任何书签，请确认扩展已获得 bookmarks 权限，且当前浏览器收藏夹不为空。');
+    }
     
     const apiBase = await getCurrentApiBaseUrl();
     const response = await fetchWithAuth(`${apiBase}/api/bookmarks/sync`, {
@@ -508,7 +575,12 @@ async function syncBookmarks(showAlert = true) {
     }
     
     const data = await response.json();
-    const count = data.total_imported || data.totalImported || 0;
+    const parsedCount = data.total_bookmarks ?? data.totalBookmarks;
+    const changedCount = data.total_imported || data.totalImported || 0;
+    const count = parsedCount ?? changedCount;
+    if (localBookmarkCount > 0 && parsedCount === 0) {
+      throw new Error(`浏览器读取到 ${localBookmarkCount} 个书签，但服务端解析为 0 个，请更新扩展后重试。`);
+    }
     
     bookmarkCount.innerHTML = `📚 书签数量: <strong>${count}</strong>`;
     const now = new Date();
@@ -517,11 +589,13 @@ async function syncBookmarks(showAlert = true) {
     await chrome.storage.local.set({
       lastSync: now.getTime(),
       bookmarkCount: count,
+      lastBrowserBookmarkCount: localBookmarkCount,
+      lastChangedBookmarkCount: changedCount,
       bookmarkData: allBookmarks
     });
     
     if (showAlert) {
-      alert(`同步成功！共同步 ${count} 个书签`);
+      alert(`同步成功！浏览器读取 ${localBookmarkCount} 个书签，服务端同步 ${count} 个（新增/修改 ${changedCount} 个）。`);
     }
   } catch (error) {
     console.error('Sync error:', error);
@@ -2199,6 +2273,7 @@ async function init() {
   if (urlStored.backendUrl) {
     API_BASE_URL = urlStored.backendUrl;
   }
+  await getCurrentApiBaseUrl();
   
   // Load stored data
   const stored = await chrome.storage.local.get([
@@ -2231,6 +2306,9 @@ async function init() {
   
   // Check connection
   await checkConnection();
+  
+  // If the user already has the Web app open, bridge that session into the extension.
+  await maybeAutoConnectFromActiveWebSession();
   
   // Check auth status and show login indicator
   await checkExtensionAuthStatus();

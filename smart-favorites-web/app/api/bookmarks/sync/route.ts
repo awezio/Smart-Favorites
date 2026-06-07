@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
     const totalImported = diff.added.length + diff.modified.length;
     return NextResponse.json({
       success: true,
+      total_bookmarks: parsedBookmarks.length,
       total_imported: totalImported,
       summary: {
         added: diff.added.length,
