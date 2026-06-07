@@ -11,7 +11,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)
 
 <p align="center">
-  <img src="extension/icons/icon128.png" alt="Smart Favorites Logo" width="128" height="128">
+  <img src="image/smart_favorites_logo_vector.jpg" alt="Smart Favorites Logo" width="128" height="128">
 </p>
 
 <p align="center">
