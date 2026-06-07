@@ -73,6 +73,7 @@ export default function SettingsPage() {
       PROVIDER_DEFINITIONS[0],
     [providerSelector]
   );
+  const selectedRequiresGitHubLogin = selectedDefinition?.authType === "github-oauth";
 
   const selectedModels =
     providerModels[selectedProvider] || selectedDefinition?.fallbackModels || [];
@@ -194,6 +195,12 @@ export default function SettingsPage() {
     if (error) {
       toast.error(error.message || "绑定失败");
     }
+  };
+
+  const loginWithGitHub = () => {
+    const loginUrl = new URL("/auth/sign-in/github", window.location.origin);
+    loginUrl.searchParams.set("redirect", "/dashboard/settings");
+    window.location.href = loginUrl.toString();
   };
 
   const testProvider = async (provider: string) => {
@@ -368,6 +375,8 @@ export default function SettingsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {selectedStatus?.configured
                       ? `已配置 (${selectedStatus.source})`
+                      : selectedRequiresGitHubLogin
+                        ? "未授权，请使用 GitHub 登录授权当前账号"
                       : "未配置个人 Key，可使用环境变量或在下方填写"}
                   </p>
                 </div>
@@ -383,35 +392,50 @@ export default function SettingsPage() {
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>API Key</Label>
-                  <div className="relative">
-                    <Input
-                      type={showKeys[selectedProvider] ? "text" : "password"}
-                      placeholder={selectedDefinition.authType === "none" ? "无需 Key" : "sk-..."}
-                      value={apiKeys[selectedProvider] || ""}
-                      onChange={(event) =>
-                        setApiKeys((current) => ({
-                          ...current,
-                          [selectedProvider]: event.target.value,
-                        }))
-                      }
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShowKeys((current) => ({
-                          ...current,
-                          [selectedProvider]: !current[selectedProvider],
-                        }))
-                      }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    >
-                      {showKeys[selectedProvider] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                {selectedRequiresGitHubLogin ? (
+                  <div className="space-y-2">
+                    <Label>GitHub 授权</Label>
+                    <div className="rounded-md border bg-muted/30 p-3">
+                      <p className="text-sm text-muted-foreground">
+                        GitHub Copilot 使用当前 GitHub 登录账号授权，不需要输入或保存 API Key。
+                      </p>
+                      <Button type="button" variant="outline" className="mt-3" onClick={loginWithGitHub}>
+                        <Github className="mr-2 h-4 w-4" />
+                        使用 GitHub 登录授权
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>API Key</Label>
+                    <div className="relative">
+                      <Input
+                        type={showKeys[selectedProvider] ? "text" : "password"}
+                        placeholder={selectedDefinition.authType === "none" ? "无需 Key" : "sk-..."}
+                        value={apiKeys[selectedProvider] || ""}
+                        onChange={(event) =>
+                          setApiKeys((current) => ({
+                            ...current,
+                            [selectedProvider]: event.target.value,
+                          }))
+                        }
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowKeys((current) => ({
+                            ...current,
+                            [selectedProvider]: !current[selectedProvider],
+                          }))
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      >
+                        {showKeys[selectedProvider] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>默认模型</Label>

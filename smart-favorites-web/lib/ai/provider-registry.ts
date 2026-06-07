@@ -22,6 +22,7 @@ export type ProviderAuthType =
   | "bearer"
   | "x-api-key"
   | "google-api-key"
+  | "github-oauth"
   | "aws-sigv4"
   | "none";
 
@@ -190,6 +191,21 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     capabilities: { chat: true, models: true, tools: true },
     docsUrl: "https://docs.github.com/en/github-models",
     fallbackModels: models(["openai/gpt-4o-mini", "OpenAI GPT-4o mini"], ["meta/Llama-3.3-70B-Instruct", "Llama 3.3 70B"]),
+  },
+  {
+    id: "github_copilot",
+    name: "GitHub Copilot",
+    category: "aggregator",
+    protocol: "openai-compatible",
+    baseURL: "https://api.githubcopilot.com",
+    modelsEndpoint: "/models",
+    chatEndpoint: "/chat/completions",
+    defaultModel: "gpt-4.1",
+    authType: "github-oauth",
+    capabilities: { chat: true, models: false, tools: true },
+    docsUrl: "https://docs.github.com/en/copilot/how-tos/copilot-sdk/setup/github-oauth",
+    fallbackModels: models(["gpt-4.1", "GPT-4.1"]),
+    note: "使用当前 GitHub 登录账号授权，不需要也不会保存 Copilot API Key。",
   },
   {
     id: "minimax",

@@ -3,6 +3,7 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import { getEnvProviderConfigured, PROVIDER_ENDPOINTS } from "@/lib/ai/provider-config";
+import { getGitHubOAuthTokenFromSession, requiresGitHubOAuth } from "@/lib/ai/github-oauth";
 import {
   MASKED_SECRET_PREFIX,
   encryptSecret,
@@ -28,7 +29,19 @@ export async function GET(request: NextRequest) {
 
     const apiKeys = userSettings?.api_keys || {};
     const providerStatus: Record<string, { configured: boolean; source: string }> = {};
+    const githubOAuthToken = isExtensionAuthUser(user)
+      ? ""
+      : await getGitHubOAuthTokenFromSession().catch(() => "");
+
     for (const provider of Object.keys(PROVIDER_ENDPOINTS)) {
+      if (requiresGitHubOAuth(provider)) {
+        providerStatus[provider] = {
+          configured: Boolean(githubOAuthToken),
+          source: githubOAuthToken ? "github-oauth" : "none",
+        };
+        continue;
+      }
+
       const hasUserKey = hasStoredSecret(apiKeys[provider]);
       const hasEnvKey = getEnvProviderConfigured(provider);
       providerStatus[provider] = {

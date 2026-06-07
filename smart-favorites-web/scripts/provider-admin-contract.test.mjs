@@ -32,6 +32,7 @@ const requiredProviders = [
   "glm",
   "ollama",
   "github_models",
+  "github_copilot",
   "minimax",
   "nvidia",
   "siliconflow",
@@ -98,6 +99,27 @@ for (const protocol of [
     `Provider registry should support the ${protocol} protocol.`
   );
 }
+
+assert.match(
+  providerRegistry,
+  /id:\s*"github_copilot"[\s\S]*?name:\s*"GitHub Copilot"[\s\S]*?authType:\s*"github-oauth"/,
+  "GitHub Copilot should be a first-class provider authenticated by GitHub OAuth, not by a manual API key."
+);
+assert.match(
+  settingsPage,
+  /selectedDefinition\??\.authType === "github-oauth"/,
+  "Settings page should render GitHub OAuth providers differently from API-key providers."
+);
+assert.match(
+  settingsPage,
+  /loginWithGitHub/,
+  "Settings page should offer a real GitHub login action for GitHub OAuth providers."
+);
+assert.doesNotMatch(
+  settingsPage,
+  /github_copilot[\s\S]{0,500}<Input[\s\S]{0,500}API Key/,
+  "GitHub Copilot settings must not ask the user to enter an API key."
+);
 
 assert.match(
   modelsRoute,

@@ -47,6 +47,21 @@ const checks = [
       content.includes("definition.modelsEndpoint"),
   },
   {
+    name: "GitHub Copilot resolves credentials from the GitHub OAuth session",
+    file: "lib/ai/github-oauth.ts",
+    assert: (content) =>
+      content.includes("getGitHubOAuthTokenFromSession") &&
+      content.includes("provider_token") &&
+      content.includes("requiresGitHubOAuth"),
+  },
+  {
+    name: "provider model route uses GitHub OAuth for Copilot",
+    file: "app/api/settings/models/route.ts",
+    assert: (content) =>
+      content.includes("resolveProviderCredential") &&
+      content.includes("getGitHubOAuthTokenFromSession"),
+  },
+  {
     name: "deployment docs require a stable encryption secret",
     file: ".env.local.example",
     assert: (content) => content.includes("USER_API_KEY_ENCRYPTION_SECRET"),

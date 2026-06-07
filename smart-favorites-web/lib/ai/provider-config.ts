@@ -95,11 +95,15 @@ function authHeaders(definition: ProviderDefinition, apiKey: string): Record<str
   if (definition.authType === "none") return {};
   if (definition.authType === "x-api-key") return { "x-api-key": apiKey };
   if (definition.authType === "google-api-key") return {};
+  if (definition.authType === "github-oauth") return { "X-GitHub-Token": apiKey };
   return { Authorization: `Bearer ${apiKey}` };
 }
 
 function ensureConfigured(definition: ProviderDefinition, apiKey: string, baseURL: string) {
   if (definition.protocol !== "ollama" && definition.authType !== "none" && !apiKey) {
+    if (definition.authType === "github-oauth") {
+      throw new Error(`请先使用 GitHub 登录授权 ${definition.name}`);
+    }
     throw new Error(`未找到 ${definition.name} 的 API Key`);
   }
 

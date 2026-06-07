@@ -1,6 +1,7 @@
 import { searchAll, type SupabaseQueryClient } from "@/lib/rag/search";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callProviderChat, getEnvProviderKey, isSupportedProvider } from "@/lib/ai/provider-config";
+import { getGitHubOAuthTokenFromSession, requiresGitHubOAuth } from "@/lib/ai/github-oauth";
 import { decryptSecret } from "@/lib/server/secrets";
 import type { SearchResult, LLMMessage } from "@/types";
 
@@ -77,6 +78,14 @@ async function getDefaultProvider(userId: string) {
 }
 
 async function resolveProviderKey(userId: string, provider: string) {
+  if (requiresGitHubOAuth(provider)) {
+    const token = await getGitHubOAuthTokenFromSession();
+    if (!token) {
+      throw new Error("请先使用 GitHub 登录授权 GitHub Copilot。");
+    }
+    return token;
+  }
+
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("user_settings")
