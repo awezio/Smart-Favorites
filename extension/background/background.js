@@ -140,6 +140,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  if (request?.action !== 'smartFavoritesExtensionAuth' || !request.token) {
+    sendResponse({ success: false, error: 'Unsupported external message' });
+    return false;
+  }
+
+  const senderOrigin = sender.origin || (sender.url ? new URL(sender.url).origin : '');
+  chrome.storage.local.set({
+    authToken: request.token,
+    extensionToken: request.token,
+    backendUrl: senderOrigin || API_BASE_URL,
+    autoConnectAttemptedAt: 0
+  }).then(() => {
+    chrome.runtime.sendMessage({ action: 'extensionAuthChanged' }).catch(() => {});
+    sendResponse({ success: true });
+  }).catch((error) => {
+    sendResponse({ success: false, error: error.message });
+  });
+
+  return true;
+});
+
 // ==================== Sync Functions ====================
 
 async function syncBookmarks() {

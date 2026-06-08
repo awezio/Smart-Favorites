@@ -79,8 +79,23 @@ assert.match(
 );
 assert.match(
   extensionSidepanel,
+  /waitForExtensionAuthToken/,
+  "Extension login should wait for the extension token to be stored before continuing sync."
+);
+assert.doesNotMatch(
+  extensionSidepanel,
   /launchWebAuthFlow/,
-  "Extension login should wait for the web auth flow to return an extension token instead of only opening a tab."
+  "Extension login should not open a separate browser auth window."
+);
+assert.match(
+  manifest,
+  /externally_connectable/,
+  "Extension manifest should allow the Smart Favorites web app to send the extension token back directly."
+);
+assert.match(
+  extensionBackground,
+  /onMessageExternal/,
+  "Extension background should receive extension tokens from the Smart Favorites web app."
 );
 assert.match(
   extensionSidepanel,
@@ -89,8 +104,8 @@ assert.match(
 );
 assert.match(
   read("app", "auth", "extension", "page.tsx"),
-  /redirect_uri/,
-  "Web extension connect page should honor a validated extension redirect URI."
+  /sendMessage\(\s*extId/,
+  "Web extension connect page should deliver the extension token by external extension messaging."
 );
 assert.match(
   extensionSidepanel,

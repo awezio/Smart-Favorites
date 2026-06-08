@@ -5,9 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
+type ExtensionRuntime = {
+  runtime?: {
+    sendMessage?: (
+      extensionId: string,
+      message: Record<string, unknown>,
+      callback?: (response?: { success?: boolean; error?: string }) => void
+    ) => void;
+    lastError?: { message?: string };
+  };
+};
+
 /**
  * Extension Connect Page
- * When user visits with ?ext_id=xxx, if logged in, redirects to extension with an extension-scoped token.
+ * When user visits with ?ext_id=xxx, if logged in, sends an extension-scoped token to the extension.
  * If not logged in, redirects to /login with return URL.
  */
 function ExtensionAuthContent() {
@@ -25,9 +36,13 @@ function ExtensionAuthContent() {
     const run = async () => {
       const supabase = createClient();
       const { data: { session }, error } = await supabase.auth.getSession();
+      const returnPath = `/auth/extension?${new URLSearchParams({
+        ext_id: extId,
+        ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+      }).toString()}`;
 
       if (error || !session) {
-        router.replace(`/login?redirect=${encodeURIComponent(`/auth/extension?ext_id=${extId}`)}`);
+        router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
         return;
       }
 
@@ -38,22 +53,35 @@ function ExtensionAuthContent() {
       });
 
       if (!tokenResponse.ok) {
-        router.replace(`/login?redirect=${encodeURIComponent(`/auth/extension?ext_id=${extId}`)}`);
+        router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
         return;
       }
 
       const { token } = await tokenResponse.json();
-      const callbackUrl =
-        redirectUri &&
-        (redirectUri.startsWith(`https://${extId}.chromiumapp.org/`) ||
-          redirectUri.startsWith(`chrome-extension://${extId}/`))
-          ? redirectUri
-          : `chrome-extension://${extId}/auth-callback.html`;
-      const hash = new URLSearchParams({
-        extensionToken: token,
-      }).toString();
+      const runtime = (window as Window & { chrome?: ExtensionRuntime }).chrome?.runtime;
 
-      window.location.href = `${callbackUrl}#${hash}`;
+      if (!runtime?.sendMessage) {
+        router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
+        return;
+      }
+
+      runtime.sendMessage(
+        extId,
+        {
+          action: "smartFavoritesExtensionAuth",
+          token,
+        },
+        (response) => {
+          const lastError = runtime.lastError;
+          if (lastError || !response?.success) {
+            router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
+            return;
+          }
+
+          window.close();
+          router.replace("/dashboard/bookmarks");
+        }
+      );
     };
 
     run();

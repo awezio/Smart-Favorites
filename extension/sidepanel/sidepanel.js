@@ -73,36 +73,6 @@ async function detectSmartFavoritesOriginFromActiveTab() {
   }
 }
 
-async function storeExtensionToken(token) {
-  if (!token) return false;
-
-  await chrome.storage.local.set({
-    authToken: token,
-    extensionToken: token,
-    autoConnectAttemptedAt: 0
-  });
-  await checkExtensionAuthStatus();
-  await checkConnection();
-  return true;
-}
-
-function extractAuthTokenFromRedirectUrl(url) {
-  try {
-    const parsed = new URL(url);
-    const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-    const queryParams = parsed.searchParams;
-    return (
-      hashParams.get('extensionToken') ||
-      hashParams.get('access_token') ||
-      queryParams.get('extensionToken') ||
-      queryParams.get('access_token') ||
-      ''
-    );
-  } catch {
-    return '';
-  }
-}
-
 async function ensureExtensionAuthenticated(showAlert = true) {
   const { authToken } = await chrome.storage.local.get(['authToken']);
   if (authToken) return true;
@@ -111,6 +81,27 @@ async function ensureExtensionAuthenticated(showAlert = true) {
     alert('请先授权浏览器扩展。即将打开 Smart Favorites 扩展连接页面，授权完成后会自动继续。');
   }
   return await openExtensionLogin({ interactive: showAlert });
+}
+
+async function waitForExtensionAuthToken(timeoutMs = 120000) {
+  const stored = await chrome.storage.local.get(['authToken']);
+  if (stored.authToken) return true;
+
+  return await new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+      resolve(false);
+    }, timeoutMs);
+
+    function handleStorageChange(changes, namespace) {
+      if (namespace !== 'local' || !changes.authToken?.newValue) return;
+      clearTimeout(timeoutId);
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+      resolve(true);
+    }
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+  });
 }
 
 async function maybeAutoConnectFromActiveWebSession() {
@@ -466,30 +457,14 @@ async function openExtensionLogin({ interactive = true } = {}) {
     `chrome-extension://${chrome.runtime.id}/auth-callback.html`;
   authUrl.searchParams.set('redirect_uri', redirectUri);
 
-  if (chrome.identity?.launchWebAuthFlow) {
-    try {
-      const responseUrl = await chrome.identity.launchWebAuthFlow({
-        url: authUrl.toString(),
-        interactive
-      });
-      const token = extractAuthTokenFromRedirectUrl(responseUrl || '');
-      if (token && await storeExtensionToken(token)) {
-        showToast('扩展已连接到 Smart Favorites', 'success');
-        return true;
-      }
-    } catch (error) {
-      if (interactive) {
-        console.warn('launchWebAuthFlow failed, falling back to tab login:', error);
-      }
-    }
-  }
-
   if (interactive) {
-    const fallbackUrl = new URL('/auth/extension', base.replace(/\/$/, ''));
-    fallbackUrl.searchParams.set('ext_id', chrome.runtime.id);
-    chrome.tabs.create({ url: fallbackUrl.toString() });
+    chrome.tabs.create({ url: authUrl.toString() });
   }
-  return false;
+  const connected = await waitForExtensionAuthToken();
+  if (connected) {
+    showToast('扩展已连接到 Smart Favorites', 'success');
+  }
+  return connected;
 }
 
 /**
