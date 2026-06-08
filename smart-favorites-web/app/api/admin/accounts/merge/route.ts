@@ -82,6 +82,7 @@ async function mergeUserSettings(
     github_username: target?.github_username || source.github_username,
     github_token: target?.github_token || source.github_token,
     default_llm_provider: target?.default_llm_provider || source.default_llm_provider,
+    default_llm_model: target?.default_llm_model || source.default_llm_model,
   };
 
   delete (merged as any).id;

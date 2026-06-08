@@ -30,6 +30,7 @@ export default function ChatPage() {
   const [initializing, setInitializing] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<LLMProvider | "">("");
   const [selectedModelId, setSelectedModelId] = useState("");
+  const [configuredProviders, setConfiguredProviders] = useState<LLMProvider[]>([]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [providerModels, setProviderModels] = useState<
     Partial<Record<LLMProvider, ChatModelOption[]>>
@@ -100,25 +101,6 @@ export default function ChatPage() {
     return session;
   }, [loadSessions]);
 
-  useEffect(() => {
-    async function init() {
-      setInitializing(true);
-      const list = await loadSessions();
-      if (list.length > 0) {
-        await openSession(list[0]);
-      } else {
-        await createNewSession();
-      }
-      setInitializing(false);
-    }
-
-    init();
-  }, [createNewSession, loadSessions, openSession]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   const loadProviderModels = useCallback(async (provider: LLMProvider) => {
     if (requestedModelsRef.current.has(provider)) {
       return;
@@ -145,15 +127,64 @@ export default function ChatPage() {
     }
   }, []);
 
+  const loadAiSettings = useCallback(async () => {
+    try {
+      const response = await fetch("/api/settings");
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      const configured = Object.entries(
+        (data.providers || {}) as Record<string, { configured?: boolean }>
+      )
+        .filter(([, status]) => Boolean(status?.configured))
+        .map(([provider]) => provider as LLMProvider);
+
+      setConfiguredProviders(configured);
+
+      const defaultProvider =
+        typeof data.defaultProvider === "string" && configured.includes(data.defaultProvider)
+          ? data.defaultProvider
+          : configured[0] || "";
+      setSelectedProvider(defaultProvider);
+      setSelectedModelId(typeof data.defaultModel === "string" ? data.defaultModel : "");
+
+      await Promise.all(configured.map((provider) => loadProviderModels(provider)));
+    } catch (error) {
+      console.error("Failed to load AI settings:", error);
+    }
+  }, [loadProviderModels]);
+
+  useEffect(() => {
+    async function init() {
+      setInitializing(true);
+      await loadAiSettings();
+      const list = await loadSessions();
+      if (list.length > 0) {
+        await openSession(list[0]);
+      } else {
+        await createNewSession();
+      }
+      setInitializing(false);
+    }
+
+    init();
+  }, [createNewSession, loadAiSettings, loadSessions, openSession]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   useEffect(() => {
     if (!showModelMenu) {
       return;
     }
 
-    CHAT_PROVIDER_OPTIONS.forEach((provider) => {
-      loadProviderModels(provider.id);
+    configuredProviders.forEach((provider) => {
+      loadProviderModels(provider);
     });
-  }, [loadProviderModels, showModelMenu]);
+  }, [configuredProviders, loadProviderModels, showModelMenu]);
 
   const deleteSession = async (sessionId: string) => {
     await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE" });
@@ -233,14 +264,19 @@ export default function ChatPage() {
   };
 
   const currentModelLabel = (() => {
+    if (configuredProviders.length === 0) {
+      return "未配置 AI 模型";
+    }
+
     if (!selectedProvider) {
       return "默认模型";
     }
 
-    const providerOptions = CHAT_PROVIDER_OPTIONS.map((provider) => ({
-      ...provider,
-      models: providerModels[provider.id] || provider.models,
-    }));
+    const providerOptions = getConfiguredProviderOptions(
+      configuredProviders,
+      providerModels,
+      modelLoadStates
+    );
     const provider = providerOptions.find((item) => item.id === selectedProvider);
     const model = selectedModelId
       ? provider?.models.find((item) => item.id === selectedModelId)
@@ -248,10 +284,11 @@ export default function ChatPage() {
     return model ? `${provider?.name} · ${model.label}` : provider?.name || selectedProvider;
   })();
 
-  const providerOptions = CHAT_PROVIDER_OPTIONS.map((provider) => ({
-    ...provider,
-    models: providerModels[provider.id] || provider.models,
-  }));
+  const providerOptions = getConfiguredProviderOptions(
+    configuredProviders,
+    providerModels,
+    modelLoadStates
+  );
 
   if (initializing) {
     return (
@@ -352,6 +389,11 @@ export default function ChatPage() {
                 >
                   默认模型
                 </button>
+                {providerOptions.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    暂无已配置且可用的模型，请先到设置中保存 API Key 并获取模型。
+                  </div>
+                )}
                 {providerOptions.map((provider) => (
                   <div key={provider.id} className="mt-1">
                     <div className="flex items-center justify-between px-2 py-1 text-xs font-medium text-muted-foreground">
@@ -405,6 +447,20 @@ export default function ChatPage() {
       </div>
     </div>
   );
+}
+
+function getConfiguredProviderOptions(
+  configuredProviders: LLMProvider[],
+  providerModels: Partial<Record<LLMProvider, ChatModelOption[]>>,
+  modelLoadStates: Record<string, boolean>
+) {
+  return CHAT_PROVIDER_OPTIONS
+    .filter((provider) => configuredProviders.includes(provider.id))
+    .map((provider) => ({
+      ...provider,
+      models: providerModels[provider.id] || [],
+    }))
+    .filter((provider) => provider.models.length > 0 || modelLoadStates[provider.id]);
 }
 
 function normalizeChatMessages(messages: unknown): ChatMessage[] {

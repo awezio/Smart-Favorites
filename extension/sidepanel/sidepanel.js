@@ -4,7 +4,11 @@
  */
 
 // Configuration - will be loaded from storage
-let API_BASE_URL = 'https://smart-favorites.vercel.app';
+const DEFAULT_API_BASE_URL = 'https://www.smart-favorites.cc.cd';
+const LEGACY_API_BASE_URLS = new Set([
+  'https://smart-favorites.vercel.app'
+]);
+let API_BASE_URL = DEFAULT_API_BASE_URL;
 const SMART_FAVORITES_HOSTS = new Set([
   'smart-favorites.vercel.app',
   'www.smart-favorites.cc.cd',
@@ -14,6 +18,46 @@ const SMART_FAVORITES_HOSTS = new Set([
 ]);
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
+function normalizeApiBaseUrl(url) {
+  const normalized = (url || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+  return LEGACY_API_BASE_URLS.has(normalized) ? DEFAULT_API_BASE_URL : normalized;
+}
+
+async function clearStoredAuthTokens() {
+  await chrome.storage.local.remove([
+    'authToken',
+    'extensionToken',
+    'supabaseRefreshToken',
+    'supabaseExpiresAt'
+  ]);
+}
+
+async function validateStoredExtensionAuthToken(authToken) {
+  const apiBase = await getCurrentApiBaseUrl();
+
+  try {
+    const response = await fetch(`${apiBase}/api/profile`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+
+    if (response.ok) {
+      return true;
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      await clearStoredAuthTokens();
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn('Unable to validate extension auth token before sync:', error);
+    return true;
+  }
+}
+
 // Helper: fetch with auth token
 async function fetchWithAuth(url, options = {}) {
   const { authToken } = await chrome.storage.local.get(['authToken']);
@@ -22,8 +66,8 @@ async function fetchWithAuth(url, options = {}) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
   const response = await fetch(url, { ...options, headers });
-  if (response.status === 401) {
-    await chrome.storage.local.remove(['authToken', 'extensionToken', 'supabaseRefreshToken', 'supabaseExpiresAt']);
+  if (response.status === 401 || response.status === 403) {
+    await clearStoredAuthTokens();
     checkExtensionAuthStatus();
   }
   return response;
@@ -46,14 +90,17 @@ async function readApiError(response, fallback = 'Request failed') {
 async function getCurrentApiBaseUrl() {
   const activeOrigin = await detectSmartFavoritesOriginFromActiveTab();
   if (activeOrigin) {
-    API_BASE_URL = activeOrigin;
-    await chrome.storage.local.set({ backendUrl: activeOrigin });
-    return activeOrigin;
+    API_BASE_URL = normalizeApiBaseUrl(activeOrigin);
+    await chrome.storage.local.set({ backendUrl: API_BASE_URL });
+    return API_BASE_URL;
   }
 
   const { backendUrl } = await chrome.storage.local.get(['backendUrl']);
-  API_BASE_URL = (backendUrl || API_BASE_URL).replace(/\/$/, '');
-  return API_BASE_URL.replace(/\/$/, '');
+  API_BASE_URL = normalizeApiBaseUrl(backendUrl || API_BASE_URL);
+  if (backendUrl && backendUrl !== API_BASE_URL) {
+    await chrome.storage.local.set({ backendUrl: API_BASE_URL });
+  }
+  return API_BASE_URL;
 }
 
 async function detectSmartFavoritesOriginFromActiveTab() {
@@ -75,7 +122,9 @@ async function detectSmartFavoritesOriginFromActiveTab() {
 
 async function ensureExtensionAuthenticated(showAlert = true) {
   const { authToken } = await chrome.storage.local.get(['authToken']);
-  if (authToken) return true;
+  if (authToken && await validateStoredExtensionAuthToken(authToken)) {
+    return true;
+  }
 
   if (showAlert) {
     alert('请先授权浏览器扩展。即将打开 Smart Favorites 扩展连接页面，授权完成后会自动继续。');
@@ -119,8 +168,10 @@ async function maybeAutoConnectFromActiveWebSession() {
     return;
   }
 
-  await chrome.storage.local.set({ autoConnectAttemptedAt: now });
-  openExtensionLogin({ interactive: false });
+  await chrome.storage.local.set({
+    autoConnectAttemptedAt: now,
+    backendUrl: activeOrigin
+  });
 }
 
 // State
@@ -356,14 +407,6 @@ async function checkConnection() {
       const data = payload.session || payload;
       const modelName = data.model || '--';
       
-      // Update current provider from backend
-      if (data.model) {
-        currentProvider = data.model;
-        if (chatModelSelector) {
-          chatModelSelector.value = data.model;
-        }
-      }
-      
       setConnected(true, modelName);
       
       if (data.bookmarks_count !== undefined) {
@@ -452,17 +495,25 @@ async function openExtensionLogin({ interactive = true } = {}) {
   const authUrl = new URL('/auth/extension', base.replace(/\/$/, ''));
   authUrl.searchParams.set('ext_id', chrome.runtime.id);
 
-  const redirectUri =
-    chrome.identity?.getRedirectURL?.('auth-callback') ||
-    `chrome-extension://${chrome.runtime.id}/auth-callback.html`;
+  const redirectUri = `chrome-extension://${chrome.runtime.id}/auth-callback.html`;
   authUrl.searchParams.set('redirect_uri', redirectUri);
 
-  if (interactive) {
-    chrome.tabs.create({ url: authUrl.toString() });
+  if (!interactive) {
+    return false;
   }
-  const connected = await waitForExtensionAuthToken();
+
+  try {
+    await chrome.tabs.create({ url: authUrl.toString(), active: true });
+  } catch (error) {
+    showToast(`无法打开扩展连接页：${error.message}`, 'error', 5000);
+    return false;
+  }
+
+  const connected = await waitForExtensionAuthToken(90000);
   if (connected) {
     showToast('扩展已连接到 Smart Favorites', 'success');
+  } else {
+    showToast('授权未完成，请在打开的 Smart Favorites 页面完成扩展连接。', 'warning', 6000);
   }
   return connected;
 }
@@ -490,7 +541,9 @@ if (userArea) {
 // Listen for auth token changes (e.g. after OAuth callback)
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && (changes.authToken || changes.backendUrl)) {
-    if (changes.backendUrl) API_BASE_URL = changes.backendUrl.newValue || API_BASE_URL;
+    if (changes.backendUrl) {
+      API_BASE_URL = normalizeApiBaseUrl(changes.backendUrl.newValue || API_BASE_URL);
+    }
     checkExtensionAuthStatus();
     checkConnection();
   }
@@ -1937,13 +1990,67 @@ const PROVIDERS = [
   { id: 'ollama', name: 'Ollama', authType: 'local-url', placeholder: DEFAULT_OLLAMA_URL }
 ];
 
+function getConfiguredExtensionProviders(providerStatus = {}, selectedProvider = currentProvider) {
+  const configured = PROVIDERS.filter((provider) => providerStatus[provider.id]?.configured);
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  const selected = PROVIDERS.find((provider) => provider.id === selectedProvider);
+  return selected ? [selected] : [];
+}
+
+function renderProviderSelect(selectEl, providers, selectedProvider) {
+  if (!selectEl) return '';
+
+  selectEl.innerHTML = providers.map((provider) =>
+    `<option value="${provider.id}">${provider.name}</option>`
+  ).join('');
+
+  const nextProvider = providers.some((provider) => provider.id === selectedProvider)
+    ? selectedProvider
+    : providers[0]?.id || '';
+
+  selectEl.value = nextProvider;
+  selectEl.disabled = providers.length === 0;
+  return nextProvider;
+}
+
+function syncProviderSelectorsFromSettings(settings = {}) {
+  const providerStatus = settings.providers || {};
+  const selectedProvider = settings.defaultProvider || currentProvider || 'deepseek';
+  const providers = getConfiguredExtensionProviders(providerStatus, selectedProvider);
+  const nextProvider =
+    renderProviderSelect(chatModelSelector, providers, selectedProvider) ||
+    renderProviderSelect(settingsDefaultProvider, providers, selectedProvider);
+
+  if (settingsDefaultProvider) {
+    renderProviderSelect(settingsDefaultProvider, providers, selectedProvider);
+  }
+
+  if (nextProvider) {
+    currentProvider = nextProvider;
+  }
+}
+
+async function loadExtensionRuntimeSettings() {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/settings`);
+    if (!response.ok) return;
+    const data = await response.json();
+    syncProviderSelectorsFromSettings(data);
+  } catch (error) {
+    console.warn('Failed to load extension AI settings:', error);
+  }
+}
+
 /**
  * Open settings modal
  */
 async function openSettingsModal() {
   // Load current backend URL from storage
   const stored = await chrome.storage.local.get(['backendUrl', 'authToken']);
-  settingsBackendUrl.value = stored.backendUrl || API_BASE_URL;
+  settingsBackendUrl.value = normalizeApiBaseUrl(stored.backendUrl || API_BASE_URL);
 
   settingsModal.style.display = 'flex';
 
@@ -1985,7 +2092,7 @@ async function loadSettingsFromBackend() {
       const data = await response.json();
       
       // Set default provider
-      settingsDefaultProvider.value = data.defaultProvider || 'deepseek';
+      syncProviderSelectorsFromSettings(data);
       
       // Render API keys grid
       const providerStatus = data.providers || {};
@@ -2213,7 +2320,7 @@ async function saveSettings() {
     return;
   }
 
-  const backendUrl = settingsBackendUrl.value.trim();
+  const backendUrl = normalizeApiBaseUrl(settingsBackendUrl.value.trim());
   const defaultProvider = settingsDefaultProvider.value;
   
   // Disable save button during save
@@ -2412,7 +2519,10 @@ async function init() {
   // Load backend URL and auth token from storage
   const urlStored = await chrome.storage.local.get(['backendUrl', 'authToken']);
   if (urlStored.backendUrl) {
-    API_BASE_URL = urlStored.backendUrl;
+    API_BASE_URL = normalizeApiBaseUrl(urlStored.backendUrl);
+    if (API_BASE_URL !== urlStored.backendUrl) {
+      await chrome.storage.local.set({ backendUrl: API_BASE_URL });
+    }
   }
   await getCurrentApiBaseUrl();
   
@@ -2453,6 +2563,9 @@ async function init() {
   
   // Check auth status and show login indicator
   await checkExtensionAuthStatus();
+
+  // Load user AI provider settings before chat interactions.
+  await loadExtensionRuntimeSettings();
   
   // Load chat sessions
   await loadChatSessions();

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
-import { getEnvProviderConfigured, PROVIDER_ENDPOINTS } from "@/lib/ai/provider-config";
+import {
+  getEnvProviderConfigured,
+  isSupportedProvider,
+  PROVIDER_ENDPOINTS,
+} from "@/lib/ai/provider-config";
 import { getGitHubOAuthTokenFromSession, requiresGitHubOAuth } from "@/lib/ai/github-oauth";
 import {
   MASKED_SECRET_PREFIX,
@@ -55,6 +59,7 @@ export async function GET(request: NextRequest) {
         userSettings?.default_llm_provider ||
         process.env.DEFAULT_LLM_PROVIDER ||
         "deepseek",
+      defaultModel: userSettings?.default_llm_model || "",
       embeddingModel:
         userSettings?.embedding_preference === "openai"
           ? "OpenAI text-embedding-3-small"
@@ -92,7 +97,17 @@ export async function PUT(request: NextRequest) {
     const updateData: any = { user_id: userId };
 
     if (body.default_llm_provider !== undefined) {
+      if (typeof body.default_llm_provider !== "string" || !isSupportedProvider(body.default_llm_provider)) {
+        return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+      }
       updateData.default_llm_provider = body.default_llm_provider;
+    }
+
+    if (body.default_llm_model !== undefined) {
+      updateData.default_llm_model =
+        typeof body.default_llm_model === "string" && body.default_llm_model.trim()
+          ? body.default_llm_model.trim()
+          : null;
     }
 
     if (body.api_keys !== undefined) {

@@ -21,7 +21,9 @@ export async function ragChat(
 ): Promise<RagResponse> {
   const sources = await searchAll(query, topK, 0.3, userId, client);
   const fallback = buildFallbackAnswer(query, sources, chatHistory);
-  const selectedProvider = provider && isSupportedProvider(provider) ? provider : await getDefaultProvider(userId);
+  const savedDefaults = await getDefaultAiSelection(userId);
+  const selectedProvider = provider && isSupportedProvider(provider) ? provider : savedDefaults.provider;
+  const selectedModel = model || (!provider ? savedDefaults.model : undefined);
 
   try {
     const apiKey = await resolveProviderKey(userId, selectedProvider);
@@ -29,7 +31,7 @@ export async function ragChat(
     const response = await callProviderChat({
       provider: selectedProvider,
       apiKey,
-      model,
+      model: selectedModel,
       messages: [
         {
           role: "system",
@@ -55,7 +57,7 @@ export async function ragChat(
     await logAiCall({
       userId,
       provider: selectedProvider,
-      model: model || "",
+      model: selectedModel || "",
       status: "error",
       error: error.message,
     });
@@ -65,16 +67,19 @@ export async function ragChat(
 
 }
 
-async function getDefaultProvider(userId: string) {
+async function getDefaultAiSelection(userId: string) {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("user_settings")
-    .select("default_llm_provider")
+    .select("default_llm_provider, default_llm_model")
     .eq("user_id", userId)
     .maybeSingle();
 
   const provider = data?.default_llm_provider || process.env.DEFAULT_LLM_PROVIDER || "deepseek";
-  return isSupportedProvider(provider) ? provider : "deepseek";
+  return {
+    provider: isSupportedProvider(provider) ? provider : "deepseek",
+    model: typeof data?.default_llm_model === "string" ? data.default_llm_model : undefined,
+  };
 }
 
 async function resolveProviderKey(userId: string, provider: string) {

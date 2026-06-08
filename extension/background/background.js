@@ -3,19 +3,31 @@
  * Handles side panel, auto-sync, scheduled sync, and bookmark change monitoring
  */
 
-let API_BASE_URL = 'https://smart-favorites.vercel.app';
+const DEFAULT_API_BASE_URL = 'https://www.smart-favorites.cc.cd';
+const LEGACY_API_BASE_URLS = new Set([
+  'https://smart-favorites.vercel.app'
+]);
+let API_BASE_URL = DEFAULT_API_BASE_URL;
+
+function normalizeApiBaseUrl(url) {
+  const normalized = (url || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+  return LEGACY_API_BASE_URLS.has(normalized) ? DEFAULT_API_BASE_URL : normalized;
+}
 
 // Load API URL from storage
 chrome.storage.local.get(['backendUrl']).then(settings => {
   if (settings.backendUrl) {
-    API_BASE_URL = settings.backendUrl;
+    API_BASE_URL = normalizeApiBaseUrl(settings.backendUrl);
+    if (API_BASE_URL !== settings.backendUrl) {
+      chrome.storage.local.set({ backendUrl: API_BASE_URL });
+    }
   }
 });
 
 // Listen for storage changes to update API_BASE_URL dynamically
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && changes.backendUrl) {
-    API_BASE_URL = changes.backendUrl.newValue || 'https://smart-favorites.vercel.app';
+    API_BASE_URL = normalizeApiBaseUrl(changes.backendUrl.newValue);
   }
 });
 
@@ -32,7 +44,11 @@ async function getAuthHeaders() {
 // Helper: get current API base URL from storage
 async function getCurrentApiUrl() {
   const { backendUrl } = await chrome.storage.local.get(['backendUrl']);
-  return backendUrl || API_BASE_URL;
+  API_BASE_URL = normalizeApiBaseUrl(backendUrl || API_BASE_URL);
+  if (backendUrl && backendUrl !== API_BASE_URL) {
+    await chrome.storage.local.set({ backendUrl: API_BASE_URL });
+  }
+  return API_BASE_URL;
 }
 
 // Check extension auth status against the web backend

@@ -1,6 +1,9 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { MASKED_SECRET_PREFIX } from "@/lib/secrets/constants";
+
+export { MASKED_SECRET_PREFIX };
 
 export type EncryptedSecret = {
   v: 1;
@@ -11,7 +14,6 @@ export type EncryptedSecret = {
 };
 
 const ENCRYPTION_SECRET_ENV = "USER_API_KEY_ENCRYPTION_SECRET";
-export const MASKED_SECRET_PREFIX = "••••";
 
 function getEncryptionKey() {
   const secret =

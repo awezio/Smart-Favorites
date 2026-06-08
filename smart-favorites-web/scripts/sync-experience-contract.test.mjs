@@ -57,6 +57,11 @@ assert.doesNotMatch(
   /smart-favorites-web\.vercel\.app|nichuanfang\/Smart-Favorites/,
   "Extension sync entry points must not point at old deployments or repository paths."
 );
+assert.doesNotMatch(
+  extensionSources,
+  /(?:API_BASE_URL\s*=\s*|value=|placeholder=|\|\|\s*)['"]https:\/\/smart-favorites\.vercel\.app/,
+  "Extension runtime should not default to the legacy Vercel domain when the production app uses the custom domain."
+);
 assert.match(
   landingPage,
   new RegExp(releaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
@@ -69,7 +74,7 @@ assert.match(
 );
 assert.match(
   extensionSources,
-  /https:\/\/smart-favorites\.vercel\.app/,
+  /https:\/\/www\.smart-favorites\.cc\.cd/,
   "Extension should default to the production web app domain."
 );
 assert.match(
@@ -87,6 +92,11 @@ assert.doesNotMatch(
   /launchWebAuthFlow/,
   "Extension login should not open a separate browser auth window."
 );
+assert.doesNotMatch(
+  extensionSidepanel,
+  /getRedirectURL/,
+  "Extension tab-based login should use the web-accessible extension callback, not the Chrome identity redirect URL."
+);
 assert.match(
   manifest,
   /externally_connectable/,
@@ -99,13 +109,28 @@ assert.match(
 );
 assert.match(
   extensionSidepanel,
-  /redirect_uri/,
-  "Extension auth bridge should pass a browser-extension redirect URI to the web connect page."
+  /chrome-extension:\/\/\$\{chrome\.runtime\.id\}\/auth-callback\.html[\s\S]*redirect_uri/,
+  "Extension auth bridge should pass its web-accessible extension callback URI to the web connect page."
 );
 assert.match(
   read("app", "auth", "extension", "page.tsx"),
   /sendMessage\(\s*extId/,
   "Web extension connect page should deliver the extension token by external extension messaging."
+);
+assert.match(
+  read("app", "auth", "extension", "page.tsx"),
+  /callbackUrl/,
+  "Web extension connect page should keep a browser-extension callback fallback."
+);
+assert.match(
+  read("app", "auth", "extension", "page.tsx"),
+  /extensionToken/,
+  "Web extension connect page fallback should include the extension token in the callback hash."
+);
+assert.match(
+  read("app", "auth", "extension", "page.tsx"),
+  /runtime\.lastError[\s\S]*redirectToExtensionCallback\(\)/,
+  "Web extension connect page should fall back to the extension callback when external messaging fails."
 );
 assert.match(
   extensionSidepanel,
@@ -119,8 +144,23 @@ assert.match(
 );
 assert.match(
   extensionSidepanel,
+  /validateStoredExtensionAuthToken/,
+  "Extension sync should validate a stored token before treating the extension as logged in."
+);
+assert.match(
+  extensionSidepanel,
+  /response\.status === 401 \|\| response\.status === 403[\s\S]*clearStoredAuthTokens/,
+  "Extension should clear stale or forbidden auth tokens before retrying the login bridge."
+);
+assert.match(
+  extensionSidepanel,
   /maybeAutoConnectFromActiveWebSession/,
   "Extension should try the auth bridge when opened on an already logged-in Smart Favorites web page."
+);
+assert.doesNotMatch(
+  extensionSidepanel,
+  /openExtensionLogin\(\{\s*interactive:\s*false\s*\}\)/,
+  "Extension should not start a hidden auth wait that never opens the connect page."
 );
 assert.match(
   extensionSidepanel,

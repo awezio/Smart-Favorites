@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { ProfileForm } from "@/components/profile-form";
 import { createClient } from "@/lib/supabase/client";
 import { PROVIDER_DEFINITIONS } from "@/lib/ai/provider-registry";
+import { MASKED_SECRET_PREFIX } from "@/lib/secrets/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,10 @@ type ModelOption = { id: string; label: string };
 
 const firstProvider = PROVIDER_DEFINITIONS[0]?.id || "deepseek";
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
+
+function isMaskedSecret(value: string | undefined) {
+  return Boolean(value && value.startsWith(MASKED_SECRET_PREFIX));
+}
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -103,6 +108,7 @@ export default function SettingsPage() {
       if (res.ok) {
         const data = await res.json();
         setDefaultProvider(data.defaultProvider || "deepseek");
+        setDefaultModel(data.defaultModel || "");
         setSelectedProvider(data.defaultProvider || firstProvider);
         setProviderStatus(data.providers || {});
         setApiKeys(data.userApiKeys || {});
@@ -135,7 +141,7 @@ export default function SettingsPage() {
     try {
       const keysToSend: Record<string, string | null> = {};
       for (const [key, value] of Object.entries(apiKeys)) {
-        if (value && !value.startsWith("••••")) {
+        if (value && !isMaskedSecret(value)) {
           keysToSend[key] = value;
         }
       }
@@ -174,7 +180,7 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "生成失败");
       setExtensionTokenGenerated(data.token);
-      setExtensionTokenPreview(data.token ? `••••${data.token.slice(-8)}` : null);
+      setExtensionTokenPreview(data.token ? `${MASKED_SECRET_PREFIX}${data.token.slice(-8)}` : null);
       toast.success("扩展 Token 已生成");
     } catch (error: any) {
       toast.error(error.message || "生成失败");
@@ -216,7 +222,7 @@ export default function SettingsPage() {
     try {
       const key = apiKeys[provider];
       const body: Record<string, string> = { provider };
-      if (key && !key.startsWith("••••")) body.apiKey = key;
+      if (key && !isMaskedSecret(key)) body.apiKey = key;
       if (defaultModel) body.model = defaultModel;
 
       const res = await fetch("/api/settings/test", {
@@ -242,7 +248,7 @@ export default function SettingsPage() {
     try {
       const key = apiKeys[provider];
       const body: Record<string, string> = { provider };
-      if (key && !key.startsWith("••••")) body.apiKey = key;
+      if (key && !isMaskedSecret(key)) body.apiKey = key;
 
       const res = await fetch("/api/settings/models", {
         method: "POST",

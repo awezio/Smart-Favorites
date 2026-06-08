@@ -59,9 +59,22 @@ function ExtensionAuthContent() {
 
       const { token } = await tokenResponse.json();
       const runtime = (window as Window & { chrome?: ExtensionRuntime }).chrome?.runtime;
+      const callbackUrl =
+        redirectUri &&
+        (redirectUri.startsWith(`https://${extId}.chromiumapp.org/`) ||
+          redirectUri.startsWith(`chrome-extension://${extId}/`))
+          ? redirectUri
+          : `chrome-extension://${extId}/auth-callback.html`;
+      const callbackHash = new URLSearchParams({
+        extensionToken: token,
+      }).toString();
+
+      const redirectToExtensionCallback = () => {
+        window.location.href = `${callbackUrl}#${callbackHash}`;
+      };
 
       if (!runtime?.sendMessage) {
-        router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
+        redirectToExtensionCallback();
         return;
       }
 
@@ -74,7 +87,7 @@ function ExtensionAuthContent() {
         (response) => {
           const lastError = runtime.lastError;
           if (lastError || !response?.success) {
-            router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
+            redirectToExtensionCallback();
             return;
           }
 
