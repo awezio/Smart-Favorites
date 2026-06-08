@@ -12,6 +12,7 @@ const SMART_FAVORITES_HOSTS = new Set([
   'localhost',
   '127.0.0.1'
 ]);
+const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 // Helper: fetch with auth token
 async function fetchWithAuth(url, options = {}) {
@@ -72,15 +73,44 @@ async function detectSmartFavoritesOriginFromActiveTab() {
   }
 }
 
+async function storeExtensionToken(token) {
+  if (!token) return false;
+
+  await chrome.storage.local.set({
+    authToken: token,
+    extensionToken: token,
+    autoConnectAttemptedAt: 0
+  });
+  await checkExtensionAuthStatus();
+  await checkConnection();
+  return true;
+}
+
+function extractAuthTokenFromRedirectUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+    const queryParams = parsed.searchParams;
+    return (
+      hashParams.get('extensionToken') ||
+      hashParams.get('access_token') ||
+      queryParams.get('extensionToken') ||
+      queryParams.get('access_token') ||
+      ''
+    );
+  } catch {
+    return '';
+  }
+}
+
 async function ensureExtensionAuthenticated(showAlert = true) {
   const { authToken } = await chrome.storage.local.get(['authToken']);
   if (authToken) return true;
 
   if (showAlert) {
-    alert('请先授权浏览器扩展。即将打开 Smart Favorites 扩展连接页面，完成后再点击同步。');
+    alert('请先授权浏览器扩展。即将打开 Smart Favorites 扩展连接页面，授权完成后会自动继续。');
   }
-  openExtensionLogin();
-  return false;
+  return await openExtensionLogin({ interactive: showAlert });
 }
 
 async function maybeAutoConnectFromActiveWebSession() {
@@ -99,7 +129,7 @@ async function maybeAutoConnectFromActiveWebSession() {
   }
 
   await chrome.storage.local.set({ autoConnectAttemptedAt: now });
-  openExtensionLogin();
+  openExtensionLogin({ interactive: false });
 }
 
 // State
@@ -426,10 +456,40 @@ async function checkExtensionAuthStatus() {
 /**
  * Open Web login/connect page for extension auth
  */
-async function openExtensionLogin() {
+async function openExtensionLogin({ interactive = true } = {}) {
   const base = await getCurrentApiBaseUrl();
-  const url = base.replace(/\/$/, '') + '/auth/extension?ext_id=' + chrome.runtime.id;
-  chrome.tabs.create({ url });
+  const authUrl = new URL('/auth/extension', base.replace(/\/$/, ''));
+  authUrl.searchParams.set('ext_id', chrome.runtime.id);
+
+  const redirectUri =
+    chrome.identity?.getRedirectURL?.('auth-callback') ||
+    `chrome-extension://${chrome.runtime.id}/auth-callback.html`;
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+
+  if (chrome.identity?.launchWebAuthFlow) {
+    try {
+      const responseUrl = await chrome.identity.launchWebAuthFlow({
+        url: authUrl.toString(),
+        interactive
+      });
+      const token = extractAuthTokenFromRedirectUrl(responseUrl || '');
+      if (token && await storeExtensionToken(token)) {
+        showToast('扩展已连接到 Smart Favorites', 'success');
+        return true;
+      }
+    } catch (error) {
+      if (interactive) {
+        console.warn('launchWebAuthFlow failed, falling back to tab login:', error);
+      }
+    }
+  }
+
+  if (interactive) {
+    const fallbackUrl = new URL('/auth/extension', base.replace(/\/$/, ''));
+    fallbackUrl.searchParams.set('ext_id', chrome.runtime.id);
+    chrome.tabs.create({ url: fallbackUrl.toString() });
+  }
+  return false;
 }
 
 /**
@@ -1898,7 +1958,8 @@ const PROVIDERS = [
   { id: 'claude', name: 'Claude', placeholder: 'sk-ant-...' },
   { id: 'gemini', name: 'Gemini', placeholder: 'AI...' },
   { id: 'glm', name: 'GLM', placeholder: 'API Key' },
-  { id: 'ollama', name: 'Ollama', placeholder: 'http://localhost:11434' }
+  { id: 'github_copilot', name: 'GitHub Copilot', authType: 'github-oauth' },
+  { id: 'ollama', name: 'Ollama', authType: 'local-url', placeholder: DEFAULT_OLLAMA_URL }
 ];
 
 /**
@@ -1906,13 +1967,24 @@ const PROVIDERS = [
  */
 async function openSettingsModal() {
   // Load current backend URL from storage
-  const stored = await chrome.storage.local.get(['backendUrl']);
+  const stored = await chrome.storage.local.get(['backendUrl', 'authToken']);
   settingsBackendUrl.value = stored.backendUrl || API_BASE_URL;
-  
+
+  settingsModal.style.display = 'flex';
+
+  if (!stored.authToken) {
+    renderSettingsLoginRequired();
+    const connected = await openExtensionLogin({ interactive: true });
+    if (connected) {
+      settingsDefaultProvider.disabled = false;
+      saveSettingsBtn.disabled = false;
+      await loadSettingsFromBackend();
+    }
+    return;
+  }
+
   // Load settings from backend
   await loadSettingsFromBackend();
-  
-  settingsModal.style.display = 'flex';
 }
 
 /**
@@ -1928,8 +2000,11 @@ function closeSettingsModal() {
 async function loadSettingsFromBackend() {
   // Hide error alert initially
   settingsErrorAlert.style.display = 'none';
+  settingsDefaultProvider.disabled = false;
+  saveSettingsBtn.disabled = false;
   
   try {
+    const stored = await chrome.storage.local.get(['ollamaBaseUrl']);
     const response = await fetchWithAuth(`${API_BASE_URL}/api/settings`);
     if (response.ok) {
       const data = await response.json();
@@ -1944,7 +2019,8 @@ async function loadSettingsFromBackend() {
         id: provider.id,
         name: provider.name,
         configured: Boolean(providerStatus[provider.id]?.configured),
-        masked_key: userApiKeys[provider.id] || ''
+        masked_key: userApiKeys[provider.id] || '',
+        baseUrl: provider.id === 'ollama' ? (stored.ollamaBaseUrl || DEFAULT_OLLAMA_URL) : undefined
       })));
       
       // Hide error alert on success
@@ -1960,7 +2036,8 @@ async function loadSettingsFromBackend() {
         id: p.id,
         name: p.name,
         configured: false,
-        masked_key: ''
+        masked_key: '',
+        baseUrl: p.id === 'ollama' ? (stored.ollamaBaseUrl || DEFAULT_OLLAMA_URL) : undefined
       })));
     }
   } catch (error) {
@@ -1976,8 +2053,34 @@ async function loadSettingsFromBackend() {
       id: p.id,
       name: p.name,
       configured: false,
-      masked_key: ''
+      masked_key: '',
+      baseUrl: p.id === 'ollama' ? DEFAULT_OLLAMA_URL : undefined
     })));
+  }
+}
+
+function renderSettingsLoginRequired() {
+  settingsErrorAlert.querySelector('.settings-error-message').textContent =
+    '请先登录并授权浏览器扩展。未登录状态下不能查看或修改 AI Provider / API 设置。';
+  settingsErrorAlert.style.display = 'block';
+  settingsDefaultProvider.disabled = true;
+  saveSettingsBtn.disabled = true;
+  apiKeysGrid.innerHTML = `
+    <div class="settings-login-required">
+      <p>扩展尚未连接到你的 Smart Favorites 账号。</p>
+      <button type="button" class="secondary-btn" id="settings-login-btn">登录并授权扩展</button>
+    </div>
+  `;
+  const loginBtn = document.getElementById('settings-login-btn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', async () => {
+      const connected = await openExtensionLogin({ interactive: true });
+      if (connected) {
+        settingsDefaultProvider.disabled = false;
+        saveSettingsBtn.disabled = false;
+        await loadSettingsFromBackend();
+      }
+    });
   }
 }
 
@@ -1987,6 +2090,29 @@ async function loadSettingsFromBackend() {
 function renderApiKeysGrid(providers) {
   apiKeysGrid.innerHTML = providers.map(p => {
     const providerInfo = PROVIDERS.find(pr => pr.id === p.id) || { placeholder: 'API Key' };
+    if (providerInfo.authType === 'github-oauth') {
+      return `
+        <div class="api-key-item" data-provider="${p.id}">
+          <div class="provider-info">
+            <span class="status-dot ${p.configured ? 'configured' : ''}"></span>
+            <span class="provider-name">${p.name}</span>
+          </div>
+          <button class="save-key-btn auth-provider-login" data-provider="${p.id}">使用 GitHub 授权</button>
+        </div>
+      `;
+    }
+    if (providerInfo.authType === 'local-url') {
+      return `
+        <div class="api-key-item" data-provider="${p.id}">
+          <div class="provider-info">
+            <span class="status-dot ${p.configured ? 'configured' : ''}" id="ollama-local-status"></span>
+            <span class="provider-name">${p.name}</span>
+          </div>
+          <input type="text" class="key-input" id="ollama-base-url" placeholder="${providerInfo.placeholder}" value="${p.baseUrl || providerInfo.placeholder}" data-provider="${p.id}">
+          <button class="save-key-btn test-ollama-btn" data-provider="${p.id}">检测</button>
+        </div>
+      `;
+    }
     return `
       <div class="api-key-item" data-provider="${p.id}">
         <div class="provider-info">
@@ -2003,6 +2129,15 @@ function renderApiKeysGrid(providers) {
   apiKeysGrid.querySelectorAll('.save-key-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const provider = btn.dataset.provider;
+      if (btn.classList.contains('auth-provider-login')) {
+        await openExtensionLogin({ interactive: true });
+        return;
+      }
+      if (btn.classList.contains('test-ollama-btn')) {
+        await testOllamaConnection();
+        return;
+      }
+
       const input = apiKeysGrid.querySelector(`.key-input[data-provider="${provider}"]`);
       const apiKey = input.value.trim();
       
@@ -2044,6 +2179,30 @@ function renderApiKeysGrid(providers) {
   });
 }
 
+async function testOllamaConnection() {
+  const input = document.getElementById('ollama-base-url');
+  const statusDot = document.getElementById('ollama-local-status');
+  const baseUrl = (input?.value || DEFAULT_OLLAMA_URL).trim().replace(/\/$/, '');
+  if (!input) return;
+
+  await chrome.storage.local.set({ ollamaBaseUrl: baseUrl });
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama responded ${response.status}`);
+    }
+    const data = await response.json();
+    const models = Array.isArray(data.models) ? data.models.length : 0;
+    statusDot?.classList.add('configured');
+    showToast(`Ollama 连接正常，发现 ${models} 个模型`, 'success');
+  } catch (error) {
+    statusDot?.classList.remove('configured');
+    showToast(`Ollama 连接失败：${error.message}`, 'error', 5000);
+  }
+}
+
 /**
  * Test backend connection
  */
@@ -2072,6 +2231,13 @@ async function testBackendConnection() {
  * Save settings
  */
 async function saveSettings() {
+  const { authToken } = await chrome.storage.local.get(['authToken']);
+  if (!authToken) {
+    renderSettingsLoginRequired();
+    openExtensionLogin({ interactive: true });
+    return;
+  }
+
   const backendUrl = settingsBackendUrl.value.trim();
   const defaultProvider = settingsDefaultProvider.value;
   

@@ -74,8 +74,23 @@ assert.match(
 );
 assert.match(
   extensionSidepanel,
-  /\/auth\/extension\?ext_id=/,
+  /\/auth\/extension[\s\S]*searchParams\.set\('ext_id'/,
   "Extension login should use the web-to-extension auth bridge."
+);
+assert.match(
+  extensionSidepanel,
+  /launchWebAuthFlow/,
+  "Extension login should wait for the web auth flow to return an extension token instead of only opening a tab."
+);
+assert.match(
+  extensionSidepanel,
+  /redirect_uri/,
+  "Extension auth bridge should pass a browser-extension redirect URI to the web connect page."
+);
+assert.match(
+  read("app", "auth", "extension", "page.tsx"),
+  /redirect_uri/,
+  "Web extension connect page should honor a validated extension redirect URI."
 );
 assert.match(
   extensionSidepanel,
@@ -249,6 +264,21 @@ assert.match(
   extensionSidepanel,
   /fetchWithAuth\(`\$\{API_BASE_URL\}\/api\/settings`/,
   "Extension settings should load through the authenticated Web settings API."
+);
+assert.match(
+  extensionSidepanel,
+  /renderSettingsLoginRequired/,
+  "Extension settings should not expose provider/API configuration while the extension is unauthenticated."
+);
+assert.match(
+  extensionSidepanel,
+  /testOllamaConnection/,
+  "Extension settings should provide a local Ollama connection check."
+);
+assert.match(
+  manifest,
+  /http:\/\/localhost:11434\/\*/,
+  "Extension should be allowed to call the default local Ollama endpoint."
 );
 assert.doesNotMatch(
   extensionSidepanel,

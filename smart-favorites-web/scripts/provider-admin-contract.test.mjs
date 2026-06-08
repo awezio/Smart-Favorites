@@ -120,6 +120,16 @@ assert.doesNotMatch(
   /github_copilot[\s\S]{0,500}<Input[\s\S]{0,500}API Key/,
   "GitHub Copilot settings must not ask the user to enter an API key."
 );
+assert.match(
+  settingsPage,
+  /DEFAULT_OLLAMA_BASE_URL[\s\S]*http:\/\/localhost:11434/,
+  "Settings page should expose the default local Ollama endpoint."
+);
+assert.match(
+  settingsPage,
+  /testLocalOllama[\s\S]*\/api\/tags/,
+  "Settings page should test local Ollama from the browser against /api/tags."
+);
 
 assert.match(
   modelsRoute,

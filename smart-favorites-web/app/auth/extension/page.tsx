@@ -14,6 +14,7 @@ function ExtensionAuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const extId = searchParams.get("ext_id");
+  const redirectUri = searchParams.get("redirect_uri");
 
   useEffect(() => {
     if (!extId) {
@@ -42,7 +43,12 @@ function ExtensionAuthContent() {
       }
 
       const { token } = await tokenResponse.json();
-      const callbackUrl = `chrome-extension://${extId}/auth-callback.html`;
+      const callbackUrl =
+        redirectUri &&
+        (redirectUri.startsWith(`https://${extId}.chromiumapp.org/`) ||
+          redirectUri.startsWith(`chrome-extension://${extId}/`))
+          ? redirectUri
+          : `chrome-extension://${extId}/auth-callback.html`;
       const hash = new URLSearchParams({
         extensionToken: token,
       }).toString();
@@ -51,7 +57,7 @@ function ExtensionAuthContent() {
     };
 
     run();
-  }, [extId, router]);
+  }, [extId, redirectUri, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">

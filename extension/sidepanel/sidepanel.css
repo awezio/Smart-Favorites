@@ -1711,6 +1711,20 @@ body::before {
   line-height: 1.4;
 }
 
+.settings-login-required {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px dashed var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-login-required p {
+  margin: 0;
+}
+
 /* ========================================
    ENHANCED CHAT INPUT AREA (ChatGPT Style)
 ======================================== */

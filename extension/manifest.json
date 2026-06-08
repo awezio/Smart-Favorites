@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Favorites",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "智能收藏夹管理 - 基于 AI 的收藏夹语义搜索和问答，支持侧边栏模式",
   "author": "Smart Favorites Team",
   "permissions": [
@@ -9,7 +9,8 @@
     "storage",
     "activeTab",
     "sidePanel",
-    "tabs"
+    "tabs",
+    "identity"
   ],
   "web_accessible_resources": [
     { "resources": ["auth-callback.html", "auth-callback.js"], "matches": ["<all_urls>"] }
@@ -17,8 +18,10 @@
   "host_permissions": [
     "http://localhost:3000/*",
     "http://localhost:8000/*",
+    "http://localhost:11434/*",
     "http://127.0.0.1:3000/*",
     "http://127.0.0.1:8000/*",
+    "http://127.0.0.1:11434/*",
     "https://*.vercel.app/*",
     "https://smart-favorites.cc.cd/*",
     "https://*.smart-favorites.cc.cd/*"

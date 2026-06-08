@@ -35,6 +35,7 @@ type TestState = "idle" | "testing" | "success" | "error";
 type ModelOption = { id: string; label: string };
 
 const firstProvider = PROVIDER_DEFINITIONS[0]?.id || "deepseek";
+const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -74,6 +75,8 @@ export default function SettingsPage() {
     [providerSelector]
   );
   const selectedRequiresGitHubLogin = selectedDefinition?.authType === "github-oauth";
+  const selectedIsOllama = selectedDefinition?.id === "ollama";
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState(DEFAULT_OLLAMA_BASE_URL);
 
   const selectedModels =
     providerModels[selectedProvider] || selectedDefinition?.fallbackModels || [];
@@ -121,6 +124,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings();
+    setOllamaBaseUrl(
+      window.localStorage.getItem("smart-favorites:ollama-base-url") ||
+        DEFAULT_OLLAMA_BASE_URL
+    );
   }, [loadSettings]);
 
   const handleSave = async () => {
@@ -251,6 +258,34 @@ export default function SettingsPage() {
     } catch (error: any) {
       setModelStates((current) => ({ ...current, [provider]: "error" }));
       setModelErrors((current) => ({ ...current, [provider]: error.message || "获取模型失败" }));
+    }
+  };
+
+  const testLocalOllama = async () => {
+    setModelStates((current) => ({ ...current, ollama: "testing" }));
+    setModelErrors((current) => ({ ...current, ollama: "" }));
+    const baseUrl = ollamaBaseUrl.trim().replace(/\/$/, "") || DEFAULT_OLLAMA_BASE_URL;
+    window.localStorage.setItem("smart-favorites:ollama-base-url", baseUrl);
+
+    try {
+      const res = await fetch(`${baseUrl}/api/tags`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`Ollama responded ${res.status}`);
+      const data = await res.json();
+      const models = (data.models || []).map((item: any) => ({
+        id: item.name,
+        label: item.name,
+      }));
+      setProviderModels((current) => ({ ...current, ollama: models }));
+      setModelStates((current) => ({ ...current, ollama: "success" }));
+      toast.success(`Ollama 连接正常，发现 ${models.length} 个模型`);
+    } catch (error: any) {
+      setModelStates((current) => ({ ...current, ollama: "error" }));
+      setModelErrors((current) => ({
+        ...current,
+        ollama: error.message || "Ollama 连接失败",
+      }));
     }
   };
 
@@ -392,7 +427,25 @@ export default function SettingsPage() {
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {selectedRequiresGitHubLogin ? (
+                {selectedIsOllama ? (
+                  <div className="space-y-2">
+                    <Label>Ollama 本地地址</Label>
+                    <div className="rounded-md border bg-muted/30 p-3">
+                      <Input
+                        value={ollamaBaseUrl}
+                        onChange={(event) => setOllamaBaseUrl(event.target.value)}
+                        placeholder={DEFAULT_OLLAMA_BASE_URL}
+                      />
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        默认端口为 11434。Vercel 云端无法访问你电脑上的 localhost，检测会从当前浏览器直接访问本机 Ollama。
+                      </p>
+                      <Button type="button" variant="outline" className="mt-3" onClick={testLocalOllama}>
+                        <TestTube className="mr-2 h-4 w-4" />
+                        检测 Ollama
+                      </Button>
+                    </div>
+                  </div>
+                ) : selectedRequiresGitHubLogin ? (
                   <div className="space-y-2">
                     <Label>GitHub 授权</Label>
                     <div className="rounded-md border bg-muted/30 p-3">
@@ -461,7 +514,7 @@ export default function SettingsPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => loadProviderModels(selectedProvider)}
+                  onClick={() => selectedIsOllama ? testLocalOllama() : loadProviderModels(selectedProvider)}
                   disabled={selectedModelState === "testing"}
                 >
                   {selectedModelState === "testing" ? (
@@ -477,7 +530,7 @@ export default function SettingsPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => testProvider(selectedProvider)}
+                  onClick={() => selectedIsOllama ? testLocalOllama() : testProvider(selectedProvider)}
                   disabled={selectedTestState === "testing"}
                 >
                   {selectedTestState === "testing" ? (
