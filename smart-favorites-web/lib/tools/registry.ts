@@ -218,7 +218,9 @@ const registry: ToolRegistration[] = [
 
       const tags = toStringArray(payload?.tags);
       const description = toString(payload?.description).trim() || undefined;
-      const embedding = await generateEmbedding(`${title} ${description || ""} ${url}`);
+      const embedding = await generateEmbedding(`${title} ${description || ""} ${url}`, {
+        userId: context.userId,
+      });
 
       const bookmark = await createBookmark({
         user_id: context.userId,

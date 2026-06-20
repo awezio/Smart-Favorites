@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchAll, searchBookmarks, searchStars } from "@/lib/rag/search";
+import { searchAll, searchBookmarks, searchDocuments, searchStars } from "@/lib/rag/search";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
         break;
       case "stars":
         results = await searchStars(query, topK, threshold, userId, supabase);
+        break;
+      case "documents":
+        results = await searchDocuments(query, topK, threshold, userId, supabase);
         break;
       case "all":
       default:

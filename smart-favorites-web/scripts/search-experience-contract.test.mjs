@@ -29,6 +29,11 @@ assert.match(
 );
 assert.match(
   searchRoute,
+  /searchDocuments\(query, topK, threshold, userId, supabase\)/,
+  "Document search should use the logged-in Supabase session client."
+);
+assert.match(
+  searchRoute,
   /searchAll\(query, topK, threshold, userId, supabase\)/,
   "Unified search should use the logged-in Supabase session client."
 );
@@ -61,8 +66,28 @@ assert.match(
 );
 assert.match(
   searchLib,
+  /match_document_chunks/,
+  "Search should include semantic retrieval for document chunks."
+);
+assert.match(
+  searchLib,
+  /keyword_search_document_chunks/,
+  "Search should include keyword fallback for document chunks."
+);
+assert.match(
+  searchLib,
+  /searchDocuments\(query, topK, threshold, userId, client\)/,
+  "Unified search should include document results."
+);
+assert.match(
+  searchLib,
   /mergeSearchResults/,
   "Semantic and keyword results should be merged and deduplicated."
+);
+assert.match(
+  ragEngine,
+  /\[document\]/,
+  "RAG prompt should format document evidence for the model."
 );
 
 assert.match(

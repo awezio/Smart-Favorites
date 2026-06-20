@@ -174,6 +174,23 @@ async function maybeAutoConnectFromActiveWebSession() {
   });
 }
 
+async function handleExtensionAuthChanged({ syncAfterAuth = true } = {}) {
+  await checkExtensionAuthStatus();
+  await checkConnection();
+  await loadExtensionRuntimeSettings();
+
+  if (!syncAfterAuth) return;
+
+  const { lastAuthAutoSyncAt } = await chrome.storage.local.get(['lastAuthAutoSyncAt']);
+  const now = Date.now();
+  if (lastAuthAutoSyncAt && now - lastAuthAutoSyncAt < 15000) {
+    return;
+  }
+
+  await chrome.storage.local.set({ lastAuthAutoSyncAt: now });
+  await syncBookmarks(false);
+}
+
 // State
 let isConnected = false;
 let currentModel = '--';
@@ -512,6 +529,7 @@ async function openExtensionLogin({ interactive = true } = {}) {
   const connected = await waitForExtensionAuthToken(90000);
   if (connected) {
     showToast('扩展已连接到 Smart Favorites', 'success');
+    await handleExtensionAuthChanged({ syncAfterAuth: true });
   } else {
     showToast('授权未完成，请在打开的 Smart Favorites 页面完成扩展连接。', 'warning', 6000);
   }
@@ -544,15 +562,13 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (changes.backendUrl) {
       API_BASE_URL = normalizeApiBaseUrl(changes.backendUrl.newValue || API_BASE_URL);
     }
-    checkExtensionAuthStatus();
-    checkConnection();
+    handleExtensionAuthChanged({ syncAfterAuth: Boolean(changes.authToken?.newValue) });
   }
 });
 
 chrome.runtime.onMessage.addListener((request) => {
   if (request.action === 'extensionAuthChanged') {
-    checkExtensionAuthStatus();
-    checkConnection();
+    handleExtensionAuthChanged({ syncAfterAuth: true });
   }
 });
 

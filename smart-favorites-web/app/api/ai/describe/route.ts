@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       const description = await generateBookmarkDescription(item.url, item.title);
 
       const textToEmbed = `${item.title} ${description} ${item.url}`;
-      const embedding = await generateEmbedding(textToEmbed);
+      const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateBookmark(
         item.id,
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       });
     } else if (type === "star") {
       const textToEmbed = `${item.owner}/${item.repo} ${item.description || ""} ${item.language || ""}`;
-      const embedding = await generateEmbedding(textToEmbed);
+      const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateStar(
         item.id,

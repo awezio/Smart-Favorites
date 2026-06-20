@@ -9,6 +9,7 @@ const read = (...parts) => readFileSync(join(repoRoot, ...parts), "utf8");
 const settingsPage = read("app", "dashboard", "settings", "page.tsx");
 const chatPage = read("app", "dashboard", "chat", "page.tsx");
 const settingsRoute = read("app", "api", "settings", "route.ts");
+const embedding = read("lib", "rag", "embedding.ts");
 const ragEngine = read("lib", "rag", "rag-engine.ts");
 const extensionSidepanel = read("..", "extension", "sidepanel", "sidepanel.js");
 const migrationsDir = join(repoRoot, "supabase", "migrations");
@@ -39,6 +40,11 @@ assert.match(
   "Database migrations should persist the user's default LLM model."
 );
 assert.match(
+  migrations,
+  /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLE\s+public\.user_settings\s+TO\s+authenticated/i,
+  "Database migrations should grant authenticated users Data API access to user_settings while RLS enforces row ownership."
+);
+assert.match(
   settingsRoute,
   /defaultModel[\s\S]*default_llm_model/,
   "Settings GET should return the stored default LLM model."
@@ -47,6 +53,16 @@ assert.match(
   settingsRoute,
   /body\.default_llm_model[\s\S]*updateData\.default_llm_model/,
   "Settings PUT should persist the default LLM model."
+);
+assert.match(
+  settingsPage,
+  /embeddingPreference/,
+  "Settings page should expose the persisted embedding preference instead of only reporting it from the API."
+);
+assert.match(
+  embedding,
+  /OPENAI_EMBEDDING_MODEL[\s\S]*dimensions/,
+  "Embedding generation should support a configurable OpenAI embedding model while preserving the 384-dimensional vector schema."
 );
 assert.match(
   ragEngine,

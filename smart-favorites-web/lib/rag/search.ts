@@ -38,6 +38,33 @@ export async function searchStars(
   return mergeSearchResults([...semantic, ...keyword], topK);
 }
 
+export async function searchDocuments(
+  query: string,
+  topK: number,
+  threshold: number,
+  userId?: string,
+  client?: SupabaseQueryClient
+): Promise<SearchResult[]> {
+  if (!userId) {
+    return [];
+  }
+
+  const supabase = client || createAdminClient();
+  const [semanticResult, keywordResult] = await Promise.allSettled([
+    searchDocumentsByEmbedding(supabase, query, topK, threshold, userId),
+    searchDocumentsByKeyword(supabase, query, topK, userId),
+  ]);
+
+  // Keyword document search is a newer RPC and may not exist on all
+  // environments yet. Degrade gracefully to semantic-only when it fails.
+  const semantic =
+    semanticResult.status === "fulfilled" ? semanticResult.value : [];
+  const keyword =
+    keywordResult.status === "fulfilled" ? keywordResult.value : [];
+
+  return mergeSearchResults([...semantic, ...keyword], topK);
+}
+
 export async function searchAll(
   query: string,
   topK: number,
@@ -45,12 +72,22 @@ export async function searchAll(
   userId?: string,
   client?: SupabaseQueryClient
 ): Promise<SearchResult[]> {
-  const [bookmarks, stars] = await Promise.all([
+  const [bookmarksResult, starsResult, documentsResult] = await Promise.allSettled([
     searchBookmarks(query, topK, threshold, userId, client),
     searchStars(query, topK, threshold, userId, client),
+    searchDocuments(query, topK, threshold, userId, client),
   ]);
 
-  return mergeSearchResults([...bookmarks, ...stars], topK);
+  // Each search type degrades independently so one missing RPC
+  // (e.g. document keyword search) never fails the whole query.
+  const bookmarks =
+    bookmarksResult.status === "fulfilled" ? bookmarksResult.value : [];
+  const stars =
+    starsResult.status === "fulfilled" ? starsResult.value : [];
+  const documents =
+    documentsResult.status === "fulfilled" ? documentsResult.value : [];
+
+  return mergeSearchResults([...bookmarks, ...stars, ...documents], topK);
 }
 
 async function searchBookmarksByEmbedding(
@@ -60,7 +97,7 @@ async function searchBookmarksByEmbedding(
   threshold: number,
   userId?: string
 ): Promise<SearchResult[]> {
-  const embedding = await generateEmbedding(query);
+  const embedding = await generateEmbedding(query, { userId });
   const { data, error } = await supabase.rpc("match_bookmarks", {
     query_embedding: embedding,
     match_threshold: threshold,
@@ -83,7 +120,7 @@ async function searchStarsByEmbedding(
   threshold: number,
   userId?: string
 ): Promise<SearchResult[]> {
-  const embedding = await generateEmbedding(query);
+  const embedding = await generateEmbedding(query, { userId });
   const { data, error } = await supabase.rpc("match_stars", {
     query_embedding: embedding,
     match_threshold: threshold,
@@ -97,6 +134,28 @@ async function searchStarsByEmbedding(
   return ((data || []) as Array<any>)
     .filter((row) => !userId || row.user_id === userId)
     .map(toStarResult);
+}
+
+async function searchDocumentsByEmbedding(
+  supabase: SupabaseQueryClient,
+  query: string,
+  topK: number,
+  threshold: number,
+  userId: string
+): Promise<SearchResult[]> {
+  const embedding = await generateEmbedding(query, { userId });
+  const { data, error } = await supabase.rpc("match_document_chunks", {
+    query_embedding: embedding,
+    user_id_param: userId,
+    match_count: topK,
+    similarity_threshold: threshold,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data || []) as Array<any>).map(toDocumentResult);
 }
 
 async function searchBookmarksByKeyword(
@@ -138,6 +197,27 @@ async function searchStarsByKeyword(
 
   return ((data || []) as Array<any>).map((row) =>
     toStarResult({ ...row, similarity: row.rank ?? 0.5 })
+  );
+}
+
+async function searchDocumentsByKeyword(
+  supabase: SupabaseQueryClient,
+  query: string,
+  topK: number,
+  userId: string
+): Promise<SearchResult[]> {
+  const { data, error } = await supabase.rpc("keyword_search_document_chunks", {
+    query_text: query,
+    filter_user_id: userId,
+    match_count: topK,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data || []) as Array<any>).map((row) =>
+    toDocumentResult({ ...row, similarity: row.rank ?? row.similarity ?? 0.5 })
   );
 }
 
@@ -197,6 +277,28 @@ function toStarResult(row: any): SearchResult {
       updated: row.updated || now,
       created_at: row.created_at || now,
       updated_at: row.updated_at || now,
+    },
+  };
+}
+
+function toDocumentResult(row: any): SearchResult {
+  const chunkId = row.id || row.chunk_id;
+  const documentId = row.document_id;
+  const title = row.title || row.document_title || row.section_title || row.file_name || "Document";
+
+  return {
+    type: "document",
+    id: chunkId,
+    similarity: Number(row.similarity ?? row.rank ?? 0),
+    document: {
+      id: chunkId,
+      document_id: documentId,
+      user_id: row.user_id,
+      title,
+      file_name: row.file_name,
+      content: row.content,
+      page_number: row.page_number,
+      section_title: row.section_title,
     },
   };
 }

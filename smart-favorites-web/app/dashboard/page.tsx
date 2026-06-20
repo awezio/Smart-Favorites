@@ -19,7 +19,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [searchType, setSearchType] = useState<"all" | "bookmarks" | "stars">(
+  const [searchType, setSearchType] = useState<"all" | "bookmarks" | "stars" | "documents">(
     "all"
   );
 
@@ -78,14 +78,20 @@ export default function SearchPage() {
           </div>
 
           <div className="flex gap-2 mt-4">
-            {(["all", "bookmarks", "stars"] as const).map((type) => (
+            {(["all", "bookmarks", "stars", "documents"] as const).map((type) => (
               <Button
                 key={type}
                 variant={searchType === type ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSearchType(type)}
               >
-                {type === "all" ? "全部" : type === "bookmarks" ? "书签" : "GitHub Stars"}
+                {type === "all"
+                  ? "全部"
+                  : type === "bookmarks"
+                    ? "书签"
+                    : type === "stars"
+                      ? "GitHub Stars"
+                      : "Documents"}
               </Button>
             ))}
           </div>
@@ -125,12 +131,15 @@ export default function SearchPage() {
 
 function ResultCard({ result }: { result: SearchResult }) {
   const isBookmark = result.type === "bookmark";
+  const isDocument = result.type === "document";
 
-  if (!result.bookmark && !result.star) return null;
+  if (!result.bookmark && !result.star && !result.document) return null;
 
   const title =
     isBookmark && result.bookmark
       ? result.bookmark.title
+      : isDocument && result.document
+        ? result.document.title
       : result.star
         ? `${result.star.owner}/${result.star.repo}`
         : "";
@@ -138,6 +147,8 @@ function ResultCard({ result }: { result: SearchResult }) {
   const description =
     isBookmark && result.bookmark
       ? result.bookmark.description
+      : isDocument && result.document
+        ? result.document.content
       : result.star?.description;
 
   const url =
@@ -153,7 +164,7 @@ function ResultCard({ result }: { result: SearchResult }) {
             <div className="flex items-center gap-2">
               <CardTitle className="text-lg">{title}</CardTitle>
               <Badge variant={isBookmark ? "default" : "secondary"}>
-                {isBookmark ? "书签" : "Star"}
+                {isBookmark ? "书签" : isDocument ? "Document" : "Star"}
               </Badge>
             </div>
             {result.star?.language && (
@@ -171,18 +182,27 @@ function ResultCard({ result }: { result: SearchResult }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-primary hover:underline"
-        >
-          {url}
-        </a>
+        {url ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary hover:underline"
+          >
+            {url}
+          </a>
+        ) : null}
         {result.star && (
           <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
             <span>Stars: {result.star.stars}</span>
             <span>Forks: {result.star.forks}</span>
+          </div>
+        )}
+        {result.document && (
+          <div className="mt-2 text-sm text-muted-foreground">
+            {result.document.file_name && <span>{result.document.file_name}</span>}
+            {result.document.page_number && <span> · Page {result.document.page_number}</span>}
+            {result.document.section_title && <span> · {result.document.section_title}</span>}
           </div>
         )}
       </CardContent>

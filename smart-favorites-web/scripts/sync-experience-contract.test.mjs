@@ -15,6 +15,7 @@ const bookmarksRoute = read("app", "api", "bookmarks", "route.ts");
 const bookmarksSyncRoute = read("app", "api", "bookmarks", "sync", "route.ts");
 const profileRoute = read("app", "api", "profile", "route.ts");
 const settingsRoute = read("app", "api", "settings", "route.ts");
+const healthRoute = read("app", "api", "health", "route.ts");
 const bookmarksDb = read("lib", "db", "bookmarks.ts");
 const githubStarsDb = read("lib", "db", "github-stars.ts");
 const dashboardLayout = read("app", "dashboard", "layout.tsx");
@@ -344,6 +345,16 @@ assert.match(
   extensionSidepanel,
   /extensionAuthChanged/,
   "Extension auth callback/status flow should notify other extension contexts after storing a token."
+);
+assert.match(
+  extensionSidepanel,
+  /handleExtensionAuthChanged[\s\S]*syncBookmarks\(false\)/,
+  "Extension should automatically sync browser bookmarks once extension auth succeeds."
+);
+assert.doesNotMatch(
+  healthRoute,
+  /createAdminClient/,
+  "Health checks used by the extension should not require the Supabase service role key."
 );
 assert.doesNotMatch(
   read("app", "dashboard", "settings", "page.tsx"),

@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     const addedWithEmbeddings = await Promise.all(
       diff.added.map(async (bookmark: any) => {
         const textToEmbed = `${bookmark.title} ${bookmark.description || ""} ${bookmark.url}`;
-        const embedding = await generateEmbedding(textToEmbed);
+        const embedding = await generateEmbedding(textToEmbed, { userId });
         return {
           user_id: userId,
           title: bookmark.title,
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Process modifications
     for (const { old: oldBookmark, new: newBookmark } of diff.modified) {
       const textToEmbed = `${newBookmark.title} ${newBookmark.description || ""} ${newBookmark.url}`;
-      const embedding = await generateEmbedding(textToEmbed);
+      const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateBookmark(
         oldBookmark.id,

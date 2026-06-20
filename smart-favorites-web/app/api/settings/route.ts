@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       defaultModel: userSettings?.default_llm_model || "",
       embeddingModel:
         userSettings?.embedding_preference === "openai"
-          ? "OpenAI text-embedding-3-small"
+          ? `OpenAI ${process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small"} (384d)`
           : process.env.EMBEDDING_MODEL || "Xenova/all-MiniLM-L6-v2",
       embeddingPreference: userSettings?.embedding_preference || "local",
       providers: providerStatus,
@@ -132,6 +132,9 @@ export async function PUT(request: NextRequest) {
       updateData.github_username = body.github_username;
     }
     if (body.embedding_preference !== undefined) {
+      if (body.embedding_preference !== "local" && body.embedding_preference !== "openai") {
+        return NextResponse.json({ error: "Invalid embedding preference" }, { status: 400 });
+      }
       updateData.embedding_preference = body.embedding_preference;
     }
     if (body.auto_generate_description !== undefined) {

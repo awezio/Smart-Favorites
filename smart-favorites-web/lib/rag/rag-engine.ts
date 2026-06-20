@@ -116,6 +116,16 @@ function buildRagPrompt(query: string, sources: SearchResult[]) {
       return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description || ""}`;
     }
 
+    if (source.type === "document" && source.document) {
+      const location = [
+        source.document.file_name ? `File: ${source.document.file_name}` : "",
+        source.document.page_number ? `Page: ${source.document.page_number}` : "",
+        source.document.section_title ? `Section: ${source.document.section_title}` : "",
+      ].filter(Boolean);
+
+      return `${index + 1}. [document] ${source.document.title}\n${location.join("\n")}\nContent: ${source.document.content}`;
+    }
+
     return `${index + 1}. ${source.id}`;
   });
 
@@ -172,6 +182,10 @@ function buildFallbackAnswer(
 
     if (source.type === "star" && source.star) {
       return `${index + 1}. ${source.star.owner}/${source.star.repo} (${source.star.url})`;
+    }
+
+    if (source.type === "document" && source.document) {
+      return `${index + 1}. ${source.document.title}: ${source.document.content.slice(0, 120)}`;
     }
 
     return `${index + 1}. Result ${source.id}`;

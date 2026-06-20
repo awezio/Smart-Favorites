@@ -523,24 +523,42 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               <div className="mt-4 space-y-1.5 border-t border-border/30 pt-3">
                 <p className="text-xs font-semibold opacity-70">引用来源</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {message.sources.map((source: SearchResult, index: number) => (
-                    <a
-                      key={`${source.id}-${index}`}
-                      href={source.bookmark?.url || source.star?.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-1 text-xs transition-colors hover:bg-muted"
-                    >
-                      <ExternalLink className="h-3 w-3 shrink-0" />
-                      <span className="max-w-[200px] truncate">
-                        {source.bookmark?.title ||
-                          `${source.star?.owner}/${source.star?.repo}`}
+                  {message.sources.map((source: SearchResult, index: number) => {
+                    const href = source.bookmark?.url || source.star?.url || "";
+                    const title =
+                      source.bookmark?.title ||
+                      (source.star ? `${source.star.owner}/${source.star.repo}` : "") ||
+                      source.document?.title ||
+                      "Document";
+                    const content = (
+                      <>
+                        {href && <ExternalLink className="h-3 w-3 shrink-0" />}
+                        <span className="max-w-[200px] truncate">{title}</span>
+                        <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                          {Math.round((source.similarity || 0) * 100)}%
+                        </Badge>
+                      </>
+                    );
+
+                    return href ? (
+                      <a
+                        key={`${source.id}-${index}`}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-1 text-xs transition-colors hover:bg-muted"
+                      >
+                        {content}
+                      </a>
+                    ) : (
+                      <span
+                        key={`${source.id}-${index}`}
+                        className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-1 text-xs"
+                      >
+                        {content}
                       </span>
-                      <Badge variant="secondary" className="px-1 py-0 text-[10px]">
-                        {Math.round((source.similarity || 0) * 100)}%
-                      </Badge>
-                    </a>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

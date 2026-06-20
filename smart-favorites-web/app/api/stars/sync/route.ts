@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const addedWithEmbeddings = await Promise.all(
       diff.added.map(async (star: any) => {
         const textToEmbed = `${star.owner}/${star.repo} ${star.description || ""} ${star.language || ""}`;
-        const embedding = await generateEmbedding(textToEmbed);
+        const embedding = await generateEmbedding(textToEmbed, { userId });
         return {
           user_id: userId,
           owner: star.owner,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Process modifications
     for (const { old: oldStar, new: newStar } of diff.modified) {
       const textToEmbed = `${newStar.owner}/${newStar.repo} ${newStar.description || ""} ${newStar.language || ""}`;
-      const embedding = await generateEmbedding(textToEmbed);
+      const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateStar(
         oldStar.id,

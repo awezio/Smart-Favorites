@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const textToEmbed = `${title} ${description || ""} ${url}`;
-    const embedding = await generateEmbedding(textToEmbed);
+    const embedding = await generateEmbedding(textToEmbed, { userId });
     const supabase = await createServerSupabaseClient();
 
     const bookmark = await createBookmark({
@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest) {
 
     if (title !== undefined || description !== undefined || url !== undefined) {
       const textToEmbed = `${title || ""} ${description || ""} ${url || ""}`;
-      updates.embedding = await generateEmbedding(textToEmbed);
+      updates.embedding = await generateEmbedding(textToEmbed, { userId });
     }
 
     const supabase = await createServerSupabaseClient();

@@ -73,6 +73,7 @@ export interface ApiAuditLogRecord {
 }
 
 export interface DocumentChunkRecord {
+  id?: string;
   document_id: string;
   user_id: string;
   content: string;
@@ -106,11 +107,21 @@ export interface ChatMessage {
 
 // Search and RAG types
 export interface SearchResult {
-  type: "bookmark" | "star";
+  type: "bookmark" | "star" | "document";
   id: string;
   similarity: number;
   bookmark?: Bookmark;
   star?: GitHubStar;
+  document?: {
+    id: string;
+    document_id: string;
+    user_id: string;
+    title: string;
+    file_name?: string | null;
+    content: string;
+    page_number?: number | null;
+    section_title?: string | null;
+  };
 }
 
 export interface DiffResult<T> {

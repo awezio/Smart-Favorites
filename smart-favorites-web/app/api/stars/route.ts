@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const textToEmbed = `${owner}/${repo} ${description || ""} ${language || ""}`;
-    const embedding = await generateEmbedding(textToEmbed);
+    const embedding = await generateEmbedding(textToEmbed, { userId });
     const supabase = await createServerSupabaseClient();
 
     const star = await createStar({
@@ -94,7 +94,7 @@ export async function PUT(request: NextRequest) {
 
     if (owner !== undefined || repo !== undefined || description !== undefined || language !== undefined) {
       const textToEmbed = `${owner || ""}/${repo || ""} ${description || ""} ${language || ""}`;
-      updates.embedding = await generateEmbedding(textToEmbed);
+      updates.embedding = await generateEmbedding(textToEmbed, { userId });
     }
 
     const supabase = await createServerSupabaseClient();

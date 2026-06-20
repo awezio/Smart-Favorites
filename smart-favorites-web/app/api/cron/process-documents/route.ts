@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
         );
 
         const embeddings = await generateEmbeddings(
-          parsed.chunks.map((chunk) => chunk.content)
+          parsed.chunks.map((chunk) => chunk.content),
+          { userId: document.user_id }
         );
 
         const chunkRecords = parsed.chunks.map((chunk, index) => ({
