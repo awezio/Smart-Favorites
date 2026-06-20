@@ -2,7 +2,6 @@
 
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 type ExtensionRuntime = {
@@ -34,23 +33,26 @@ function ExtensionAuthContent() {
     }
 
     const run = async () => {
-      const supabase = createClient();
-      const { data: { session }, error } = await supabase.auth.getSession();
       const returnPath = `/auth/extension?${new URLSearchParams({
         ext_id: extId,
         ...(redirectUri ? { redirect_uri: redirectUri } : {}),
       }).toString()}`;
+      let accessToken = "";
 
-      if (error || !session) {
-        router.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
-        return;
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data } = await supabase.auth.getSession();
+        accessToken = data.session?.access_token || "";
+      } catch {
+        // The server API below can still resolve auth from Supabase SSR cookies.
       }
 
       const tokenResponse = await fetch("/api/auth/extension/session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({ extensionId: extId }),
       });
@@ -95,8 +97,7 @@ function ExtensionAuthContent() {
             return;
           }
 
-          window.close();
-          router.replace("/dashboard/bookmarks");
+          redirectToExtensionCallback();
         }
       );
     };

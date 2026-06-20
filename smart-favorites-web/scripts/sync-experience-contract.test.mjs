@@ -24,6 +24,8 @@ const extensionBackground = read("..", "extension", "background", "background.js
 const extensionSidepanel = read("..", "extension", "sidepanel", "sidepanel.js");
 const extensionOptions = read("..", "extension", "options", "options.html");
 const extensionAuthCallback = read("..", "extension", "auth-callback.js");
+const authExtensionPage = read("app", "auth", "extension", "page.tsx");
+const supabaseMiddleware = read("lib", "supabase", "middleware.ts");
 const extensionSources = [
   extensionBackground,
   extensionSidepanel,
@@ -114,34 +116,54 @@ assert.match(
   "Extension auth bridge should pass its web-accessible extension callback URI to the web connect page."
 );
 assert.match(
-  read("app", "auth", "extension", "page.tsx"),
+  authExtensionPage,
   /sendMessage\(\s*extId/,
   "Web extension connect page should deliver the extension token by external extension messaging."
 );
 assert.match(
-  read("app", "auth", "extension", "page.tsx"),
+  authExtensionPage,
   /callbackUrl/,
   "Web extension connect page should keep a browser-extension callback fallback."
 );
 assert.match(
-  read("app", "auth", "extension", "page.tsx"),
+  authExtensionPage,
   /extensionToken/,
   "Web extension connect page fallback should include the extension token in the callback hash."
 );
 assert.match(
-  read("app", "auth", "extension", "page.tsx"),
-  /Authorization:\s*`Bearer \$\{session\.access_token\}`/,
-  "Web extension connect page should send the browser Supabase access token to the extension session API so cookie sync issues do not block extension auth."
+  authExtensionPage,
+  /accessToken[\s\S]*Authorization:\s*`Bearer \$\{accessToken\}`/,
+  "Web extension connect page should optionally send the browser Supabase access token to the extension session API."
 );
 assert.match(
-  read("app", "auth", "extension", "page.tsx"),
+  authExtensionPage,
+  /fetch\("\/api\/auth\/extension\/session"/,
+  "Web extension connect page should ask the server API to resolve auth from SSR cookies even when the browser client session is unavailable."
+);
+assert.doesNotMatch(
+  authExtensionPage,
+  /if\s*\(\s*(?:error\s*\|\|\s*)?!session\s*\)[\s\S]*router\.replace\(`\/login\?redirect=/,
+  "Web extension connect page must not redirect to login before trying the server-side extension session API."
+);
+assert.match(
+  authExtensionPage,
   /backendUrl:\s*window\.location\.origin/,
   "Web extension connect page fallback should tell the extension which backend origin issued the token."
 );
 assert.match(
-  read("app", "auth", "extension", "page.tsx"),
+  authExtensionPage,
   /runtime\.lastError[\s\S]*redirectToExtensionCallback\(\)/,
   "Web extension connect page should fall back to the extension callback when external messaging fails."
+);
+assert.match(
+  authExtensionPage,
+  /response\?\.success[\s\S]*redirectToExtensionCallback\(\)/,
+  "Web extension connect page should still route through the extension callback after external messaging succeeds so storage is written in the extension context."
+);
+assert.match(
+  supabaseMiddleware,
+  /pathname === "\/login" && user[\s\S]*getSafeRedirect\(request\.nextUrl\.searchParams\.get\("redirect"\)\)[\s\S]*NextResponse\.redirect\(new URL\(redirect, request\.url\)\)/,
+  "Middleware should preserve /login?redirect=/auth/extension... for already logged-in users instead of sending them to /dashboard."
 );
 assert.match(
   extensionSidepanel,

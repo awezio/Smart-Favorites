@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function getSafeRedirect(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  return value;
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request,
@@ -71,10 +79,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (pathname === "/login" && user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/dashboard";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+    const redirect = getSafeRedirect(request.nextUrl.searchParams.get("redirect"));
+    return NextResponse.redirect(new URL(redirect, request.url));
   }
 
   return response;
