@@ -87,18 +87,28 @@ assert.match(
 );
 assert.match(
   extensionSidepanel,
-  /waitForExtensionAuthToken/,
-  "Extension login should wait for the extension token to be stored before continuing sync."
-);
-assert.doesNotMatch(
-  extensionSidepanel,
   /launchWebAuthFlow/,
-  "Extension login should not open a separate browser auth window."
+  "Extension login should prefer Chrome identity web auth flow so the extension receives the auth redirect directly."
 );
-assert.doesNotMatch(
+assert.match(
   extensionSidepanel,
-  /getRedirectURL/,
-  "Extension tab-based login should use the web-accessible extension callback, not the Chrome identity redirect URL."
+  /getRedirectURL\('auth-callback'\)/,
+  "Extension login should use the Chrome identity redirect URL for the primary auth callback."
+);
+assert.match(
+  extensionSidepanel,
+  /parseExtensionAuthRedirect/,
+  "Extension login should parse the returned identity auth redirect URL for the extension token."
+);
+assert.match(
+  extensionSidepanel,
+  /persistExtensionAuthToken/,
+  "Extension login should persist the returned extension token before syncing."
+);
+assert.match(
+  extensionSidepanel,
+  /waitForExtensionAuthToken/,
+  "Extension tab fallback should still wait for the extension token to be stored before continuing sync."
 );
 assert.match(
   manifest,
@@ -113,7 +123,7 @@ assert.match(
 assert.match(
   extensionSidepanel,
   /chrome-extension:\/\/\$\{chrome\.runtime\.id\}\/auth-callback\.html[\s\S]*redirect_uri/,
-  "Extension auth bridge should pass its web-accessible extension callback URI to the web connect page."
+  "Extension auth bridge should keep a web-accessible extension callback URI as the tab fallback."
 );
 assert.match(
   authExtensionPage,

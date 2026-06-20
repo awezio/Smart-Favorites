@@ -153,6 +153,35 @@ async function waitForExtensionAuthToken(timeoutMs = 120000) {
   });
 }
 
+function parseExtensionAuthRedirect(responseUrl) {
+  if (!responseUrl) return { token: '', backendUrl: '' };
+
+  const parsed = new URL(responseUrl);
+  const params = new URLSearchParams(parsed.hash ? parsed.hash.slice(1) : parsed.search.slice(1));
+  return {
+    token: params.get('extensionToken') || params.get('access_token') || '',
+    backendUrl: params.get('backendUrl') || ''
+  };
+}
+
+async function persistExtensionAuthToken(token, backendUrl) {
+  if (!token) return false;
+
+  const updates = {
+    authToken: token,
+    extensionToken: token,
+    autoConnectAttemptedAt: 0
+  };
+
+  if (backendUrl) {
+    updates.backendUrl = normalizeApiBaseUrl(backendUrl);
+  }
+
+  await chrome.storage.local.set(updates);
+  chrome.runtime.sendMessage({ action: 'extensionAuthChanged' }).catch(() => {});
+  return true;
+}
+
 async function maybeAutoConnectFromActiveWebSession() {
   const { authToken, autoConnectAttemptedAt } = await chrome.storage.local.get([
     'authToken',
@@ -512,12 +541,35 @@ async function openExtensionLogin({ interactive = true } = {}) {
   const authUrl = new URL('/auth/extension', base.replace(/\/$/, ''));
   authUrl.searchParams.set('ext_id', chrome.runtime.id);
 
-  const redirectUri = `chrome-extension://${chrome.runtime.id}/auth-callback.html`;
-  authUrl.searchParams.set('redirect_uri', redirectUri);
-
   if (!interactive) {
     return false;
   }
+
+  const extensionCallbackUri = `chrome-extension://${chrome.runtime.id}/auth-callback.html`;
+  const identityRedirectUri =
+    chrome.identity?.getRedirectURL ? chrome.identity.getRedirectURL('auth-callback') : '';
+
+  if (identityRedirectUri && chrome.identity?.launchWebAuthFlow) {
+    const identityAuthUrl = new URL(authUrl.toString());
+    identityAuthUrl.searchParams.set('redirect_uri', identityRedirectUri);
+
+    try {
+      const responseUrl = await chrome.identity.launchWebAuthFlow({
+        url: identityAuthUrl.toString(),
+        interactive: true
+      });
+      const { token, backendUrl } = parseExtensionAuthRedirect(responseUrl);
+      if (await persistExtensionAuthToken(token, backendUrl || base)) {
+        showToast('扩展已连接到 Smart Favorites', 'success');
+        await handleExtensionAuthChanged({ syncAfterAuth: true });
+        return true;
+      }
+    } catch (error) {
+      console.warn('Chrome identity extension auth failed; falling back to tab bridge:', error);
+    }
+  }
+
+  authUrl.searchParams.set('redirect_uri', extensionCallbackUri);
 
   try {
     await chrome.tabs.create({ url: authUrl.toString(), active: true });
