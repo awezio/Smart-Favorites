@@ -48,7 +48,10 @@ function ExtensionAuthContent() {
 
       const tokenResponse = await fetch("/api/auth/extension/session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ extensionId: extId }),
       });
 
@@ -67,6 +70,7 @@ function ExtensionAuthContent() {
           : `chrome-extension://${extId}/auth-callback.html`;
       const callbackHash = new URLSearchParams({
         extensionToken: token,
+        backendUrl: window.location.origin,
       }).toString();
 
       const redirectToExtensionCallback = () => {

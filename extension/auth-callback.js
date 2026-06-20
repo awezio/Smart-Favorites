@@ -6,12 +6,20 @@
   const params = new URLSearchParams(hash);
   const extensionToken = params.get('extensionToken');
   const accessToken = params.get('access_token');
+  const backendUrl = params.get('backendUrl');
 
   if (extensionToken || accessToken) {
-    chrome.storage.local.set({
+    const updates = {
       authToken: extensionToken || accessToken,
       extensionToken: extensionToken || accessToken,
-    }, () => {
+    };
+
+    if (backendUrl) {
+      updates.backendUrl = backendUrl.replace(/\/$/, '');
+      updates.autoConnectAttemptedAt = 0;
+    }
+
+    chrome.storage.local.set(updates, () => {
       console.log('Extension auth: extensionToken stored');
       chrome.runtime.sendMessage({ action: 'extensionAuthChanged' }).catch(() => {});
       setTimeout(() => window.close(), 800);

@@ -130,6 +130,16 @@ assert.match(
 );
 assert.match(
   read("app", "auth", "extension", "page.tsx"),
+  /Authorization:\s*`Bearer \$\{session\.access_token\}`/,
+  "Web extension connect page should send the browser Supabase access token to the extension session API so cookie sync issues do not block extension auth."
+);
+assert.match(
+  read("app", "auth", "extension", "page.tsx"),
+  /backendUrl:\s*window\.location\.origin/,
+  "Web extension connect page fallback should tell the extension which backend origin issued the token."
+);
+assert.match(
+  read("app", "auth", "extension", "page.tsx"),
   /runtime\.lastError[\s\S]*redirectToExtensionCallback\(\)/,
   "Web extension connect page should fall back to the extension callback when external messaging fails."
 );
@@ -187,6 +197,11 @@ assert.match(
   extensionAuthCallback,
   /extensionToken/,
   "Extension callback should persist an extension-scoped token."
+);
+assert.match(
+  extensionAuthCallback,
+  /backendUrl/,
+  "Extension callback should persist the backend origin from the web auth page."
 );
 
 assert.doesNotMatch(
