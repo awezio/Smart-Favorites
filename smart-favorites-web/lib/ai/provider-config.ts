@@ -95,15 +95,16 @@ function authHeaders(definition: ProviderDefinition, apiKey: string): Record<str
   if (definition.authType === "none") return {};
   if (definition.authType === "x-api-key") return { "x-api-key": apiKey };
   if (definition.authType === "google-api-key") return {};
-  if (definition.authType === "github-oauth") return { "X-GitHub-Token": apiKey };
-  return { Authorization: `Bearer ${apiKey}` };
+  const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}` };
+  if (definition.id === "github_models") {
+    headers.Accept = "application/vnd.github+json";
+    headers["X-GitHub-Api-Version"] = "2026-03-10";
+  }
+  return headers;
 }
 
 function ensureConfigured(definition: ProviderDefinition, apiKey: string, baseURL: string) {
   if (definition.protocol !== "ollama" && definition.authType !== "none" && !apiKey) {
-    if (definition.authType === "github-oauth") {
-      throw new Error(`请先使用 GitHub 登录授权 ${definition.name}`);
-    }
     throw new Error(`未找到 ${definition.name} 的 API Key`);
   }
 
@@ -165,14 +166,21 @@ export async function fetchProviderModels(
   if (!response.ok) throw new Error(`API 错误 (${response.status})`);
 
   const data = await response.json();
-  const items = data.data || data.models || [];
+  const items = Array.isArray(data) ? data : data.data || data.models || [];
   return uniqueModels(
     items.map((item: any) => {
       const id = String(item.id || item.name || "").replace(/^models\//, "");
+      const inputModalities = Array.isArray(item.supported_input_modalities)
+        ? item.supported_input_modalities
+        : [];
       return {
         id,
-        label: item.display_name || item.displayName || modelLabel(id),
-        vision: id.includes("vision") || id.includes("gpt-4o") || id.includes("gemini"),
+        label: item.display_name || item.displayName || item.name || modelLabel(id),
+        vision:
+          inputModalities.includes("image") ||
+          id.includes("vision") ||
+          id.includes("gpt-4o") ||
+          id.includes("gemini"),
       };
     })
   );

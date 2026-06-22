@@ -81,7 +81,6 @@ export default function SettingsPage() {
       PROVIDER_DEFINITIONS[0],
     [providerSelector]
   );
-  const selectedRequiresGitHubLogin = selectedDefinition?.authType === "github-oauth";
   const selectedIsOllama = selectedDefinition?.id === "ollama";
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState(DEFAULT_OLLAMA_BASE_URL);
 
@@ -214,12 +213,6 @@ export default function SettingsPage() {
     if (error) {
       toast.error(error.message || "绑定失败");
     }
-  };
-
-  const loginWithGitHub = () => {
-    const loginUrl = new URL("/auth/sign-in/github", window.location.origin);
-    loginUrl.searchParams.set("redirect", "/dashboard/settings");
-    window.location.href = loginUrl.toString();
   };
 
   const testProvider = async (provider: string) => {
@@ -472,8 +465,6 @@ export default function SettingsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {selectedStatus?.configured
                       ? `已配置 (${selectedStatus.source})`
-                      : selectedRequiresGitHubLogin
-                        ? "未授权，请使用 GitHub 登录授权当前账号"
                       : "未配置个人 Key，可使用环境变量或在下方填写"}
                   </p>
                 </div>
@@ -504,19 +495,6 @@ export default function SettingsPage() {
                       <Button type="button" variant="outline" className="mt-3" onClick={testLocalOllama}>
                         <TestTube className="mr-2 h-4 w-4" />
                         检测 Ollama
-                      </Button>
-                    </div>
-                  </div>
-                ) : selectedRequiresGitHubLogin ? (
-                  <div className="space-y-2">
-                    <Label>GitHub 授权</Label>
-                    <div className="rounded-md border bg-muted/30 p-3">
-                      <p className="text-sm text-muted-foreground">
-                        GitHub Copilot 使用当前 GitHub 登录账号授权，不需要输入或保存 API Key。
-                      </p>
-                      <Button type="button" variant="outline" className="mt-3" onClick={loginWithGitHub}>
-                        <Github className="mr-2 h-4 w-4" />
-                        使用 GitHub 登录授权
                       </Button>
                     </div>
                   </div>

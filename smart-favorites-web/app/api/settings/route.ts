@@ -7,7 +7,6 @@ import {
   isSupportedProvider,
   PROVIDER_ENDPOINTS,
 } from "@/lib/ai/provider-config";
-import { getGitHubOAuthTokenFromSession, requiresGitHubOAuth } from "@/lib/ai/github-oauth";
 import {
   MASKED_SECRET_PREFIX,
   encryptSecret,
@@ -33,19 +32,8 @@ export async function GET(request: NextRequest) {
 
     const apiKeys = userSettings?.api_keys || {};
     const providerStatus: Record<string, { configured: boolean; source: string }> = {};
-    const githubOAuthToken = isExtensionAuthUser(user)
-      ? ""
-      : await getGitHubOAuthTokenFromSession().catch(() => "");
 
     for (const provider of Object.keys(PROVIDER_ENDPOINTS)) {
-      if (requiresGitHubOAuth(provider)) {
-        providerStatus[provider] = {
-          configured: Boolean(githubOAuthToken),
-          source: githubOAuthToken ? "github-oauth" : "none",
-        };
-        continue;
-      }
-
       const hasUserKey = hasStoredSecret(apiKeys[provider]);
       const hasEnvKey = getEnvProviderConfigured(provider);
       providerStatus[provider] = {
@@ -55,10 +43,11 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      defaultProvider:
+      defaultProvider: normalizeDefaultProvider(
         userSettings?.default_llm_provider ||
         process.env.DEFAULT_LLM_PROVIDER ||
-        "deepseek",
+        "deepseek"
+      ),
       defaultModel: userSettings?.default_llm_model || "",
       providerModels: normalizeProviderModels(userSettings?.provider_models),
       embeddingModel:
@@ -82,6 +71,10 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function normalizeDefaultProvider(provider: unknown) {
+  return typeof provider === "string" && isSupportedProvider(provider) ? provider : "deepseek";
 }
 
 function normalizeProviderModels(value: unknown) {

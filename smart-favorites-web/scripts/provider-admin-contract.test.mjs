@@ -8,6 +8,7 @@ const read = (...segments) => readFileSync(join(repoRoot, ...segments), "utf8");
 const exists = (...segments) => existsSync(join(repoRoot, ...segments));
 
 const providerRegistry = read("lib", "ai", "provider-registry.ts");
+const providerConfig = read("lib", "ai", "provider-config.ts");
 const settingsPage = read("app", "dashboard", "settings", "page.tsx");
 const dashboardLayout = read("app", "dashboard", "layout.tsx");
 const landingPage = read("app", "page.tsx");
@@ -32,7 +33,6 @@ const requiredProviders = [
   "glm",
   "ollama",
   "github_models",
-  "github_copilot",
   "minimax",
   "nvidia",
   "siliconflow",
@@ -102,24 +102,18 @@ for (const protocol of [
 
 assert.match(
   providerRegistry,
-  /id:\s*"github_copilot"[\s\S]*?name:\s*"GitHub Copilot"[\s\S]*?authType:\s*"github-oauth"/,
-  "GitHub Copilot should be a first-class provider authenticated by GitHub OAuth, not by a manual API key."
+  /id:\s*"github_models"[\s\S]*?baseURL:\s*"https:\/\/models\.github\.ai"[\s\S]*?modelsEndpoint:\s*"\/catalog\/models"[\s\S]*?chatEndpoint:\s*"\/inference\/chat\/completions"[\s\S]*?authType:\s*"bearer"/,
+  "GitHub Models should use the official REST catalog and inference endpoints with a bearer token."
 );
 assert.match(
-  settingsPage,
-  /selectedDefinition\??\.authType === "github-oauth"/,
-  "Settings page should render GitHub OAuth providers differently from API-key providers."
+  providerRegistry,
+  /models:read/,
+  "GitHub Models settings should tell users to use a GitHub token with models:read."
 );
-assert.match(
-  settingsPage,
-  /loginWithGitHub/,
-  "Settings page should offer a real GitHub login action for GitHub OAuth providers."
-);
-assert.doesNotMatch(
-  settingsPage,
-  /github_copilot[\s\S]{0,500}<Input[\s\S]{0,500}API Key/,
-  "GitHub Copilot settings must not ask the user to enter an API key."
-);
+assert.doesNotMatch(providerRegistry, /id:\s*"github_copilot"/, "GitHub Copilot should not be exposed as a broken OAuth-backed chat provider.");
+assert.match(providerRegistry, /docs\.github\.com\/en\/rest\/models/, "GitHub Models should link to the official REST API docs.");
+assert.match(providerConfig, /X-GitHub-Api-Version/, "GitHub Models requests should include GitHub's REST API version header.");
+assert.match(providerConfig, /item\.name/, "GitHub catalog model names should be used as display labels.");
 assert.match(
   settingsPage,
   /DEFAULT_OLLAMA_BASE_URL[\s\S]*http:\/\/localhost:11434/,

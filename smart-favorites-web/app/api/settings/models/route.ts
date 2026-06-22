@@ -7,7 +7,6 @@ import {
   getEnvProviderKey,
   isSupportedProvider,
 } from "@/lib/ai/provider-config";
-import { getGitHubOAuthTokenFromSession, requiresGitHubOAuth } from "@/lib/ai/github-oauth";
 import { MASKED_SECRET_PREFIX, decryptSecret } from "@/lib/server/secrets";
 
 type StoredProviderModels = Record<string, { models: any[]; fetchedAt: string }>;
@@ -15,14 +14,6 @@ type StoredProviderModels = Record<string, { models: any[]; fetchedAt: string }>
 async function resolveProviderCredential(userId: string, provider: string, transientKey?: string) {
   if (!isSupportedProvider(provider)) {
     throw new Error("Invalid provider");
-  }
-
-  if (requiresGitHubOAuth(provider)) {
-    const token = await getGitHubOAuthTokenFromSession();
-    if (!token) {
-      throw new Error("请先使用 GitHub 登录授权 GitHub Copilot。");
-    }
-    return token;
   }
 
   if (transientKey && !transientKey.startsWith(MASKED_SECRET_PREFIX)) {

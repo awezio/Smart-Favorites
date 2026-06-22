@@ -6,7 +6,6 @@ import {
   isSupportedProvider,
   testProviderConnection,
 } from "@/lib/ai/provider-config";
-import { getGitHubOAuthTokenFromSession, requiresGitHubOAuth } from "@/lib/ai/github-oauth";
 import { decryptSecret } from "@/lib/server/secrets";
 
 export async function POST(request: NextRequest) {
@@ -24,15 +23,6 @@ export async function POST(request: NextRequest) {
     }
 
     let resolvedKey = apiKey;
-    if (requiresGitHubOAuth(provider)) {
-      resolvedKey = await getGitHubOAuthTokenFromSession();
-      if (!resolvedKey) {
-        return NextResponse.json({
-          success: false,
-          error: "请先使用 GitHub 登录授权 GitHub Copilot。",
-        });
-      }
-    }
     if (!resolvedKey) {
       const supabase = createAdminClient();
       const { data } = await supabase

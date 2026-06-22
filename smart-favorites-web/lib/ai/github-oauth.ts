@@ -1,10 +1,9 @@
 import "server-only";
 
-import { getProviderDefinition } from "@/lib/ai/provider-registry";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 export function requiresGitHubOAuth(provider: string) {
-  return getProviderDefinition(provider)?.authType === "github-oauth";
+  return false;
 }
 
 export function normalizeGitHubOAuthToken(value: unknown) {
@@ -35,7 +34,7 @@ export async function requireGitHubOAuthTokenFromSession(provider: string) {
 
   const token = await getGitHubOAuthTokenFromSession();
   if (!token) {
-    throw new Error("请先使用 GitHub 登录授权 GitHub Copilot。");
+    throw new Error("This provider no longer supports GitHub OAuth token authentication.");
   }
 
   return token;

@@ -9,6 +9,7 @@ const read = (...parts) => readFileSync(join(repoRoot, ...parts), "utf8");
 const settingsPage = read("app", "dashboard", "settings", "page.tsx");
 const chatPage = read("app", "dashboard", "chat", "page.tsx");
 const settingsRoute = read("app", "api", "settings", "route.ts");
+const providerRegistry = read("lib", "ai", "provider-registry.ts");
 const embedding = read("lib", "rag", "embedding.ts");
 const ragEngine = read("lib", "rag", "rag-engine.ts");
 const extensionSidepanel = read("..", "extension", "sidepanel", "sidepanel.js");
@@ -63,6 +64,16 @@ assert.match(
   settingsRoute,
   /providerModels[\s\S]*provider_models/,
   "Settings GET should return cached provider model lists from user_settings."
+);
+assert.match(
+  settingsRoute,
+  /normalizeDefaultProvider/,
+  "Settings API should normalize stale saved default providers before returning them to the UI."
+);
+assert.doesNotMatch(
+  providerRegistry,
+  /id:\s*"github_copilot"/,
+  "Settings provider list should not expose the removed GitHub Copilot OAuth provider."
 );
 assert.match(
   settingsPage,

@@ -47,19 +47,22 @@ const checks = [
       content.includes("definition.modelsEndpoint"),
   },
   {
-    name: "GitHub Copilot resolves credentials from the GitHub OAuth session",
-    file: "lib/ai/github-oauth.ts",
-    assert: (content) =>
-      content.includes("getGitHubOAuthTokenFromSession") &&
-      content.includes("provider_token") &&
-      content.includes("requiresGitHubOAuth"),
-  },
-  {
-    name: "provider model route uses GitHub OAuth for Copilot",
+    name: "GitHub Models uses encrypted user keys instead of GitHub OAuth session tokens",
     file: "app/api/settings/models/route.ts",
     assert: (content) =>
-      content.includes("resolveProviderCredential") &&
-      content.includes("getGitHubOAuthTokenFromSession"),
+      content.includes("decryptSecret(saved)") &&
+      !content.includes("getGitHubOAuthTokenFromSession") &&
+      !content.includes("requiresGitHubOAuth"),
+  },
+  {
+    name: "GitHub Models provider follows official REST endpoints",
+    file: "lib/ai/provider-registry.ts",
+    assert: (content) =>
+      content.includes("https://models.github.ai") &&
+      content.includes("/catalog/models") &&
+      content.includes("/inference/chat/completions") &&
+      content.includes("models:read") &&
+      !content.includes("api.githubcopilot.com"),
   },
   {
     name: "deployment docs require a stable encryption secret",
