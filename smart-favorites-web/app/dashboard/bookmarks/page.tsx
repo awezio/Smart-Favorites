@@ -167,28 +167,6 @@ export default function BookmarksPage() {
       setExtensionId(detected?.extensionId ?? null);
       setExtensionVersion(detected?.version ?? null);
       setCheckingExtension(false);
-
-      // #region agent log
-      fetch("http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "d21e4d",
-        },
-        body: JSON.stringify({
-          sessionId: "d21e4d",
-          location: "bookmarks/page.tsx:detectExtension",
-          message: "extension detection result",
-          data: {
-            detected: Boolean(detected),
-            extensionId: detected?.extensionId ?? null,
-            version: detected?.version ?? null,
-          },
-          timestamp: Date.now(),
-          hypothesisId: "B",
-        }),
-      }).catch(() => {});
-      // #endregion
     }
 
     detectExtension();
@@ -231,24 +209,6 @@ export default function BookmarksPage() {
     setLoading(true);
     toast.loading("正在同步浏览器书签...", { id: "bookmark-sync" });
 
-    // #region agent log
-    fetch("http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "d21e4d",
-      },
-      body: JSON.stringify({
-        sessionId: "d21e4d",
-        location: "bookmarks/page.tsx:handleOneClickSync:start",
-        message: "one click sync started",
-        data: { extensionId, checkingExtension },
-        timestamp: Date.now(),
-        hypothesisId: "A,C",
-      }),
-    }).catch(() => {});
-    // #endregion
-
     try {
       if (!extensionId) {
         toast.error("未检测到 Smart Favorites 扩展，请先安装扩展。", {
@@ -259,24 +219,6 @@ export default function BookmarksPage() {
       }
 
       const result = await triggerExtensionBookmarkSync(extensionId);
-
-      // #region agent log
-      fetch("http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "d21e4d",
-        },
-        body: JSON.stringify({
-          sessionId: "d21e4d",
-          location: "bookmarks/page.tsx:handleOneClickSync:result",
-          message: "one click sync result",
-          data: result,
-          timestamp: Date.now(),
-          hypothesisId: "A,C",
-        }),
-      }).catch(() => {});
-      // #endregion
 
       if (!result.success) {
         toast.error(`同步失败：${result.error || "未知错误"}`, { id: "bookmark-sync" });

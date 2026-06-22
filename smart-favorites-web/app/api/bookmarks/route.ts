@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServerSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get("limit") || "100");
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "100", 10) || 100, 1),
+      20000
+    );
     const offset = parseInt(searchParams.get("offset") || "0");
 
     const bookmarks = await getBookmarks(limit, offset, userId, supabase);

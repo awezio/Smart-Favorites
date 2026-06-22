@@ -17,6 +17,7 @@ type StarUpdate = Partial<Omit<GitHubStar, "id" | "user_id" | "created_at">> & {
 const SYNC_STAR_COLUMNS =
   "id, user_id, url, owner, repo, description, language, stars, forks, updated";
 const DB_BATCH_SIZE = 200;
+const POSTGREST_PAGE_SIZE = 1000;
 
 async function runInBatches<T>(
   items: T[],
@@ -35,22 +36,41 @@ export async function getStars(
   client?: SupabaseQueryClient
 ): Promise<GitHubStar[]> {
   const supabase = client || createAdminClient();
-  let query = supabase
-    .from("github_stars")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+  const results: GitHubStar[] = [];
+  let remaining = limit;
+  let currentOffset = offset;
 
-  if (userId) {
-    query = query.eq("user_id", userId);
+  while (remaining > 0) {
+    const batchSize = Math.min(POSTGREST_PAGE_SIZE, remaining);
+    let query = supabase
+      .from("github_stars")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .range(currentOffset, currentOffset + batchSize - 1);
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.length) {
+      break;
+    }
+
+    results.push(...(data as GitHubStar[]));
+    remaining -= data.length;
+    currentOffset += data.length;
+
+    if (data.length < batchSize) {
+      break;
+    }
   }
 
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as GitHubStar[];
+  return results;
 }
 
 export async function getStarsForSync(

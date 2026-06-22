@@ -16,6 +16,7 @@ type BookmarkUpdate = Partial<Omit<Bookmark, "id" | "user_id" | "created_at">> &
 
 const SYNC_BOOKMARK_COLUMNS = "id, user_id, title, url, description, folder_path, add_date, icon";
 const DB_BATCH_SIZE = 200;
+const POSTGREST_PAGE_SIZE = 1000;
 
 async function runInBatches<T>(
   items: T[],
@@ -34,22 +35,41 @@ export async function getBookmarks(
   client?: SupabaseQueryClient
 ): Promise<Bookmark[]> {
   const supabase = client || createAdminClient();
-  let query = supabase
-    .from("bookmarks")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+  const results: Bookmark[] = [];
+  let remaining = limit;
+  let currentOffset = offset;
 
-  if (userId) {
-    query = query.eq("user_id", userId);
+  while (remaining > 0) {
+    const batchSize = Math.min(POSTGREST_PAGE_SIZE, remaining);
+    let query = supabase
+      .from("bookmarks")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(currentOffset, currentOffset + batchSize - 1);
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.length) {
+      break;
+    }
+
+    results.push(...(data as Bookmark[]));
+    remaining -= data.length;
+    currentOffset += data.length;
+
+    if (data.length < batchSize) {
+      break;
+    }
   }
 
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as Bookmark[];
+  return results;
 }
 
 export async function getBookmarksForSync(
