@@ -5,10 +5,12 @@ import {
   Bot,
   ChevronDown,
   ExternalLink,
+  FileText,
   Loader2,
   MessageSquare,
   Plus,
   Send,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -246,10 +248,11 @@ export default function ChatPage() {
         throw new Error(data.error || "获取回答失败");
       }
 
+      const sources = normalizeChatSources(data.sources);
       const assistantMessage: ChatMessage = {
         role: "assistant",
-        content: data.answer,
-        sources: data.sources,
+        content: normalizeAssistantAnswer(data.answer, sources),
+        sources,
         timestamp: new Date().toISOString(),
       };
       const savedMessages = [...nextMessages, assistantMessage];
@@ -501,34 +504,76 @@ function normalizeChatMessages(messages: unknown): ChatMessage[] {
     })
     .map((message) => {
       const role = message.role === "assistant" ? "assistant" : "user";
+      const sources = normalizeChatSources(message.sources);
+      const rawContent = String(message.content ?? "");
       return {
         role,
-        content: String(message.content ?? ""),
-        sources: Array.isArray(message.sources) ? (message.sources as SearchResult[]) : undefined,
+        content: role === "assistant" ? normalizeAssistantAnswer(rawContent, sources) : rawContent,
+        sources,
         timestamp: typeof message.timestamp === "string" ? message.timestamp : "",
       };
     });
 }
 
+function normalizeChatSources(sources: unknown): SearchResult[] | undefined {
+  return Array.isArray(sources) ? (sources as SearchResult[]) : undefined;
+}
+
+function normalizeAssistantAnswer(answer: unknown, sources?: SearchResult[]): string {
+  const text = typeof answer === "string" ? answer.trim() : "";
+  if (text.length > 0) {
+    return text;
+  }
+
+  if (sources && sources.length > 0) {
+    return "我找到了相关引用来源，但这次模型没有返回可显示的回答。你可以换一个模型重试，或基于下方来源继续追问。";
+  }
+
+  return "这次没有生成可显示的回答。请稍后重试，或切换到另一个已配置的模型。";
+}
+
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
+  const sources = message.sources || [];
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[85%] ${isUser ? "" : "w-full"}`}>
-        <Card className={isUser ? "bg-primary text-primary-foreground" : ""}>
-          <CardContent className="pt-4">
+      <div className={isUser ? "max-w-[85%] md:max-w-[68%]" : "w-full max-w-4xl"}>
+        <Card
+          className={
+            isUser
+              ? "rounded-2xl border-primary bg-primary text-primary-foreground shadow-sm"
+              : "rounded-2xl border-border/70 bg-card shadow-sm"
+          }
+        >
+          <CardContent className={isUser ? "pt-4" : "space-y-4 pt-4"}>
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
             ) : (
-              <MarkdownRenderer content={message.content} />
+              <>
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </span>
+                  <span>Smart Favorites</span>
+                </div>
+                <div className="prose prose-sm max-w-none rounded-xl bg-muted/20 px-4 py-3 dark:prose-invert">
+                  <MarkdownRenderer content={normalizeAssistantAnswer(message.content, sources)} />
+                </div>
+              </>
             )}
 
-            {message.sources && message.sources.length > 0 && (
-              <div className="mt-4 space-y-1.5 border-t border-border/30 pt-3">
-                <p className="text-xs font-semibold opacity-70">引用来源</p>
+            {!isUser && sources.length > 0 && (
+              <details className="group rounded-xl border border-border/70 bg-muted/20 px-3 py-2" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5" />
+                    引用来源 · {sources.length}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                </summary>
                 <div className="flex flex-wrap gap-1.5">
-                  {message.sources.map((source: SearchResult, index: number) => {
+                  {sources.map((source: SearchResult, index: number) => {
                     const href = source.bookmark?.url || source.star?.url || "";
                     const title =
                       source.bookmark?.title ||
@@ -551,21 +596,21 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-1 text-xs transition-colors hover:bg-muted"
+                        className="mt-2 inline-flex max-w-full items-center gap-1 rounded-md bg-background px-2 py-1 text-xs transition-colors hover:bg-muted"
                       >
                         {content}
                       </a>
                     ) : (
                       <span
                         key={`${source.id}-${index}`}
-                        className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-1 text-xs"
+                        className="mt-2 inline-flex max-w-full items-center gap-1 rounded-md bg-background px-2 py-1 text-xs"
                       >
                         {content}
                       </span>
                     );
                   })}
                 </div>
-              </div>
+              </details>
             )}
           </CardContent>
         </Card>

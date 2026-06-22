@@ -86,6 +86,26 @@ assert.match(
   "Chat page should show saved provider model lists without requiring a fresh provider API call."
 );
 assert.match(
+  chatPage,
+  /normalizeAssistantAnswer\(data\.answer,\s*sources\)/,
+  "Chat page should normalize assistant answers before saving messages so an empty model response cannot render as sources only."
+);
+assert.match(
+  chatPage,
+  /normalizeAssistantAnswer\(message\.content,\s*sources\)/,
+  "Chat message rendering should keep a visible assistant answer even when a saved session has blank content with sources."
+);
+assert.match(
+  chatPage,
+  /<MarkdownRenderer content=\{normalizeAssistantAnswer\(message\.content,\s*sources\)\} \/>/,
+  "Assistant messages should render the answer body before citations."
+);
+assert.match(
+  chatPage,
+  /<details[\s\S]*引用来源 · \{sources\.length\}/,
+  "Chat citations should be a secondary expandable evidence block, not the only visible assistant content."
+);
+assert.match(
   settingsPage,
   /default_llm_provider:\s*selectedProvider/,
   "Saving AI provider settings should persist the provider currently being configured, not a stale previous default."
