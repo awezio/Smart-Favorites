@@ -10,23 +10,15 @@ import type { Bookmark, DocumentChunkRecord, DocumentRecord, GitHubStar } from "
 
 export async function exportKnowledgeAsSfkf(userId: string): Promise<SfkfExport> {
   const supabase = createAdminClient();
-  const [bookmarksRes, starsRes, documentsRes, chunksRes] = await Promise.all([
-    supabase.from("bookmarks").select("*").eq("user_id", userId).order("created_at"),
-    supabase.from("github_stars").select("*").eq("user_id", userId).order("created_at"),
-    supabase.from("documents").select("*").eq("user_id", userId).order("created_at"),
-    supabase.from("document_chunks").select("*").eq("user_id", userId).order("document_id").order("chunk_index"),
+  const [bookmarks, stars, documents, chunks] = await Promise.all([
+    fetchAllKnowledgeRows<Bookmark>(supabase, "bookmarks", userId, [{ column: "created_at" }]),
+    fetchAllKnowledgeRows<GitHubStar>(supabase, "github_stars", userId, [{ column: "created_at" }]),
+    fetchAllKnowledgeRows<DocumentRecord>(supabase, "documents", userId, [{ column: "created_at" }]),
+    fetchAllKnowledgeRows<DocumentChunkRecord>(supabase, "document_chunks", userId, [
+      { column: "document_id" },
+      { column: "chunk_index" },
+    ]),
   ]);
-
-  for (const result of [bookmarksRes, starsRes, documentsRes, chunksRes]) {
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-  }
-
-  const bookmarks = (bookmarksRes.data || []) as Bookmark[];
-  const stars = (starsRes.data || []) as GitHubStar[];
-  const documents = (documentsRes.data || []) as DocumentRecord[];
-  const chunks = (chunksRes.data || []) as DocumentChunkRecord[];
   const generatedAt = new Date().toISOString();
   const manifest: SfkfManifest = {
     format: "sfkf",
@@ -243,6 +235,47 @@ export async function exportKnowledgeAsSfkf(userId: string): Promise<SfkfExport>
   );
 
   return { manifest, files };
+}
+
+const EXPORT_PAGE_SIZE = 1000;
+
+async function fetchAllKnowledgeRows<T>(
+  supabase: ReturnType<typeof createAdminClient>,
+  table: string,
+  userId: string,
+  orderBy: Array<{ column: string; ascending?: boolean }>
+): Promise<T[]> {
+  const rows: T[] = [];
+  let offset = 0;
+
+  while (true) {
+    let query = supabase
+      .from(table)
+      .select("*")
+      .eq("user_id", userId);
+
+    for (const order of orderBy) {
+      query = query.order(order.column, { ascending: order.ascending ?? true });
+    }
+
+    const { data, error } = await query.range(offset, offset + EXPORT_PAGE_SIZE - 1);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.length) {
+      break;
+    }
+
+    rows.push(...(data as T[]));
+    if (data.length < EXPORT_PAGE_SIZE) {
+      break;
+    }
+
+    offset += EXPORT_PAGE_SIZE;
+  }
+
+  return rows;
 }
 
 function serializeManifest(manifest: SfkfManifest) {
