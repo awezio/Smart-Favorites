@@ -75,7 +75,10 @@ function ExtensionAuthContent() {
         backendUrl: window.location.origin,
       }).toString();
 
+      let hasRedirected = false;
       const redirectToExtensionCallback = () => {
+        if (hasRedirected) return;
+        hasRedirected = true;
         window.location.href = `${callbackUrl}#${callbackHash}`;
       };
 
@@ -83,6 +86,10 @@ function ExtensionAuthContent() {
         redirectToExtensionCallback();
         return;
       }
+
+      // Some MV3 backgrounds do not answer external messages reliably; keep
+      // chrome.identity flows moving by always falling back to the callback URL.
+      const fallbackTimer = window.setTimeout(redirectToExtensionCallback, 3000);
 
       runtime.sendMessage(
         extId,
@@ -92,6 +99,7 @@ function ExtensionAuthContent() {
         },
         (response) => {
           const lastError = runtime.lastError;
+          window.clearTimeout(fallbackTimer);
           if (lastError || !response?.success) {
             redirectToExtensionCallback();
             return;

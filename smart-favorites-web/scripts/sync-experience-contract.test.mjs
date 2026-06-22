@@ -167,6 +167,16 @@ assert.match(
 );
 assert.match(
   authExtensionPage,
+  /window\.setTimeout\(redirectToExtensionCallback,\s*3000\)/,
+  "Web extension connect page should time out external messaging so chrome.identity flows are never left waiting."
+);
+assert.match(
+  authExtensionPage,
+  /window\.clearTimeout\(fallbackTimer\)/,
+  "Web extension connect page should cancel the external messaging timeout once the extension responds."
+);
+assert.match(
+  authExtensionPage,
   /response\?\.success[\s\S]*redirectToExtensionCallback\(\)/,
   "Web extension connect page should still route through the extension callback after external messaging succeeds so storage is written in the extension context."
 );
