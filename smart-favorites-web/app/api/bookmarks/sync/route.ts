@@ -61,9 +61,6 @@ export async function POST(request: NextRequest) {
     }));
 
     if (addedBookmarks.length > 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'bookmarks/sync/route.ts:bulkInsert',message:'bookmark sync insert sample',data:{count:addedBookmarks.length,sampleAddDates:addedBookmarks.slice(0,3).map((b)=>b.add_date)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       await bulkInsertBookmarks(addedBookmarks as any, supabase);
     }
 
@@ -104,9 +101,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Bookmark sync error:", error);
-    // #region agent log
-    fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'bookmarks/sync/route.ts:catch',message:'bookmark sync error',data:{errorMessage:error?.message||String(error)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return NextResponse.json(
       { error: error.message || "Sync failed" },
       { status: 500 }

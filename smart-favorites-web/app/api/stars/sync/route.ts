@@ -82,9 +82,6 @@ export async function POST(request: NextRequest) {
     }));
 
     if (addedStars.length > 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'stars/sync/route.ts:bulkInsert',message:'stars sync insert sample',data:{count:addedStars.length,sampleUpdated:addedStars.slice(0,3).map((s)=>s.updated),fetchedCount:fetchedStars.length},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       await bulkInsertStars(addedStars as any, supabase);
     }
 
@@ -124,9 +121,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Stars sync error:", error);
-    // #region agent log
-    fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'stars/sync/route.ts:catch',message:'stars sync error',data:{errorMessage:error?.message||String(error)},timestamp:Date.now(),hypothesisId:'B,C,E'})}).catch(()=>{});
-    // #endregion
     return NextResponse.json(
       { error: error.message || "Sync failed" },
       { status: 500 }
