@@ -191,7 +191,9 @@ export function MarkdownRenderer({ content }: { content: string }) {
             );
           },
         }}
-      />
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

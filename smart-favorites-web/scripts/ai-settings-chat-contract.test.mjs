@@ -8,6 +8,7 @@ const read = (...parts) => readFileSync(join(repoRoot, ...parts), "utf8");
 
 const settingsPage = read("app", "dashboard", "settings", "page.tsx");
 const chatPage = read("app", "dashboard", "chat", "page.tsx");
+const markdownRenderer = read("components", "markdown-renderer.tsx");
 const settingsRoute = read("app", "api", "settings", "route.ts");
 const providerRegistry = read("lib", "ai", "provider-registry.ts");
 const embedding = read("lib", "rag", "embedding.ts");
@@ -99,6 +100,11 @@ assert.match(
   chatPage,
   /<MarkdownRenderer content=\{normalizeAssistantAnswer\(message\.content,\s*sources\)\} \/>/,
   "Assistant messages should render the answer body before citations."
+);
+assert.match(
+  markdownRenderer,
+  /<ReactMarkdown[\s\S]*>\s*\{content\}\s*<\/ReactMarkdown>/,
+  "MarkdownRenderer should pass the content prop into ReactMarkdown so assistant answer text is visible."
 );
 assert.match(
   chatPage,
