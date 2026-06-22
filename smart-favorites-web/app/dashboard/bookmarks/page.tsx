@@ -9,7 +9,6 @@ import {
   LayoutGrid,
   LayoutList,
   Columns3,
-  ChevronDown,
   Trash2,
   Plus,
   Pencil,
@@ -19,22 +18,21 @@ import {
   Loader2,
   Bookmark as BookmarkIcon,
   Search,
+  FolderOpen,
+  FileCheck,
+  FileX,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { StatsOverview } from "@/components/dashboard/stats-overview";
+import {
+  FilterToolbar,
+  ItemSurface,
+  ViewModeToggle,
+} from "@/components/dashboard/filter-toolbar";
 import {
   Card,
   CardContent,
@@ -113,19 +111,6 @@ type ViewMode = "list" | "card" | "compact";
 type SortKey = "title" | "created_at" | "url";
 type FilterStatus = "all" | "has_desc" | "no_desc";
 
-const COLORS = [
-  "#6366f1",
-  "#8b5cf6",
-  "#ec4899",
-  "#f43f5e",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#14b8a6",
-  "#06b6d4",
-  "#3b82f6",
-];
-
 export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [filter, setFilter] = useState("");
@@ -146,6 +131,7 @@ export default function BookmarksPage() {
 
   // Batch operations
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [generatingBatch, setGeneratingBatch] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
 
@@ -212,6 +198,13 @@ export default function BookmarksPage() {
       { name: "有描述", value: withDesc },
       { name: "无描述", value: withoutDesc },
     ];
+  }, [bookmarks]);
+
+  const descCoverage = useMemo(() => {
+    if (bookmarks.length === 0) return 0;
+    return Math.round(
+      (bookmarks.filter((b) => b.description).length / bookmarks.length) * 100
+    );
   }, [bookmarks]);
 
   const filteredBookmarks = useMemo(() => {
@@ -329,6 +322,54 @@ export default function BookmarksPage() {
       }
     } catch {
       toast.error("描述生成失败", { id: `desc-${bookmark.id}` });
+    }
+  };
+
+  const batchGenerateDescriptions = async () => {
+    const selected = filteredBookmarks.filter((bookmark) =>
+      selectedIds.has(bookmark.id)
+    );
+    if (selected.length === 0) {
+      toast.error("请先选择要生成描述的书签");
+      return;
+    }
+
+    const targets = selected.filter((bookmark) => !bookmark.description?.trim());
+    if (targets.length === 0) {
+      toast.info("所选书签均已有描述");
+      return;
+    }
+
+    setGeneratingBatch(true);
+    toast.loading(`正在生成 ${targets.length} 条描述...`, { id: "batch-desc" });
+    let success = 0;
+    let failed = 0;
+
+    for (const bookmark of targets) {
+      try {
+        const response = await fetch("/api/ai/describe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "bookmark", item: bookmark }),
+        });
+        if (response.ok) {
+          success += 1;
+        } else {
+          failed += 1;
+        }
+      } catch {
+        failed += 1;
+      }
+    }
+
+    await loadBookmarks();
+    setGeneratingBatch(false);
+    setSelectedIds(new Set());
+
+    if (failed === 0) {
+      toast.success(`已为 ${success} 个书签生成描述`, { id: "batch-desc" });
+    } else {
+      toast.error(`完成：${success} 成功，${failed} 失败`, { id: "batch-desc" });
     }
   };
 
@@ -452,81 +493,76 @@ export default function BookmarksPage() {
 
       {/* Statistics Panel */}
       {bookmarks.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">描述覆盖率</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={descStats}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }: any) =>
-                      `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-                    }
-                  >
-                    {descStats.map((_, idx) => (
-                      <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">各文件夹书签数 (Top 10)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={folderStats} layout="vertical">
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#6366f1" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <StatsOverview
+          metrics={[
+            {
+              label: "书签总数",
+              value: bookmarks.length,
+              icon: BookmarkIcon,
+              accent: "primary",
+            },
+            {
+              label: "有描述",
+              value: descStats[0]?.value ?? 0,
+              hint: `覆盖率 ${descCoverage}%`,
+              icon: FileCheck,
+              accent: "emerald",
+            },
+            {
+              label: "待补描述",
+              value: descStats[1]?.value ?? 0,
+              icon: FileX,
+              accent: "amber",
+            },
+            {
+              label: "文件夹",
+              value: folders.length,
+              icon: FolderOpen,
+              accent: "violet",
+            },
+          ]}
+          donut={{
+            title: "描述覆盖率",
+            data: descStats.filter((item) => item.value > 0),
+            centerLabel: "总计",
+            centerValue: `${descCoverage}%`,
+          }}
+          bars={{
+            title: "各文件夹书签数 (Top 10)",
+            data: folderStats,
+            layout: "horizontal",
+          }}
+        />
       )}
 
       {/* Toolbar */}
-      <Card>
+      <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
         <CardContent className="pt-6 space-y-4">
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={openExtensionGuide}>
+            <Button onClick={openExtensionGuide} className="rounded-xl">
               <ExternalLink className="h-4 w-4 mr-2" />浏览器扩展自动同步
             </Button>
 
             <label>
-              <Button variant="outline" disabled={loading} asChild>
+              <Button variant="outline" disabled={loading} asChild className="rounded-xl">
                 <span><Upload className="h-4 w-4 mr-2" />导入 HTML</span>
               </Button>
               <input type="file" accept=".html" className="hidden" onChange={handleImport} />
             </label>
 
             <label>
-              <Button variant="outline" disabled={loading} asChild>
+              <Button variant="outline" disabled={loading} asChild className="rounded-xl">
                 <span><FileText className="h-4 w-4 mr-2" />查新</span>
               </Button>
               <input type="file" accept=".html" className="hidden" onChange={handleDiff} />
             </label>
 
-            <Button variant="outline" onClick={loadBookmarks}>
+            <Button variant="outline" onClick={loadBookmarks} className="rounded-xl">
               <RefreshCw className="h-4 w-4 mr-2" />刷新
             </Button>
 
             {isEditing && (
-              <Button onClick={() => setShowAddModal(true)}>
+              <Button onClick={() => setShowAddModal(true)} className="rounded-xl">
                 <Plus className="h-4 w-4 mr-2" />手动添加
               </Button>
             )}
@@ -535,6 +571,7 @@ export default function BookmarksPage() {
               <Button
                 variant="destructive"
                 size="sm"
+                className="rounded-xl"
                 onClick={() => handleDelete(Array.from(selectedIds))}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
@@ -543,92 +580,85 @@ export default function BookmarksPage() {
             )}
           </div>
 
-          {/* Filter Row */}
-          <div className="flex gap-2 flex-wrap items-center">
-            <Input
-              placeholder="搜索书签..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="max-w-xs"
-            />
-
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">全部状态</option>
-              <option value="has_desc">有描述</option>
-              <option value="no_desc">无描述</option>
-            </select>
-
-            <select
-              value={filterFolder}
-              onChange={(e) => setFilterFolder(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm max-w-[200px]"
-            >
-              <option value="all">全部文件夹</option>
-              {folders.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={`${sortKey}-${sortAsc ? "asc" : "desc"}`}
-              onChange={(e) => {
-                const [k, d] = e.target.value.split("-");
-                setSortKey(k as SortKey);
-                setSortAsc(d === "asc");
-              }}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="created_at-desc">最新添加</option>
-              <option value="created_at-asc">最早添加</option>
-              <option value="title-asc">标题 A-Z</option>
-              <option value="title-desc">标题 Z-A</option>
-              <option value="url-asc">URL A-Z</option>
-            </select>
-
-            {/* View toggle */}
-            <div className="flex border rounded-md ml-auto">
-              {([
-                { mode: "list" as ViewMode, icon: LayoutList },
-                { mode: "card" as ViewMode, icon: LayoutGrid },
-                { mode: "compact" as ViewMode, icon: Columns3 },
-              ]).map(({ mode, icon: Icon }) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`p-2 transition-colors ${
-                    viewMode === mode
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent"
-                  }`}
+          <FilterToolbar
+            searchPlaceholder="搜索书签..."
+            searchValue={filter}
+            onSearchChange={setFilter}
+            showSelectAll={filteredBookmarks.length > 0}
+            allSelected={
+              selectedIds.size === filteredBookmarks.length &&
+              filteredBookmarks.length > 0
+            }
+            onToggleSelectAll={toggleSelectAll}
+            selectedCount={selectedIds.size}
+            selects={[
+              {
+                id: "status",
+                value: filterStatus,
+                onChange: (value) => setFilterStatus(value as FilterStatus),
+                options: [
+                  { value: "all", label: "全部状态" },
+                  { value: "has_desc", label: "有描述" },
+                  { value: "no_desc", label: "无描述" },
+                ],
+              },
+              {
+                id: "folder",
+                value: filterFolder,
+                onChange: setFilterFolder,
+                className: "max-w-[220px]",
+                options: [
+                  { value: "all", label: "全部文件夹" },
+                  ...folders.map((folder) => ({ value: folder, label: folder })),
+                ],
+              },
+              {
+                id: "sort",
+                value: `${sortKey}-${sortAsc ? "asc" : "desc"}`,
+                onChange: (value) => {
+                  const [key, direction] = value.split("-");
+                  setSortKey(key as SortKey);
+                  setSortAsc(direction === "asc");
+                },
+                options: [
+                  { value: "created_at-desc", label: "最新添加" },
+                  { value: "created_at-asc", label: "最早添加" },
+                  { value: "title-asc", label: "标题 A-Z" },
+                  { value: "title-desc", label: "标题 Z-A" },
+                  { value: "url-asc", label: "URL A-Z" },
+                ],
+              },
+            ]}
+            actions={
+              selectedIds.size > 0 ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={generatingBatch}
+                  onClick={batchGenerateDescriptions}
+                  className="h-10 rounded-xl"
                 >
-                  <Icon className="h-4 w-4" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Select all */}
-          {isEditing && filteredBookmarks.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === filteredBookmarks.length && filteredBookmarks.length > 0}
-                onChange={toggleSelectAll}
-                className="h-4 w-4 rounded"
+                  {generatingBatch ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-1" />
+                  )}
+                  一键生成描述 ({selectedIds.size})
+                </Button>
+              ) : null
+            }
+            viewToggle={
+              <ViewModeToggle
+                active={viewMode}
+                onChange={(mode) => setViewMode(mode as ViewMode)}
+                modes={[
+                  { id: "list", icon: LayoutList },
+                  { id: "card", icon: LayoutGrid },
+                  { id: "compact", icon: Columns3 },
+                ]}
               />
-              <span>
-                {selectedIds.size > 0
-                  ? `已选 ${selectedIds.size} / ${filteredBookmarks.length}`
-                  : `${filteredBookmarks.length} 个书签`}
-              </span>
-            </div>
-          )}
+            }
+          />
         </CardContent>
       </Card>
 
@@ -662,81 +692,70 @@ export default function BookmarksPage() {
         /* Card View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBookmarks.map((b) => (
-            <Card
-              key={b.id}
-              className={`transition-all duration-200 hover:shadow-md hover:border-primary/20 ${
-                isEditing && selectedIds.has(b.id) ? "ring-2 ring-primary" : ""
-              }`}
-            >
-              <CardHeader className="pb-2">
+            <ItemSurface key={b.id} selected={selectedIds.has(b.id)}>
+              <div className="p-4">
                 <div className="flex items-start gap-2">
-                  {isEditing && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(b.id)}
-                      onChange={() => toggleSelect(b.id)}
-                      className="mt-1 h-4 w-4 rounded"
-                    />
-                  )}
+                  <Checkbox
+                    checked={selectedIds.has(b.id)}
+                    onChange={() => toggleSelect(b.id)}
+                    className="mt-1"
+                    aria-label={`选择 ${b.title}`}
+                  />
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm truncate">{b.title}</CardTitle>
+                    <p className="text-sm font-medium truncate tracking-tight">{b.title}</p>
                     <a
                       href={b.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline truncate block mt-1"
+                      className="text-xs text-primary/90 hover:text-primary truncate block mt-1"
                     >
                       {new URL(b.url).hostname}
                     </a>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2 min-h-[2rem]">
                   {b.description || "暂无描述"}
                 </p>
                 {b.folder_path && b.folder_path !== "/" && (
-                  <Badge variant="outline" className="text-[10px] mt-2">
+                  <Badge variant="outline" className="mt-2 rounded-lg text-[10px]">
                     {b.folder_path}
                   </Badge>
                 )}
-                <div className="flex gap-1 mt-2">
+                <div className="flex gap-1 mt-3">
                   {!b.description && (
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateDescription(b)}>
+                    <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => generateDescription(b)}>
                       <Sparkles className="h-3 w-3 mr-1" />AI
                     </Button>
                   )}
                   {isEditing && (
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDelete([b.id])}>
+                    <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => handleDelete([b.id])}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </ItemSurface>
           ))}
         </div>
       ) : viewMode === "compact" ? (
         /* Compact multi-column */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {filteredBookmarks.map((b) => (
-            <div
+            <ItemSurface
               key={b.id}
-              className={`flex items-center gap-2 p-2 rounded-lg border transition-colors hover:bg-accent ${
-                isEditing && selectedIds.has(b.id) ? "bg-primary/5 border-primary" : ""
-              }`}
+              selected={selectedIds.has(b.id)}
+              className="px-3 py-2.5"
             >
-              {isEditing && (
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(b.id)}
-                  onChange={() => toggleSelect(b.id)}
-                  className="h-3.5 w-3.5 rounded shrink-0"
-                />
-              )}
+              <div className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedIds.has(b.id)}
+                onChange={() => toggleSelect(b.id)}
+                className="h-3.5 w-3.5"
+                aria-label={`选择 ${b.title}`}
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{b.title}</span>
+                  <span className="text-sm font-medium truncate tracking-tight">{b.title}</span>
                   {!b.description && (
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="无描述" />
                   )}
@@ -748,40 +767,34 @@ export default function BookmarksPage() {
               <a href={b.url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
               </a>
-            </div>
+              </div>
+            </ItemSurface>
           ))}
         </div>
       ) : (
         /* List View */
         <div className="space-y-2">
           {filteredBookmarks.map((b) => (
-            <Card
-              key={b.id}
-              className={`transition-all duration-200 hover:shadow-md hover:border-primary/20 ${
-                isEditing && selectedIds.has(b.id) ? "ring-2 ring-primary" : ""
-              }`}
-            >
-              <CardHeader className="py-3">
+            <ItemSurface key={b.id} selected={selectedIds.has(b.id)}>
+              <div className="px-4 py-3">
                 <div className="flex items-start gap-3">
-                  {isEditing && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(b.id)}
-                      onChange={() => toggleSelect(b.id)}
-                      className="mt-1 h-4 w-4 rounded shrink-0"
-                    />
-                  )}
+                  <Checkbox
+                    checked={selectedIds.has(b.id)}
+                    onChange={() => toggleSelect(b.id)}
+                    className="mt-1"
+                    aria-label={`选择 ${b.title}`}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <CardTitle className="text-base truncate">
+                        <p className="text-base font-medium truncate tracking-tight">
                           {b.title}
-                        </CardTitle>
+                        </p>
                         <a
                           href={b.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline truncate block mt-0.5"
+                          className="text-sm text-primary/90 hover:text-primary truncate block mt-0.5"
                         >
                           {b.url}
                         </a>
@@ -791,7 +804,7 @@ export default function BookmarksPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs"
+                            className="h-8 rounded-xl text-xs"
                             onClick={() => generateDescription(b)}
                           >
                             <Sparkles className="h-3 w-3 mr-1" />
@@ -802,7 +815,7 @@ export default function BookmarksPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 w-7 p-0"
+                            className="h-8 w-8 rounded-xl p-0"
                             onClick={() => handleDelete([b.id])}
                           >
                             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -811,19 +824,19 @@ export default function BookmarksPage() {
                       </div>
                     </div>
                     {b.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      <p className="text-sm leading-relaxed text-muted-foreground mt-2 line-clamp-2">
                         {b.description}
                       </p>
                     )}
                     {b.folder_path && b.folder_path !== "/" && (
-                      <Badge variant="outline" className="text-xs mt-1.5">
+                      <Badge variant="outline" className="mt-2 rounded-lg text-xs">
                         {b.folder_path}
                       </Badge>
                     )}
                   </div>
                 </div>
-              </CardHeader>
-            </Card>
+              </div>
+            </ItemSurface>
           ))}
         </div>
       )}

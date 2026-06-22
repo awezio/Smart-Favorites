@@ -14,22 +14,21 @@ import {
   Pencil,
   Check,
   Github,
+  Code2,
+  Layers,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { StatsOverview } from "@/components/dashboard/stats-overview";
+import {
+  FilterToolbar,
+  ItemSurface,
+  ViewModeToggle,
+} from "@/components/dashboard/filter-toolbar";
 import {
   Card,
   CardContent,
@@ -124,11 +123,6 @@ function StarListSkeleton() {
 
 type ViewMode = "list" | "card" | "compact";
 type SortKey = "stars" | "repo" | "created_at" | "language";
-
-const COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
-  "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6",
-];
 
 async function readApiError(response: Response, fallback: string) {
   const text = await response.text().catch(() => "");
@@ -272,6 +266,13 @@ export default function StarsPage() {
     [stars]
   );
 
+  const starsWithDesc = useMemo(
+    () => stars.filter((star) => star.description?.trim()).length,
+    [stars]
+  );
+
+  const topLanguage = useMemo(() => langStats[0]?.name ?? "—", [langStats]);
+
   const filteredStars = useMemo(() => {
     let result = [...stars];
 
@@ -353,57 +354,52 @@ export default function StarsPage() {
 
       {/* Statistics */}
       {stars.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">语言分布 (Top 10)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={langStats}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }: any) =>
-                      `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-                    }
-                  >
-                    {langStats.map((_, idx) => (
-                      <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Star 数分布</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={starsRangeStats}>
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <StatsOverview
+          metrics={[
+            {
+              label: "项目总数",
+              value: stars.length,
+              icon: Github,
+              accent: "primary",
+            },
+            {
+              label: "累计 Stars",
+              value: totalStarsCount.toLocaleString(),
+              icon: TrendingUp,
+              accent: "violet",
+            },
+            {
+              label: "语言种类",
+              value: languages.length,
+              hint: topLanguage !== "—" ? `Top: ${topLanguage}` : undefined,
+              icon: Code2,
+              accent: "emerald",
+            },
+            {
+              label: "有描述",
+              value: starsWithDesc,
+              hint: `${Math.round((starsWithDesc / stars.length) * 100)}% 覆盖率`,
+              icon: Layers,
+              accent: "amber",
+            },
+          ]}
+          donut={{
+            title: "语言分布 (Top 10)",
+            data: langStats,
+            centerLabel: "项目",
+            centerValue: String(stars.length),
+          }}
+          bars={{
+            title: "Star 数分布",
+            data: starsRangeStats,
+          }}
+        />
       )}
 
       {/* Sync Card */}
-      <Card>
+      <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base tracking-tight">
             <Github className="h-4 w-4" />
             一键同步 GitHub Stars
           </CardTitle>
@@ -415,15 +411,17 @@ export default function StarsPage() {
         <CardContent>
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex-1 min-w-[200px]">
-              <Label className="text-xs">GitHub 用户名（可选）</Label>
+              <Label className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                GitHub 用户名（可选）
+              </Label>
               <Input
                 placeholder="留空使用 GitHub 登录账号"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mt-1"
+                className="mt-1 rounded-xl border-border/60"
               />
             </div>
-            <Button onClick={handleSync} disabled={loading}>
+            <Button onClick={handleSync} disabled={loading} className="rounded-xl">
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               {loading ? "同步中..." : "同步"}
             </Button>
@@ -431,104 +429,79 @@ export default function StarsPage() {
         </CardContent>
       </Card>
 
-      {/* Filter & View toolbar */}
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <div className="flex gap-2 flex-wrap items-center">
-            <Input
-              placeholder="搜索项目..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="max-w-xs"
-            />
-
-            <select
-              value={filterLang}
-              onChange={(e) => setFilterLang(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm max-w-[160px]"
+      <FilterToolbar
+        searchPlaceholder="搜索项目..."
+        searchValue={filter}
+        onSearchChange={setFilter}
+        showSelectAll={filteredStars.length > 0}
+        allSelected={
+          selectedIds.size === filteredStars.length && filteredStars.length > 0
+        }
+        onToggleSelectAll={toggleSelectAll}
+        selectedCount={selectedIds.size}
+        selects={[
+          {
+            id: "lang",
+            value: filterLang,
+            onChange: setFilterLang,
+            className: "max-w-[180px]",
+            options: [
+              { value: "all", label: "全部语言" },
+              ...languages.map((lang) => ({ value: lang, label: lang })),
+            ],
+          },
+          {
+            id: "desc",
+            value: filterDesc,
+            onChange: setFilterDesc,
+            options: [
+              { value: "all", label: "全部" },
+              { value: "has_desc", label: "有描述" },
+              { value: "no_desc", label: "无描述" },
+            ],
+          },
+          {
+            id: "sort",
+            value: `${sortKey}-${sortAsc ? "asc" : "desc"}`,
+            onChange: (value) => {
+              const [key, direction] = value.split("-");
+              setSortKey(key as SortKey);
+              setSortAsc(direction === "asc");
+            },
+            options: [
+              { value: "stars-desc", label: "Stars 多到少" },
+              { value: "stars-asc", label: "Stars 少到多" },
+              { value: "repo-asc", label: "名称 A-Z" },
+              { value: "created_at-desc", label: "最新添加" },
+              { value: "language-asc", label: "按语言" },
+            ],
+          },
+        ]}
+        actions={
+          isEditing && selectedIds.size > 0 ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-10 rounded-xl"
+              onClick={() => handleDelete(Array.from(selectedIds))}
             >
-              <option value="all">全部语言</option>
-              {languages.map((l) => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-
-            <select
-              value={filterDesc}
-              onChange={(e) => setFilterDesc(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">全部</option>
-              <option value="has_desc">有描述</option>
-              <option value="no_desc">无描述</option>
-            </select>
-
-            <select
-              value={`${sortKey}-${sortAsc ? "asc" : "desc"}`}
-              onChange={(e) => {
-                const [k, d] = e.target.value.split("-");
-                setSortKey(k as SortKey);
-                setSortAsc(d === "asc");
-              }}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="stars-desc">Stars 多到少</option>
-              <option value="stars-asc">Stars 少到多</option>
-              <option value="repo-asc">名称 A-Z</option>
-              <option value="created_at-desc">最新添加</option>
-              <option value="language-asc">按语言</option>
-            </select>
-
-            {isEditing && selectedIds.size > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleDelete(Array.from(selectedIds))}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                删除 ({selectedIds.size})
-              </Button>
-            )}
-
-            {/* View toggle */}
-            <div className="flex border rounded-md ml-auto">
-              {([
-                { mode: "list" as ViewMode, icon: LayoutList },
-                { mode: "card" as ViewMode, icon: LayoutGrid },
-                { mode: "compact" as ViewMode, icon: Columns3 },
-              ]).map(({ mode, icon: Icon }) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`p-2 transition-colors ${
-                    viewMode === mode
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isEditing && filteredStars.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === filteredStars.length && filteredStars.length > 0}
-                onChange={toggleSelectAll}
-                className="h-4 w-4 rounded"
-              />
-              <span>
-                {selectedIds.size > 0
-                  ? `已选 ${selectedIds.size} / ${filteredStars.length}`
-                  : `${filteredStars.length} 个项目`}
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <Trash2 className="h-4 w-4 mr-1" />
+              删除 ({selectedIds.size})
+            </Button>
+          ) : null
+        }
+        viewToggle={
+          <ViewModeToggle
+            active={viewMode}
+            onChange={(mode) => setViewMode(mode as ViewMode)}
+            modes={[
+              { id: "list", icon: LayoutList },
+              { id: "card", icon: LayoutGrid },
+              { id: "compact", icon: Columns3 },
+            ]}
+          />
+        }
+      />
 
       {/* Stars Display */}
       {filteredStars.length === 0 && stars.length === 0 ? (
@@ -551,39 +524,30 @@ export default function StarsPage() {
       ) : viewMode === "card" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredStars.map((s) => (
-            <Card
-              key={s.id}
-              className={`transition-all duration-200 hover:shadow-md hover:border-primary/20 ${
-                isEditing && selectedIds.has(s.id) ? "ring-2 ring-primary" : ""
-              }`}
-            >
-              <CardHeader className="pb-2">
+            <ItemSurface key={s.id} selected={selectedIds.has(s.id)}>
+              <div className="p-4">
                 <div className="flex items-start gap-2">
-                  {isEditing && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(s.id)}
-                      onChange={() => toggleSelect(s.id)}
-                      className="mt-1 h-4 w-4 rounded"
-                    />
-                  )}
+                  <Checkbox
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleSelect(s.id)}
+                    className="mt-1"
+                    aria-label={`选择 ${s.owner}/${s.repo}`}
+                  />
                   <div className="flex-1 min-w-0">
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-medium text-sm hover:text-primary hover:underline truncate block">
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-medium text-sm tracking-tight hover:text-primary truncate block">
                       {s.owner}/{s.repo}
                     </a>
                   </div>
                   {s.language && (
-                    <Badge variant="outline" className="text-[10px] shrink-0">
+                    <Badge variant="outline" className="rounded-lg text-[10px] shrink-0">
                       {s.language}
                     </Badge>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                <p className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2 min-h-[2rem]">
                   {s.description || "暂无描述"}
                 </p>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
                   <span className="flex items-center gap-0.5">
                     <Star className="h-3 w-3" /> {s.stars.toLocaleString()}
                   </span>
@@ -591,68 +555,56 @@ export default function StarsPage() {
                     <GitFork className="h-3 w-3" /> {s.forks.toLocaleString()}
                   </span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </ItemSurface>
           ))}
         </div>
       ) : viewMode === "compact" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {filteredStars.map((s) => (
-            <div
-              key={s.id}
-              className={`flex items-center gap-2 p-2 rounded-lg border transition-colors hover:bg-accent ${
-                isEditing && selectedIds.has(s.id) ? "bg-primary/5 border-primary" : ""
-              }`}
-            >
-              {isEditing && (
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(s.id)}
-                  onChange={() => toggleSelect(s.id)}
-                  className="h-3.5 w-3.5 rounded shrink-0"
-                />
-              )}
+            <ItemSurface key={s.id} selected={selectedIds.has(s.id)} className="px-3 py-2.5">
+              <div className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedIds.has(s.id)}
+                onChange={() => toggleSelect(s.id)}
+                className="h-3.5 w-3.5"
+                aria-label={`选择 ${s.owner}/${s.repo}`}
+              />
               <div className="flex-1 min-w-0">
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary hover:underline truncate block">
+                <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium tracking-tight hover:text-primary truncate block">
                   {s.owner}/{s.repo}
                 </a>
               </div>
               {s.language && (
-                <Badge variant="outline" className="text-[10px]">{s.language}</Badge>
+                <Badge variant="outline" className="rounded-lg text-[10px]">{s.language}</Badge>
               )}
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5 shrink-0">
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5 shrink-0 tabular-nums">
                 <Star className="h-3 w-3" /> {s.stars.toLocaleString()}
               </span>
-            </div>
+              </div>
+            </ItemSurface>
           ))}
         </div>
       ) : (
         <div className="space-y-2">
           {filteredStars.map((s) => (
-            <Card
-              key={s.id}
-              className={`transition-all duration-200 hover:shadow-md hover:border-primary/20 ${
-                isEditing && selectedIds.has(s.id) ? "ring-2 ring-primary" : ""
-              }`}
-            >
-              <CardHeader className="py-3">
+            <ItemSurface key={s.id} selected={selectedIds.has(s.id)}>
+              <div className="px-4 py-3">
                 <div className="flex items-start gap-3">
-                  {isEditing && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(s.id)}
-                      onChange={() => toggleSelect(s.id)}
-                      className="mt-1 h-4 w-4 rounded shrink-0"
-                    />
-                  )}
+                  <Checkbox
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleSelect(s.id)}
+                    className="mt-1"
+                    aria-label={`选择 ${s.owner}/${s.repo}`}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-base font-medium hover:text-primary hover:underline">
+                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-base font-medium tracking-tight hover:text-primary">
                           {s.owner}/{s.repo}
                         </a>
                         {s.description && (
-                          <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                          <p className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2">
                             {s.description}
                           </p>
                         )}
@@ -661,16 +613,16 @@ export default function StarsPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 w-7 p-0 shrink-0"
+                          className="h-8 w-8 rounded-xl p-0 shrink-0"
                           onClick={() => handleDelete([s.id])}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="mt-2 flex items-center gap-3 tabular-nums">
                       {s.language && (
-                        <Badge variant="outline" className="text-xs">{s.language}</Badge>
+                        <Badge variant="outline" className="rounded-lg text-xs">{s.language}</Badge>
                       )}
                       <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                         <Star className="h-3 w-3" /> {s.stars.toLocaleString()}
@@ -681,8 +633,8 @@ export default function StarsPage() {
                     </div>
                   </div>
                 </div>
-              </CardHeader>
-            </Card>
+              </div>
+            </ItemSurface>
           ))}
         </div>
       )}
