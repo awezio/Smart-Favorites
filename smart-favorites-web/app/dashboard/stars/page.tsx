@@ -124,6 +124,18 @@ function StarListSkeleton() {
 type ViewMode = "list" | "card" | "compact";
 type SortKey = "stars" | "repo" | "created_at" | "language";
 
+function starDescription(star: GitHubStar) {
+  return star.description_zh || star.description || "";
+}
+
+function starDescriptionEn(star: GitHubStar) {
+  return star.description_en || "";
+}
+
+function hasStarDescription(star: GitHubStar) {
+  return Boolean(starDescription(star).trim() || starDescriptionEn(star).trim());
+}
+
 async function readApiError(response: Response, fallback: string) {
   const text = await response.text().catch(() => "");
   if (!text.trim()) return fallback;
@@ -267,7 +279,7 @@ export default function StarsPage() {
   );
 
   const starsWithDesc = useMemo(
-    () => stars.filter((star) => star.description?.trim()).length,
+    () => stars.filter(hasStarDescription).length,
     [stars]
   );
 
@@ -282,7 +294,8 @@ export default function StarsPage() {
         (s) =>
           s.repo.toLowerCase().includes(q) ||
           s.owner.toLowerCase().includes(q) ||
-          s.description?.toLowerCase().includes(q) ||
+          starDescription(s).toLowerCase().includes(q) ||
+          starDescriptionEn(s).toLowerCase().includes(q) ||
           s.language?.toLowerCase().includes(q)
       );
     }
@@ -292,9 +305,9 @@ export default function StarsPage() {
     }
 
     if (filterDesc === "has_desc") {
-      result = result.filter((s) => s.description);
+      result = result.filter(hasStarDescription);
     } else if (filterDesc === "no_desc") {
-      result = result.filter((s) => !s.description);
+      result = result.filter((s) => !hasStarDescription(s));
     }
 
     result.sort((a, b) => {
@@ -545,8 +558,13 @@ export default function StarsPage() {
                   )}
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2 min-h-[2rem]">
-                  {s.description || "暂无描述"}
+                  {starDescription(s) || "暂无描述"}
                 </p>
+                {starDescriptionEn(s) && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2">
+                    EN: {starDescriptionEn(s)}
+                  </p>
+                )}
                 <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
                   <span className="flex items-center gap-0.5">
                     <Star className="h-3 w-3" /> {s.stars.toLocaleString()}
@@ -603,9 +621,14 @@ export default function StarsPage() {
                         <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-base font-medium tracking-tight hover:text-primary">
                           {s.owner}/{s.repo}
                         </a>
-                        {s.description && (
+                        {hasStarDescription(s) && (
                           <p className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2">
-                            {s.description}
+                            {starDescription(s)}
+                          </p>
+                        )}
+                        {starDescriptionEn(s) && (
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground/75 line-clamp-2">
+                            EN: {starDescriptionEn(s)}
                           </p>
                         )}
                       </div>

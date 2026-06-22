@@ -5,6 +5,9 @@ export interface Bookmark {
   title: string;
   url: string;
   description?: string;
+  description_zh?: string;
+  description_en?: string;
+  description_metadata?: Record<string, any> | null;
   folder_path?: string;
   add_date?: string;
   icon?: string;
@@ -21,6 +24,9 @@ export interface GitHubStar {
   repo: string;
   url: string;
   description?: string;
+  description_zh?: string;
+  description_en?: string;
+  description_metadata?: Record<string, any> | null;
   language?: string;
   stars: number;
   forks: number;

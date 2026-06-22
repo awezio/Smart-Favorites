@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateBookmarkDescription } from "@/lib/ai/description-generator";
+import { generateBookmarkDescription, generateStarDescription } from "@/lib/ai/description-generator";
 import { updateBookmark } from "@/lib/db/bookmarks";
 import { updateStar } from "@/lib/db/github-stars";
 import { generateEmbedding } from "@/lib/rag/embedding";
@@ -25,15 +25,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === "bookmark") {
-      const description = await generateBookmarkDescription(item.url, item.title);
+      const generated = await generateBookmarkDescription(item.url, item.title, { userId });
 
-      const textToEmbed = `${item.title} ${description} ${item.url}`;
+      const textToEmbed = `${item.title} ${generated.description_zh} ${generated.description_en} ${item.url}`;
       const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateBookmark(
         item.id,
         {
-          description,
+          description: generated.description_zh,
+          description_zh: generated.description_zh,
+          description_en: generated.description_en,
+          description_metadata: generated.description_metadata,
           embedding,
         },
         userId,
@@ -42,15 +45,21 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        description,
+        description: generated.description_zh,
+        ...generated,
       });
     } else if (type === "star") {
-      const textToEmbed = `${item.owner}/${item.repo} ${item.description || ""} ${item.language || ""}`;
+      const generated = await generateStarDescription(item, { userId });
+      const textToEmbed = `${item.owner}/${item.repo} ${generated.description_zh} ${generated.description_en} ${item.language || ""}`;
       const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateStar(
         item.id,
         {
+          description: generated.description_zh,
+          description_zh: generated.description_zh,
+          description_en: generated.description_en,
+          description_metadata: generated.description_metadata,
           embedding,
         },
         userId,
@@ -59,7 +68,8 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        description: item.description,
+        description: generated.description_zh,
+        ...generated,
       });
     }
 

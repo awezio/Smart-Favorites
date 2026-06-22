@@ -15,7 +15,7 @@ type StarUpdate = Partial<Omit<GitHubStar, "id" | "user_id" | "created_at">> & {
 };
 
 const SYNC_STAR_COLUMNS =
-  "id, user_id, url, owner, repo, description, language, stars, forks, updated";
+  "id, user_id, url, owner, repo, description, description_zh, description_en, description_metadata, language, stars, forks, updated";
 const DB_BATCH_SIZE = 200;
 const POSTGREST_PAGE_SIZE = 1000;
 

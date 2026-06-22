@@ -16,6 +16,9 @@ export interface Database {
           title: string
           url: string
           description: string | null
+          description_zh: string | null
+          description_en: string | null
+          description_metadata: Json | null
           folder_path: string | null
           add_date: string | null
           icon: string | null
@@ -30,6 +33,9 @@ export interface Database {
           title: string
           url: string
           description?: string | null
+          description_zh?: string | null
+          description_en?: string | null
+          description_metadata?: Json | null
           folder_path?: string | null
           add_date?: string | null
           icon?: string | null
@@ -44,6 +50,9 @@ export interface Database {
           title?: string
           url?: string
           description?: string | null
+          description_zh?: string | null
+          description_en?: string | null
+          description_metadata?: Json | null
           folder_path?: string | null
           add_date?: string | null
           icon?: string | null
@@ -61,6 +70,9 @@ export interface Database {
           repo: string
           url: string
           description: string | null
+          description_zh: string | null
+          description_en: string | null
+          description_metadata: Json | null
           language: string | null
           stars: number
           forks: number
@@ -77,6 +89,9 @@ export interface Database {
           repo: string
           url: string
           description?: string | null
+          description_zh?: string | null
+          description_en?: string | null
+          description_metadata?: Json | null
           language?: string | null
           stars?: number
           forks?: number
@@ -93,6 +108,9 @@ export interface Database {
           repo?: string
           url?: string
           description?: string | null
+          description_zh?: string | null
+          description_en?: string | null
+          description_metadata?: Json | null
           language?: string | null
           stars?: number
           forks?: number

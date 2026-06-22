@@ -117,6 +117,18 @@ type ViewMode = "list" | "card" | "compact";
 type SortKey = "title" | "created_at" | "url";
 type FilterStatus = "all" | "has_desc" | "no_desc";
 
+function bookmarkDescription(bookmark: Bookmark) {
+  return bookmark.description_zh || bookmark.description || "";
+}
+
+function bookmarkDescriptionEn(bookmark: Bookmark) {
+  return bookmark.description_en || "";
+}
+
+function hasBookmarkDescription(bookmark: Bookmark) {
+  return Boolean(bookmarkDescription(bookmark).trim() || bookmarkDescriptionEn(bookmark).trim());
+}
+
 export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [filter, setFilter] = useState("");
@@ -264,7 +276,7 @@ export default function BookmarksPage() {
   }, [bookmarks]);
 
   const descStats = useMemo(() => {
-    const withDesc = bookmarks.filter((b) => b.description).length;
+    const withDesc = bookmarks.filter(hasBookmarkDescription).length;
     const withoutDesc = bookmarks.length - withDesc;
     return [
       { name: "有描述", value: withDesc },
@@ -275,7 +287,7 @@ export default function BookmarksPage() {
   const descCoverage = useMemo(() => {
     if (bookmarks.length === 0) return 0;
     return Math.round(
-      (bookmarks.filter((b) => b.description).length / bookmarks.length) * 100
+      (bookmarks.filter(hasBookmarkDescription).length / bookmarks.length) * 100
     );
   }, [bookmarks]);
 
@@ -289,15 +301,16 @@ export default function BookmarksPage() {
         (b) =>
           b.title.toLowerCase().includes(q) ||
           b.url.toLowerCase().includes(q) ||
-          b.description?.toLowerCase().includes(q)
+          bookmarkDescription(b).toLowerCase().includes(q) ||
+          bookmarkDescriptionEn(b).toLowerCase().includes(q)
       );
     }
 
     // Status filter
     if (filterStatus === "has_desc") {
-      result = result.filter((b) => b.description);
+      result = result.filter(hasBookmarkDescription);
     } else if (filterStatus === "no_desc") {
-      result = result.filter((b) => !b.description);
+      result = result.filter((b) => !hasBookmarkDescription(b));
     }
 
     // Folder filter
@@ -406,7 +419,7 @@ export default function BookmarksPage() {
       return;
     }
 
-    const targets = selected.filter((bookmark) => !bookmark.description?.trim());
+    const targets = selected.filter((bookmark) => !hasBookmarkDescription(bookmark));
     if (targets.length === 0) {
       toast.info("所选书签均已有描述");
       return;
@@ -826,15 +839,20 @@ export default function BookmarksPage() {
                   </div>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2 min-h-[2rem]">
-                  {b.description || "暂无描述"}
+                  {bookmarkDescription(b) || "暂无描述"}
                 </p>
+                {bookmarkDescriptionEn(b) && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2">
+                    EN: {bookmarkDescriptionEn(b)}
+                  </p>
+                )}
                 {b.folder_path && b.folder_path !== "/" && (
                   <Badge variant="outline" className="mt-2 rounded-lg text-[10px]">
                     {b.folder_path}
                   </Badge>
                 )}
                 <div className="flex gap-1 mt-3">
-                  {!b.description && (
+                  {!hasBookmarkDescription(b) && (
                     <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => generateDescription(b)}>
                       <Sparkles className="h-3 w-3 mr-1" />AI
                     </Button>
@@ -868,7 +886,7 @@ export default function BookmarksPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium truncate tracking-tight">{b.title}</span>
-                  {!b.description && (
+                  {!hasBookmarkDescription(b) && (
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="无描述" />
                   )}
                 </div>
@@ -912,7 +930,7 @@ export default function BookmarksPage() {
                         </a>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        {!b.description && (
+                        {!hasBookmarkDescription(b) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -935,9 +953,14 @@ export default function BookmarksPage() {
                         )}
                       </div>
                     </div>
-                    {b.description && (
+                    {hasBookmarkDescription(b) && (
                       <p className="text-sm leading-relaxed text-muted-foreground mt-2 line-clamp-2">
-                        {b.description}
+                        {bookmarkDescription(b)}
+                      </p>
+                    )}
+                    {bookmarkDescriptionEn(b) && (
+                      <p className="text-xs leading-relaxed text-muted-foreground/75 mt-1 line-clamp-2">
+                        EN: {bookmarkDescriptionEn(b)}
                       </p>
                     )}
                     {b.folder_path && b.folder_path !== "/" && (

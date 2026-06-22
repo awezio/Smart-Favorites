@@ -90,8 +90,16 @@ export async function exportKnowledgeAsSfkf(userId: string): Promise<SfkfExport>
           license: "unknown",
           folder_path: bookmark.folder_path || "",
           content_hash: bookmark.source_hash || "",
+          description_zh: bookmark.description_zh || bookmark.description || "",
+          description_en: bookmark.description_en || "",
+          description_metadata: JSON.stringify(bookmark.description_metadata || {}),
         },
-        `# ${bookmark.title}\n\n${bookmark.description || ""}\n\n${bookmark.url}\n`
+        bilingualDescriptionMarkdown({
+          title: bookmark.title,
+          descriptionZh: bookmark.description_zh || bookmark.description || "",
+          descriptionEn: bookmark.description_en || "",
+          url: bookmark.url,
+        })
       ),
     });
   }
@@ -133,8 +141,16 @@ export async function exportKnowledgeAsSfkf(userId: string): Promise<SfkfExport>
           language: star.language || "",
           stars: String(star.stars || 0),
           forks: String(star.forks || 0),
+          description_zh: star.description_zh || star.description || "",
+          description_en: star.description_en || "",
+          description_metadata: JSON.stringify(star.description_metadata || {}),
         },
-        `# ${title}\n\n${star.description || ""}\n\n${star.url}\n`
+        bilingualDescriptionMarkdown({
+          title,
+          descriptionZh: star.description_zh || star.description || "",
+          descriptionEn: star.description_en || "",
+          url: star.url,
+        })
       ),
     });
   }
@@ -284,6 +300,28 @@ function markdownWithFrontmatter(frontmatter: Record<string, string>, body: stri
   return `---\n${yaml}\n---\n\n${body}`;
 }
 
+function bilingualDescriptionMarkdown({
+  title,
+  descriptionZh,
+  descriptionEn,
+  url,
+}: {
+  title: string;
+  descriptionZh: string;
+  descriptionEn: string;
+  url: string;
+}) {
+  const sections = [`# ${title}`];
+  if (descriptionZh) {
+    sections.push(`## 中文描述\n\n${descriptionZh}`);
+  }
+  if (descriptionEn) {
+    sections.push(`## English Description\n\n${descriptionEn}`);
+  }
+  sections.push(url);
+  return `${sections.join("\n\n")}\n`;
+}
+
 function quote(value: string) {
   return JSON.stringify(value ?? "");
 }
@@ -301,4 +339,3 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "untitled";
 }
-
