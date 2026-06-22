@@ -130,6 +130,25 @@ const COLORS = [
   "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6",
 ];
 
+async function readApiError(response: Response, fallback: string) {
+  const text = await response.text().catch(() => "");
+  if (!text.trim()) return fallback;
+
+  try {
+    const data = JSON.parse(text);
+    if (typeof data?.error === "string" && data.error.trim()) {
+      return data.error;
+    }
+    if (typeof data?.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+  } catch {
+    // Vercel platform failures can be plain text, not JSON.
+  }
+
+  return text.trim().slice(0, 300) || fallback;
+}
+
 export default function StarsPage() {
   const [stars, setStars] = useState<GitHubStar[]>([]);
   const [filter, setFilter] = useState("");
@@ -184,8 +203,8 @@ export default function StarsPage() {
         toast.success(`同步完成！新增: ${data.summary.added}, 修改: ${data.summary.modified}, 删除: ${data.summary.removed}`, { id: "sync-stars" });
         await loadStars();
       } else {
-        const err = await response.json();
-        toast.error(`同步失败: ${err.error || "未知错误"}`, { id: "sync-stars" });
+        const message = await readApiError(response, "未知错误");
+        toast.error(`同步失败: ${message}`, { id: "sync-stars" });
       }
     } catch (error: any) {
       toast.error(`同步失败: ${error.message}`, { id: "sync-stars" });

@@ -5,7 +5,6 @@ import {
   fetchUserStars,
 } from "@/lib/parsers/github-stars";
 import { bulkInsertStars, getStars, updateStar, deleteStar } from "@/lib/db/github-stars";
-import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -69,35 +68,25 @@ export async function POST(request: NextRequest) {
     const diff = diffStars(existingStars, fetchedStars);
 
     // Process additions
-    const addedWithEmbeddings = await Promise.all(
-      diff.added.map(async (star: any) => {
-        const textToEmbed = `${star.owner}/${star.repo} ${star.description || ""} ${star.language || ""}`;
-        const embedding = await generateEmbedding(textToEmbed, { userId });
-        return {
-          user_id: userId,
-          owner: star.owner,
-          repo: star.repo,
-          url: star.url,
-          description: star.description,
-          language: star.language,
-          stars: star.stars || 0,
-          forks: star.forks || 0,
-          updated: star.updated,
-          embedding,
-          updated_at: new Date().toISOString(),
-        };
-      })
-    );
+    const addedStars = diff.added.map((star: any) => ({
+      user_id: userId,
+      owner: star.owner,
+      repo: star.repo,
+      url: star.url,
+      description: star.description,
+      language: star.language,
+      stars: star.stars || 0,
+      forks: star.forks || 0,
+      updated: star.updated,
+      updated_at: new Date().toISOString(),
+    }));
 
-    if (addedWithEmbeddings.length > 0) {
-      await bulkInsertStars(addedWithEmbeddings as any, supabase);
+    if (addedStars.length > 0) {
+      await bulkInsertStars(addedStars as any, supabase);
     }
 
     // Process modifications
     for (const { old: oldStar, new: newStar } of diff.modified) {
-      const textToEmbed = `${newStar.owner}/${newStar.repo} ${newStar.description || ""} ${newStar.language || ""}`;
-      const embedding = await generateEmbedding(textToEmbed, { userId });
-
       await updateStar(
         oldStar.id,
         {
@@ -109,7 +98,6 @@ export async function POST(request: NextRequest) {
           stars: newStar.stars,
           forks: newStar.forks,
           updated: newStar.updated,
-          embedding,
         },
         userId,
         supabase

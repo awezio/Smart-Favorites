@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseBookmarksHtml, diffBookmarks } from "@/lib/parsers/bookmark-parser";
 import { bulkInsertBookmarks, getBookmarks, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
-import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -50,33 +49,23 @@ export async function POST(request: NextRequest) {
     const diff = diffBookmarks(existingBookmarks, newBookmarks);
 
     // Process additions
-    const addedWithEmbeddings = await Promise.all(
-      diff.added.map(async (bookmark: any) => {
-        const textToEmbed = `${bookmark.title} ${bookmark.description || ""} ${bookmark.url}`;
-        const embedding = await generateEmbedding(textToEmbed, { userId });
-        return {
-          user_id: userId,
-          title: bookmark.title,
-          url: bookmark.url,
-          description: bookmark.description,
-          folder_path: bookmark.folder_path,
-          add_date: bookmark.add_date,
-          icon: bookmark.icon,
-          embedding,
-          updated_at: new Date().toISOString(),
-        };
-      })
-    );
+    const addedBookmarks = diff.added.map((bookmark: any) => ({
+      user_id: userId,
+      title: bookmark.title,
+      url: bookmark.url,
+      description: bookmark.description,
+      folder_path: bookmark.folder_path,
+      add_date: bookmark.add_date,
+      icon: bookmark.icon,
+      updated_at: new Date().toISOString(),
+    }));
 
-    if (addedWithEmbeddings.length > 0) {
-      await bulkInsertBookmarks(addedWithEmbeddings as any, supabase);
+    if (addedBookmarks.length > 0) {
+      await bulkInsertBookmarks(addedBookmarks as any, supabase);
     }
 
     // Process modifications
     for (const { old: oldBookmark, new: newBookmark } of diff.modified) {
-      const textToEmbed = `${newBookmark.title} ${newBookmark.description || ""} ${newBookmark.url}`;
-      const embedding = await generateEmbedding(textToEmbed, { userId });
-
       await updateBookmark(
         oldBookmark.id,
         {
@@ -84,7 +73,6 @@ export async function POST(request: NextRequest) {
           url: newBookmark.url,
           description: newBookmark.description,
           folder_path: newBookmark.folder_path,
-          embedding,
         },
         userId,
         supabase
