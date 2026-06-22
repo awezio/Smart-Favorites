@@ -157,7 +157,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
-  if (request?.action !== 'smartFavoritesExtensionAuth' || !request.token) {
+  const action = request?.action;
+
+  if (action === 'ping') {
+    sendResponse({
+      success: true,
+      installed: true,
+      version: chrome.runtime.getManifest().version,
+    });
+    return false;
+  }
+
+  if (action === 'openSidePanel') {
+    const windowId = sender.tab?.windowId;
+    if (windowId === undefined) {
+      sendResponse({ success: false, error: 'Missing browser window context' });
+      return false;
+    }
+
+    chrome.sidePanel
+      .open({ windowId })
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (action === 'triggerSync') {
+    syncBookmarks()
+      .then((result) => sendResponse(result))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (action !== 'smartFavoritesExtensionAuth' || !request.token) {
     sendResponse({ success: false, error: 'Unsupported external message' });
     return false;
   }

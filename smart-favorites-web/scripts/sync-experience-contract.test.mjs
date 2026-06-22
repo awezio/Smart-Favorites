@@ -7,6 +7,7 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (...segments) => readFileSync(join(repoRoot, ...segments), "utf8");
 
 const bookmarksPage = read("app", "dashboard", "bookmarks", "page.tsx");
+const extensionBridge = read("lib", "extension", "bridge.ts");
 const landingPage = read("app", "page.tsx");
 const starsPage = read("app", "dashboard", "stars", "page.tsx");
 const starsSyncRoute = read("app", "api", "stars", "sync", "route.ts");
@@ -71,9 +72,24 @@ assert.match(
   "Landing page extension entry point should target the latest GitHub Release."
 );
 assert.match(
-  bookmarksPage,
+  `${bookmarksPage}\n${extensionBridge}`,
   new RegExp(releaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
   "Bookmarks extension sync entry point should target the latest GitHub Release."
+);
+assert.match(
+  bookmarksPage,
+  /一键同步/,
+  "Bookmarks page should expose a one-click sync action."
+);
+assert.match(
+  extensionBackground,
+  /action === 'ping'/,
+  "Extension background should answer web-page ping requests for install detection."
+);
+assert.match(
+  extensionBackground,
+  /action === 'triggerSync'/,
+  "Extension background should allow the web page to trigger bookmark sync directly."
 );
 assert.match(
   extensionSources,

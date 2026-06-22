@@ -122,6 +122,16 @@ export function StatsOverview({
 
   return (
     <div className={cn("space-y-5", className)}>
+      <div className="flex items-end justify-between gap-4 px-1">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Overview
+          </p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight">数据概览</h2>
+        </div>
+        <div className="hidden h-px flex-1 bg-border/60 sm:block" aria-hidden />
+      </div>
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {metrics.map((metric) => {
           const Icon = metric.icon;

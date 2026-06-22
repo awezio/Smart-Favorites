@@ -32,6 +32,7 @@
       "http://127.0.0.1:3000/*",
       "https://smart-favorites.vercel.app/*",
       "https://smart-favorites.cc.cd/*",
+      "https://www.smart-favorites.cc.cd/*",
       "https://*.smart-favorites.cc.cd/*"
     ]
   },

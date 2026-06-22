@@ -44,6 +44,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import type { Bookmark } from "@/types";
+import {
+  getExtensionInstallUrl,
+  openExtensionSidePanel,
+  pingInstalledExtension,
+  triggerExtensionBookmarkSync,
+} from "@/lib/extension/bridge";
 
 function BookmarkListSkeleton() {
   return (
@@ -132,6 +138,9 @@ export default function BookmarksPage() {
   // Batch operations
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [generatingBatch, setGeneratingBatch] = useState(false);
+  const [extensionId, setExtensionId] = useState<string | null>(null);
+  const [extensionVersion, setExtensionVersion] = useState<string | null>(null);
+  const [checkingExtension, setCheckingExtension] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
 
@@ -143,6 +152,49 @@ export default function BookmarksPage() {
 
   useEffect(() => {
     loadBookmarks();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function detectExtension() {
+      setCheckingExtension(true);
+      const detected = await pingInstalledExtension();
+      if (cancelled) {
+        return;
+      }
+
+      setExtensionId(detected?.extensionId ?? null);
+      setExtensionVersion(detected?.version ?? null);
+      setCheckingExtension(false);
+
+      // #region agent log
+      fetch("http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "d21e4d",
+        },
+        body: JSON.stringify({
+          sessionId: "d21e4d",
+          location: "bookmarks/page.tsx:detectExtension",
+          message: "extension detection result",
+          data: {
+            detected: Boolean(detected),
+            extensionId: detected?.extensionId ?? null,
+            version: detected?.version ?? null,
+          },
+          timestamp: Date.now(),
+          hypothesisId: "B",
+        }),
+      }).catch(() => {});
+      // #endregion
+    }
+
+    detectExtension();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadBookmarks = async () => {
@@ -160,11 +212,89 @@ export default function BookmarksPage() {
   };
 
   const openExtensionGuide = () => {
-    window.open(
-      "https://github.com/awezio/Smart-Favorites/releases/latest",
-      "_blank",
-      "noopener,noreferrer"
-    );
+    window.open(getExtensionInstallUrl(), "_blank", "noopener,noreferrer");
+  };
+
+  const handleOpenExtension = async () => {
+    if (!extensionId) {
+      openExtensionGuide();
+      return;
+    }
+
+    const opened = await openExtensionSidePanel(extensionId);
+    if (!opened) {
+      toast.error("无法打开扩展侧边栏，请从浏览器工具栏点击 Smart Favorites 图标。");
+    }
+  };
+
+  const handleOneClickSync = async () => {
+    setLoading(true);
+    toast.loading("正在同步浏览器书签...", { id: "bookmark-sync" });
+
+    // #region agent log
+    fetch("http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "d21e4d",
+      },
+      body: JSON.stringify({
+        sessionId: "d21e4d",
+        location: "bookmarks/page.tsx:handleOneClickSync:start",
+        message: "one click sync started",
+        data: { extensionId, checkingExtension },
+        timestamp: Date.now(),
+        hypothesisId: "A,C",
+      }),
+    }).catch(() => {});
+    // #endregion
+
+    try {
+      if (!extensionId) {
+        toast.error("未检测到 Smart Favorites 扩展，请先安装扩展。", {
+          id: "bookmark-sync",
+        });
+        openExtensionGuide();
+        return;
+      }
+
+      const result = await triggerExtensionBookmarkSync(extensionId);
+
+      // #region agent log
+      fetch("http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "d21e4d",
+        },
+        body: JSON.stringify({
+          sessionId: "d21e4d",
+          location: "bookmarks/page.tsx:handleOneClickSync:result",
+          message: "one click sync result",
+          data: result,
+          timestamp: Date.now(),
+          hypothesisId: "A,C",
+        }),
+      }).catch(() => {});
+      // #endregion
+
+      if (!result.success) {
+        toast.error(`同步失败：${result.error || "未知错误"}`, { id: "bookmark-sync" });
+        await openExtensionSidePanel(extensionId);
+        return;
+      }
+
+      await loadBookmarks();
+      toast.success(
+        `同步完成！共同步 ${result.count ?? 0} 个变更项。`,
+        { id: "bookmark-sync" }
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "同步失败";
+      toast.error(`同步失败：${message}`, { id: "bookmark-sync" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ── Computed data ── */
@@ -470,20 +600,42 @@ export default function BookmarksPage() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">浏览器扩展自动同步</CardTitle>
+          <CardTitle className="text-base tracking-tight">浏览器扩展自动同步</CardTitle>
           <CardDescription>
-            网页无法直接读取浏览器收藏夹。安装 Smart Favorites 浏览器扩展后，扩展会通过浏览器授权的 bookmarks API 读取收藏夹，并支持手动或自动同步。
+            网页无法直接读取浏览器收藏夹。安装 Smart Favorites 扩展后，可在此一键同步；未安装时将引导你下载扩展。
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button onClick={openExtensionGuide}>
-            <ExternalLink className="h-4 w-4 mr-2" />
-            安装/打开扩展同步
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={handleOneClickSync}
+            disabled={loading || checkingExtension}
+            className="rounded-xl"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            一键同步
           </Button>
+
+          <Button
+            variant={extensionId ? "secondary" : "default"}
+            onClick={extensionId ? handleOpenExtension : openExtensionGuide}
+            className="rounded-xl"
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            {checkingExtension
+              ? "检测扩展中..."
+              : extensionId
+                ? `打开扩展${extensionVersion ? ` v${extensionVersion}` : ""}`
+                : "安装/打开扩展同步"}
+          </Button>
+
           <label>
-            <Button variant="outline" disabled={loading} asChild>
+            <Button variant="outline" disabled={loading} asChild className="rounded-xl">
               <span><Upload className="h-4 w-4 mr-2" />备用：导入 HTML</span>
             </Button>
             <input type="file" accept=".html" className="hidden" onChange={handleImport} />
@@ -539,8 +691,26 @@ export default function BookmarksPage() {
       <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
         <CardContent className="pt-6 space-y-4">
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={openExtensionGuide} className="rounded-xl">
-              <ExternalLink className="h-4 w-4 mr-2" />浏览器扩展自动同步
+            <Button
+              onClick={handleOneClickSync}
+              disabled={loading || checkingExtension}
+              className="rounded-xl"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              一键同步
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={extensionId ? handleOpenExtension : openExtensionGuide}
+              className="rounded-xl"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              浏览器扩展自动同步
             </Button>
 
             <label>
