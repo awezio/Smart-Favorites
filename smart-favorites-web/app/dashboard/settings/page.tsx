@@ -154,7 +154,7 @@ export default function SettingsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          default_llm_provider: defaultProvider,
+          default_llm_provider: selectedProvider,
           default_llm_model: defaultModel || undefined,
           api_keys: keysToSend,
           github_username: githubUsername,
@@ -440,6 +440,7 @@ export default function SettingsPage() {
                 value={selectedProvider}
                 onChange={(event) => {
                   setSelectedProvider(event.target.value);
+                  setDefaultProvider(event.target.value);
                   setDefaultModel("");
                 }}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"

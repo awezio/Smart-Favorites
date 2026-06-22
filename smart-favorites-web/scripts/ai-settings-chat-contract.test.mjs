@@ -56,6 +56,16 @@ assert.match(
 );
 assert.match(
   settingsPage,
+  /default_llm_provider:\s*selectedProvider/,
+  "Saving AI provider settings should persist the provider currently being configured, not a stale previous default."
+);
+assert.doesNotMatch(
+  settingsRoute,
+  /settings:\s*data/,
+  "Settings PUT responses should not return raw stored settings because api_keys contains encrypted secret material."
+);
+assert.match(
+  settingsPage,
   /embeddingPreference/,
   "Settings page should expose the persisted embedding preference instead of only reporting it from the API."
 );

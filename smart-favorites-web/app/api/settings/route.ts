@@ -144,14 +144,14 @@ export async function PUT(request: NextRequest) {
       updateData.auto_snapshot = body.auto_snapshot;
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("user_settings")
       .upsert(updateData, { onConflict: "user_id" })
-      .select()
+      .select("id")
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ success: true, settings: data });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
