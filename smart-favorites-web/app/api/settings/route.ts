@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
         process.env.DEFAULT_LLM_PROVIDER ||
         "deepseek",
       defaultModel: userSettings?.default_llm_model || "",
+      providerModels: normalizeProviderModels(userSettings?.provider_models),
       embeddingModel:
         userSettings?.embedding_preference === "openai"
           ? `OpenAI ${process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small"} (384d)`
@@ -81,6 +82,35 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function normalizeProviderModels(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, any>)
+      .map(([provider, entry]) => {
+        const models = Array.isArray(entry?.models)
+          ? entry.models
+          : Array.isArray(entry)
+            ? entry
+            : [];
+        return [
+          provider,
+          models
+            .filter((model: any) => model && typeof model.id === "string")
+            .map((model: any) => ({
+              id: model.id,
+              label: typeof model.label === "string" ? model.label : model.id,
+              ...(model.webSearch ? { webSearch: true } : {}),
+              ...(model.vision ? { vision: true } : {}),
+            })),
+        ];
+      })
+      .filter(([, models]) => models.length > 0)
+  );
 }
 
 export async function PUT(request: NextRequest) {

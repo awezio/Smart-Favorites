@@ -137,6 +137,11 @@ assert.match(
   "Models API should resolve providers from the registry."
 );
 assert.match(
+  modelsRoute,
+  /provider_models[\s\S]*upsert/,
+  "Models API should save the latest fetched provider model list to backend settings."
+);
+assert.match(
   testRoute,
   /testProviderConnection/,
   "Provider test API should use the registry test strategy."

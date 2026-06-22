@@ -114,6 +114,7 @@ export default function SettingsPage() {
         setSelectedProvider(data.defaultProvider || firstProvider);
         setProviderStatus(data.providers || {});
         setApiKeys(data.userApiKeys || {});
+        setProviderModels(data.providerModels || {});
         setGithubUsername(data.github?.username || "");
         setGithubStatus({
           configured: data.github?.configured || false,

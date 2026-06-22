@@ -41,6 +41,11 @@ assert.match(
 );
 assert.match(
   migrations,
+  /provider_models/i,
+  "Database migrations should persist the latest fetched provider model lists."
+);
+assert.match(
+  migrations,
   /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLE\s+public\.user_settings\s+TO\s+authenticated/i,
   "Database migrations should grant authenticated users Data API access to user_settings while RLS enforces row ownership."
 );
@@ -53,6 +58,21 @@ assert.match(
   settingsRoute,
   /body\.default_llm_model[\s\S]*updateData\.default_llm_model/,
   "Settings PUT should persist the default LLM model."
+);
+assert.match(
+  settingsRoute,
+  /providerModels[\s\S]*provider_models/,
+  "Settings GET should return cached provider model lists from user_settings."
+);
+assert.match(
+  settingsPage,
+  /setProviderModels\(data\.providerModels \|\| \{\}\)/,
+  "Settings page should hydrate fetched provider models from saved backend state."
+);
+assert.match(
+  chatPage,
+  /setProviderModels\(data\.providerModels \|\| \{\}\)/,
+  "Chat page should show saved provider model lists without requiring a fresh provider API call."
 );
 assert.match(
   settingsPage,

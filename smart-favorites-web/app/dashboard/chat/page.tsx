@@ -135,6 +135,8 @@ export default function ChatPage() {
       }
 
       const data = await response.json();
+      const savedProviderModels = data.providerModels || {};
+      setProviderModels(data.providerModels || {});
       const configured = Object.entries(
         (data.providers || {}) as Record<string, { configured?: boolean }>
       )
@@ -150,7 +152,10 @@ export default function ChatPage() {
       setSelectedProvider(defaultProvider);
       setSelectedModelId(typeof data.defaultModel === "string" ? data.defaultModel : "");
 
-      await Promise.all(configured.map((provider) => loadProviderModels(provider)));
+      const missingModelProviders = configured.filter(
+        (provider) => !savedProviderModels[provider]?.length
+      );
+      await Promise.all(missingModelProviders.map((provider) => loadProviderModels(provider)));
     } catch (error) {
       console.error("Failed to load AI settings:", error);
     }
