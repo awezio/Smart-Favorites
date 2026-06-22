@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -112,7 +113,7 @@ export function ViewModeToggle({
   active,
   onChange,
 }: {
-  modes: Array<{ id: string; icon: React.ComponentType<{ className?: string }> }>;
+  modes: Array<{ id: string; icon: LucideIcon }>;
   active: string;
   onChange: (id: string) => void;
 }) {
