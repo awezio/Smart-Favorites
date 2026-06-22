@@ -15,6 +15,7 @@
     "test:server-runtime": "node scripts/server-runtime-contract.test.mjs",
     "test:search-experience": "node scripts/search-experience-contract.test.mjs",
     "test:okf-knowledge-format": "node scripts/okf-knowledge-format-contract.test.mjs",
+    "test:knowledge-graph": "node scripts/knowledge-graph-contract.test.mjs",
     "test:ai-settings-chat": "node scripts/ai-settings-chat-contract.test.mjs",
     "test:provider-admin": "node scripts/provider-admin-contract.test.mjs",
     "test:favicon": "node scripts/favicon-contract.test.mjs",

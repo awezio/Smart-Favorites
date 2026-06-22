@@ -16,6 +16,7 @@ import {
   LogOut,
   User,
   Globe,
+  Network,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ const primaryNavItems = [
   { href: "/dashboard/chat", icon: MessageSquare, label: "AI 问答" },
   { href: "/dashboard/bookmarks", icon: Bookmark, label: "书签管理" },
   { href: "/dashboard/stars", icon: Star, label: "GitHub Stars" },
+  { href: "/dashboard/knowledge", icon: Network, label: "Knowledge Graph" },
   { href: "/dashboard/square", icon: Globe, label: "广场" },
 ];
 

@@ -24,8 +24,9 @@ assert.match(exporter, /export async function exportKnowledgeAsSfkf/, "OKF expor
 assert.match(exporter, /manifest\.yaml/, "OKF exporter should generate manifest.yaml.");
 assert.match(exporter, /indexes\/nodes\.yaml/, "OKF exporter should generate nodes.yaml.");
 assert.match(exporter, /indexes\/sources\.yaml/, "OKF exporter should generate sources.yaml.");
+assert.match(exporter, /indexes\/links\.yaml/, "OKF exporter should generate portable graph links.");
 assert.match(exporter, /fetchAllKnowledgeRows/, "OKF exporter should share a paginated fetch helper.");
-assert.match(exporter, /\.range\(offset,\s*offset \+ EXPORT_PAGE_SIZE - 1\)/, "OKF exporter should page through all rows instead of relying on the PostgREST default page.");
+assert.match(read("lib", "knowledge-format", "records.ts"), /\.range\(offset,\s*offset \+ KNOWLEDGE_PAGE_SIZE - 1\)/, "OKF exporter should page through all rows instead of relying on the PostgREST default page.");
 assert.match(route, /exportKnowledgeAsSfkf/, "OKF export API should use the shared exporter.");
 assert.match(route, /application\/json/, "OKF export API should return a machine-readable payload.");
 

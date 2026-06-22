@@ -1,5 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildKnowledgeEdges } from "@/lib/knowledge-format/links";
+import { fetchAllKnowledgeRows } from "@/lib/knowledge-format/records";
 import type {
+  KnowledgeEdge,
   KnowledgeNode,
   KnowledgeSource,
   SfkfExport,
@@ -20,6 +23,7 @@ export async function exportKnowledgeAsSfkf(userId: string): Promise<SfkfExport>
     ]),
   ]);
   const generatedAt = new Date().toISOString();
+  const links = buildKnowledgeEdges({ bookmarks, stars, documents });
   const manifest: SfkfManifest = {
     format: "sfkf",
     version: "0.1.0",
@@ -231,51 +235,15 @@ export async function exportKnowledgeAsSfkf(userId: string): Promise<SfkfExport>
       path: "indexes/sources.yaml",
       mediaType: "text/yaml",
       content: serializeSources(sources),
+    },
+    {
+      path: "indexes/links.yaml",
+      mediaType: "text/yaml",
+      content: serializeLinks(links),
     }
   );
 
   return { manifest, files };
-}
-
-const EXPORT_PAGE_SIZE = 1000;
-
-async function fetchAllKnowledgeRows<T>(
-  supabase: ReturnType<typeof createAdminClient>,
-  table: string,
-  userId: string,
-  orderBy: Array<{ column: string; ascending?: boolean }>
-): Promise<T[]> {
-  const rows: T[] = [];
-  let offset = 0;
-
-  while (true) {
-    let query = supabase
-      .from(table)
-      .select("*")
-      .eq("user_id", userId);
-
-    for (const order of orderBy) {
-      query = query.order(order.column, { ascending: order.ascending ?? true });
-    }
-
-    const { data, error } = await query.range(offset, offset + EXPORT_PAGE_SIZE - 1);
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (!data?.length) {
-      break;
-    }
-
-    rows.push(...(data as T[]));
-    if (data.length < EXPORT_PAGE_SIZE) {
-      break;
-    }
-
-    offset += EXPORT_PAGE_SIZE;
-  }
-
-  return rows;
 }
 
 function serializeManifest(manifest: SfkfManifest) {
@@ -321,6 +289,21 @@ function serializeSources(sources: KnowledgeSource[]) {
       `    license: ${source.license}`,
       `    access_type: ${source.access_type}`,
       `    retrieved_at: ${quote(source.retrieved_at || "")}`,
+    ]),
+    "",
+  ].join("\n");
+}
+
+function serializeLinks(links: KnowledgeEdge[]) {
+  return [
+    "links:",
+    ...links.flatMap((link) => [
+      `  - id: ${quote(link.id)}`,
+      `    source: ${quote(link.source)}`,
+      `    target: ${quote(link.target)}`,
+      `    relation: ${link.relation}`,
+      `    label: ${quote(link.label)}`,
+      `    weight: ${link.weight}`,
     ]),
     "",
   ].join("\n");

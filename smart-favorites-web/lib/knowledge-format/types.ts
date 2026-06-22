@@ -26,6 +26,21 @@ export type KnowledgeNode = {
   content_hash?: string | null;
 };
 
+export type KnowledgeEdgeRelation =
+  | "same_domain"
+  | "same_folder"
+  | "same_language"
+  | "shared_topic";
+
+export type KnowledgeEdge = {
+  id: string;
+  source: string;
+  target: string;
+  relation: KnowledgeEdgeRelation;
+  label: string;
+  weight: number;
+};
+
 export type KnowledgeSource = {
   id: string;
   name: string;
@@ -46,4 +61,3 @@ export type SfkfExport = {
   manifest: SfkfManifest;
   files: SfkfFile[];
 };
-
