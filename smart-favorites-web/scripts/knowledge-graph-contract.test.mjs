@@ -30,6 +30,7 @@ assert.match(types, /same_domain[\s\S]*same_folder[\s\S]*same_language[\s\S]*sha
 assert.match(records, /KNOWLEDGE_PAGE_SIZE[\s\S]*\.range\(offset,\s*offset \+ KNOWLEDGE_PAGE_SIZE - 1\)/, "Knowledge graph data fetches should page through all records.");
 assert.match(links, /export function buildKnowledgeEdges/, "Graph links should be reusable by OKF export.");
 assert.match(links, /export function buildKnowledgeGraph/, "API should use a bounded graph payload builder.");
+assert.match(links, /selectGraphNodes[\s\S]*bookmark[\s\S]*star[\s\S]*document/, "Graph sampling should preserve bookmarks, stars, and documents.");
 assert.match(exporter, /indexes\/links\.yaml[\s\S]*serializeLinks/, "OKF export should include links.yaml.");
 assert.match(route, /buildKnowledgeGraph/, "Graph API should return the shared graph payload.");
 assert.match(route, /fetchAllKnowledgeRows/, "Graph API should use paginated knowledge record loading.");

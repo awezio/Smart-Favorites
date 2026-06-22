@@ -69,9 +69,7 @@ export function buildKnowledgeGraph({
   documents: DocumentRecord[];
 }, options: BuildGraphOptions = {}) {
   const maxNodes = options.maxNodes ?? 280;
-  const nodes = normalizeNodes({ bookmarks, stars, documents })
-    .sort((a, b) => Date.parse(b.created_at || "") - Date.parse(a.created_at || ""))
-    .slice(0, maxNodes);
+  const nodes = selectGraphNodes(normalizeNodes({ bookmarks, stars, documents }), maxNodes);
   const nodeIds = new Set(nodes.map((node) => node.id));
   const edges = linkNodes(nodes).filter(
     (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
@@ -89,6 +87,33 @@ export function buildKnowledgeGraph({
       documentCount: nodes.filter((node) => node.type === "document").length,
     },
   };
+}
+
+function selectGraphNodes(nodes: KnowledgeItemNode[], maxNodes: number) {
+  const sorted = [...nodes].sort(sortRecent);
+  const selected = new Map<string, KnowledgeItemNode>();
+  const budgets = {
+    bookmark: Math.max(20, Math.floor(maxNodes * 0.5)),
+    star: Math.max(10, Math.floor(maxNodes * 0.25)),
+    document: Math.max(10, Math.floor(maxNodes * 0.25)),
+  };
+
+  for (const type of ["bookmark", "star", "document"] as const) {
+    for (const node of sorted.filter((item) => item.type === type).slice(0, budgets[type])) {
+      selected.set(node.id, node);
+    }
+  }
+
+  for (const node of sorted) {
+    if (selected.size >= maxNodes) break;
+    selected.set(node.id, node);
+  }
+
+  return [...selected.values()].sort(sortRecent);
+}
+
+function sortRecent(a: KnowledgeItemNode, b: KnowledgeItemNode) {
+  return Date.parse(b.created_at || "") - Date.parse(a.created_at || "");
 }
 
 function normalizeNodes({

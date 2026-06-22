@@ -14,3 +14,19 @@ export async function insertDocumentChunks(
     throw new Error(error.message);
   }
 }
+
+export async function deleteDocumentChunks(
+  documentId: string,
+  userId: string
+): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("document_chunks")
+    .delete()
+    .eq("document_id", documentId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}

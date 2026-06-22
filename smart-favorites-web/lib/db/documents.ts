@@ -104,13 +104,34 @@ export async function deleteDocument(id: string, userId: string): Promise<void> 
 }
 
 export async function listPendingDocuments(limit: number): Promise<DocumentRecord[]> {
+  return listDocumentsForProcessing({ limit });
+}
+
+export async function listDocumentsForProcessing({
+  limit,
+  userId,
+  documentId,
+}: {
+  limit: number;
+  userId?: string;
+  documentId?: string;
+}): Promise<DocumentRecord[]> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("documents")
     .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+    .in("status", ["pending", "failed"])
+    .order("created_at", { ascending: true });
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  if (documentId) {
+    query = query.eq("id", documentId);
+  }
+
+  const { data, error } = await query.limit(limit);
 
   if (error) {
     throw new Error(error.message);
