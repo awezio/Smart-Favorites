@@ -11,6 +11,7 @@
     "test:chat-sessions": "node scripts/chat-session-opening.test.mjs",
     "test:sync-experience": "node scripts/sync-experience-contract.test.mjs",
     "test:bookmark-parser": "node scripts/bookmark-parser-contract.test.mjs",
+    "test:server-runtime": "node scripts/server-runtime-contract.test.mjs",
     "test:search-experience": "node scripts/search-experience-contract.test.mjs",
     "test:okf-knowledge-format": "node scripts/okf-knowledge-format-contract.test.mjs",
     "test:ai-settings-chat": "node scripts/ai-settings-chat-contract.test.mjs",
