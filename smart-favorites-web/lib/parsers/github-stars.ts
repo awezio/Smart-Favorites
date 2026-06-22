@@ -36,52 +36,60 @@ async function fetchStarsFromGitHub(
   baseUrl: string,
   token?: string
 ): Promise<ParsedStar[]> {
-  const results: ParsedStar[] = [];
-  let page = 1;
   const perPage = 100;
+  const maxPages = 10;
+  const pageResults = await Promise.all(
+    Array.from({ length: maxPages }, (_, index) =>
+      fetchStarPage(baseUrl, index + 1, perPage, token)
+    )
+  );
 
-  while (page <= 10) {
-    const url = new URL(baseUrl);
-    url.searchParams.set("per_page", String(perPage));
-    url.searchParams.set("page", String(page));
-
-    const response = await fetch(url, {
-      headers: buildGitHubHeaders(token),
-    });
-
-    if (!response.ok) {
-      const message = await readGitHubErrorMessage(response);
-      throw new Error(`GitHub API error: ${response.status}${message ? ` - ${message}` : ""}`);
-    }
-
-    const data = (await response.json()) as GitHubRepo[];
-    if (data.length === 0) {
+  const results: ParsedStar[] = [];
+  for (const pageData of pageResults) {
+    if (pageData.length === 0) {
       break;
     }
-
-    for (const repo of data) {
-      results.push({
-        owner: repo.owner.login,
-        repo: repo.name,
-        url: repo.html_url,
-        description: repo.description || "",
-        language: repo.language || "",
-        stars: repo.stargazers_count || 0,
-        forks: repo.forks_count || 0,
-        updated: repo.updated_at,
-        embedding: undefined,
-        source_hash: undefined,
-      });
-    }
-
-    if (data.length < perPage) {
+    results.push(...pageData);
+    if (pageData.length < perPage) {
       break;
     }
-
-    page += 1;
   }
 
   return results;
+}
+
+async function fetchStarPage(
+  baseUrl: string,
+  page: number,
+  perPage: number,
+  token?: string
+): Promise<ParsedStar[]> {
+  const url = new URL(baseUrl);
+  url.searchParams.set("per_page", String(perPage));
+  url.searchParams.set("page", String(page));
+
+  const response = await fetch(url, {
+    headers: buildGitHubHeaders(token),
+  });
+
+  if (!response.ok) {
+    const message = await readGitHubErrorMessage(response);
+    throw new Error(`GitHub API error: ${response.status}${message ? ` - ${message}` : ""}`);
+  }
+
+  const data = (await response.json()) as GitHubRepo[];
+  return data.map((repo) => ({
+    owner: repo.owner.login,
+    repo: repo.name,
+    url: repo.html_url,
+    description: repo.description || "",
+    language: repo.language || "",
+    stars: repo.stargazers_count || 0,
+    forks: repo.forks_count || 0,
+    updated: repo.updated_at,
+    embedding: undefined,
+    source_hash: undefined,
+  }));
 }
 
 export function diffStars(

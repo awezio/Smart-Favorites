@@ -14,6 +14,19 @@ type BookmarkUpdate = Partial<Omit<Bookmark, "id" | "user_id" | "created_at">> &
   updated_at?: string;
 };
 
+const SYNC_BOOKMARK_COLUMNS = "id, user_id, title, url, description, folder_path, add_date, icon";
+const DB_BATCH_SIZE = 200;
+
+async function runInBatches<T>(
+  items: T[],
+  batchSize: number,
+  handler: (batch: T[]) => Promise<void>
+): Promise<void> {
+  for (let index = 0; index < items.length; index += batchSize) {
+    await handler(items.slice(index, index + batchSize));
+  }
+}
+
 export async function getBookmarks(
   limit: number,
   offset: number,
@@ -37,6 +50,41 @@ export async function getBookmarks(
   }
 
   return data as Bookmark[];
+}
+
+export async function getBookmarksForSync(
+  userId: string,
+  client?: SupabaseQueryClient
+): Promise<Bookmark[]> {
+  const supabase = client || createAdminClient();
+  const results: Bookmark[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("bookmarks")
+      .select(SYNC_BOOKMARK_COLUMNS)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + 999);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.length) {
+      break;
+    }
+
+    results.push(...(data as Bookmark[]));
+    if (data.length < 1000) {
+      break;
+    }
+
+    offset += 1000;
+  }
+
+  return results;
 }
 
 export async function createBookmark(
@@ -110,8 +158,50 @@ export async function bulkInsertBookmarks(
   }
 
   const supabase = client || createAdminClient();
-  const { error } = await supabase.from("bookmarks").insert(payload);
-  if (error) {
-    throw new Error(error.message);
+  await runInBatches(payload, DB_BATCH_SIZE, async (batch) => {
+    const { error } = await supabase.from("bookmarks").insert(batch);
+    if (error) {
+      throw new Error(error.message);
+    }
+  });
+}
+
+export async function bulkUpsertBookmarks(
+  payload: Array<BookmarkInsert & { id: string }>,
+  client?: SupabaseQueryClient
+): Promise<void> {
+  if (payload.length === 0) {
+    return;
   }
+
+  const supabase = client || createAdminClient();
+  await runInBatches(payload, DB_BATCH_SIZE, async (batch) => {
+    const { error } = await supabase.from("bookmarks").upsert(batch);
+    if (error) {
+      throw new Error(error.message);
+    }
+  });
+}
+
+export async function bulkDeleteBookmarks(
+  ids: string[],
+  userId: string,
+  client?: SupabaseQueryClient
+): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+
+  const supabase = client || createAdminClient();
+  await runInBatches(ids, DB_BATCH_SIZE, async (batch) => {
+    const { error } = await supabase
+      .from("bookmarks")
+      .delete()
+      .in("id", batch)
+      .eq("user_id", userId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  });
 }

@@ -14,6 +14,20 @@ type StarUpdate = Partial<Omit<GitHubStar, "id" | "user_id" | "created_at">> & {
   updated_at?: string;
 };
 
+const SYNC_STAR_COLUMNS =
+  "id, user_id, url, owner, repo, description, language, stars, forks, updated";
+const DB_BATCH_SIZE = 200;
+
+async function runInBatches<T>(
+  items: T[],
+  batchSize: number,
+  handler: (batch: T[]) => Promise<void>
+): Promise<void> {
+  for (let index = 0; index < items.length; index += batchSize) {
+    await handler(items.slice(index, index + batchSize));
+  }
+}
+
 export async function getStars(
   limit: number,
   offset: number,
@@ -37,6 +51,41 @@ export async function getStars(
   }
 
   return data as GitHubStar[];
+}
+
+export async function getStarsForSync(
+  userId: string,
+  client?: SupabaseQueryClient
+): Promise<GitHubStar[]> {
+  const supabase = client || createAdminClient();
+  const results: GitHubStar[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("github_stars")
+      .select(SYNC_STAR_COLUMNS)
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + 999);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.length) {
+      break;
+    }
+
+    results.push(...(data as GitHubStar[]));
+    if (data.length < 1000) {
+      break;
+    }
+
+    offset += 1000;
+  }
+
+  return results;
 }
 
 export async function createStar(
@@ -110,8 +159,50 @@ export async function bulkInsertStars(
   }
 
   const supabase = client || createAdminClient();
-  const { error } = await supabase.from("github_stars").insert(payload);
-  if (error) {
-    throw new Error(error.message);
+  await runInBatches(payload, DB_BATCH_SIZE, async (batch) => {
+    const { error } = await supabase.from("github_stars").insert(batch);
+    if (error) {
+      throw new Error(error.message);
+    }
+  });
+}
+
+export async function bulkUpsertStars(
+  payload: Array<StarInsert & { id: string }>,
+  client?: SupabaseQueryClient
+): Promise<void> {
+  if (payload.length === 0) {
+    return;
   }
+
+  const supabase = client || createAdminClient();
+  await runInBatches(payload, DB_BATCH_SIZE, async (batch) => {
+    const { error } = await supabase.from("github_stars").upsert(batch);
+    if (error) {
+      throw new Error(error.message);
+    }
+  });
+}
+
+export async function bulkDeleteStars(
+  ids: string[],
+  userId: string,
+  client?: SupabaseQueryClient
+): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+
+  const supabase = client || createAdminClient();
+  await runInBatches(ids, DB_BATCH_SIZE, async (batch) => {
+    const { error } = await supabase
+      .from("github_stars")
+      .delete()
+      .in("id", batch)
+      .eq("user_id", userId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  });
 }

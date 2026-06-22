@@ -21,6 +21,24 @@ function loadBookmarkParser() {
   const module = { exports: {} };
   const sandboxRequire = (id) => {
     if (id === "cheerio") return require("cheerio");
+    if (id === "@/lib/utils/timestamp") {
+      const timestampPath = join(repoRoot, "lib", "utils", "timestamp.ts");
+      const timestampSource = readFileSync(timestampPath, "utf8");
+      const timestampCompiled = ts.transpileModule(timestampSource, {
+        compilerOptions: {
+          module: ts.ModuleKind.CommonJS,
+          target: ts.ScriptTarget.ES2022,
+          esModuleInterop: true,
+        },
+      }).outputText;
+      const timestampModule = { exports: {} };
+      vm.runInNewContext(timestampCompiled, {
+        exports: timestampModule.exports,
+        module: timestampModule,
+        require: sandboxRequire,
+      });
+      return timestampModule.exports;
+    }
     return require(id);
   };
 
@@ -67,6 +85,19 @@ assert.deepEqual(
     ["Nested Example", "https://nested.example.com", "/Toolbar/Nested"],
   ],
   "Parser should preserve nested folder paths from extension HTML.",
+);
+
+const exampleBookmark = parsed.find((bookmark) => bookmark.url === "https://example.com");
+assert.ok(exampleBookmark?.add_date, "Parser should convert ADD_DATE to ISO timestamps.");
+assert.match(
+  exampleBookmark?.add_date || "",
+  /^\d{4}-\d{2}-\d{2}T/,
+  "ADD_DATE should be stored as ISO 8601 for PostgreSQL timestamptz.",
+);
+assert.notEqual(
+  exampleBookmark?.add_date,
+  "1782090000",
+  "Raw Unix ADD_DATE must not be passed through to the database layer.",
 );
 
 console.log("bookmark parser contract passed");

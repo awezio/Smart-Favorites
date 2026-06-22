@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { Bookmark, DiffResult } from "@/types";
+import { parseNetscapeTimestamp } from "@/lib/utils/timestamp";
 
 export type ParsedBookmark = {
   title: string;
@@ -52,11 +53,12 @@ export function parseBookmarksHtml(htmlContent: string): ParsedBookmark[] {
           return;
         }
 
+        const rawAddDate = link.attr("add_date") || undefined;
         results.push({
           title: title || url,
           url,
           folder_path: basePath === "/" ? "" : basePath,
-          add_date: link.attr("add_date") || undefined,
+          add_date: parseNetscapeTimestamp(rawAddDate),
           icon: link.attr("icon") || undefined,
         });
       }

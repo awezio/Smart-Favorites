@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseBookmarksHtml, diffBookmarks } from "@/lib/parsers/bookmark-parser";
-import { bulkInsertBookmarks, getBookmarks, updateBookmark, deleteBookmark } from "@/lib/db/bookmarks";
+import { bulkInsertBookmarks, bulkUpsertBookmarks, bulkDeleteBookmarks, getBookmarksForSync } from "@/lib/db/bookmarks";
 import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       : await createServerSupabaseClient();
 
     // Get existing bookmarks for this user
-    const existingBookmarks = await getBookmarks(10000, 0, userId, supabase);
+    const existingBookmarks = await getBookmarksForSync(userId, supabase);
 
     // Convert parsed bookmarks to Bookmark format for diff
     const newBookmarks = parsedBookmarks.map(pb => ({
@@ -61,27 +61,33 @@ export async function POST(request: NextRequest) {
     }));
 
     if (addedBookmarks.length > 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'bookmarks/sync/route.ts:bulkInsert',message:'bookmark sync insert sample',data:{count:addedBookmarks.length,sampleAddDates:addedBookmarks.slice(0,3).map((b)=>b.add_date)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       await bulkInsertBookmarks(addedBookmarks as any, supabase);
     }
 
-    // Process modifications
-    for (const { old: oldBookmark, new: newBookmark } of diff.modified) {
-      await updateBookmark(
-        oldBookmark.id,
-        {
-          title: newBookmark.title,
-          url: newBookmark.url,
-          description: newBookmark.description,
-          folder_path: newBookmark.folder_path,
-        },
+    if (diff.modified.length > 0) {
+      const modifiedBookmarks = diff.modified.map(({ old: oldBookmark, new: newBookmark }) => ({
+        id: oldBookmark.id,
+        user_id: userId,
+        title: newBookmark.title,
+        url: newBookmark.url,
+        description: newBookmark.description,
+        folder_path: newBookmark.folder_path,
+        add_date: newBookmark.add_date,
+        icon: newBookmark.icon,
+        updated_at: new Date().toISOString(),
+      }));
+      await bulkUpsertBookmarks(modifiedBookmarks as any, supabase);
+    }
+
+    if (diff.removed.length > 0) {
+      await bulkDeleteBookmarks(
+        diff.removed.map((bookmark) => bookmark.id),
         userId,
         supabase
       );
-    }
-
-    // Process removals
-    for (const bookmark of diff.removed) {
-      await deleteBookmark(bookmark.id, userId, supabase);
     }
 
     const totalImported = diff.added.length + diff.modified.length;
@@ -98,6 +104,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Bookmark sync error:", error);
+    // #region agent log
+    fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'bookmarks/sync/route.ts:catch',message:'bookmark sync error',data:{errorMessage:error?.message||String(error)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     return NextResponse.json(
       { error: error.message || "Sync failed" },
       { status: 500 }

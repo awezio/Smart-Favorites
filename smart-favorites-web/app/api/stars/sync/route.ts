@@ -4,7 +4,7 @@ import {
   fetchAuthenticatedUserStars,
   fetchUserStars,
 } from "@/lib/parsers/github-stars";
-import { bulkInsertStars, getStars, updateStar, deleteStar } from "@/lib/db/github-stars";
+import { bulkInsertStars, bulkUpsertStars, bulkDeleteStars, getStarsForSync } from "@/lib/db/github-stars";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         : await fetchUserStars(credentials.username!, credentials.token);
 
     // Get existing stars for this user
-    const existingStars = await getStars(10000, 0, userId, supabase);
+    const existingStars = await getStarsForSync(userId, supabase);
 
     // Perform diff
     const diff = diffStars(existingStars, fetchedStars);
@@ -82,31 +82,35 @@ export async function POST(request: NextRequest) {
     }));
 
     if (addedStars.length > 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'stars/sync/route.ts:bulkInsert',message:'stars sync insert sample',data:{count:addedStars.length,sampleUpdated:addedStars.slice(0,3).map((s)=>s.updated),fetchedCount:fetchedStars.length},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       await bulkInsertStars(addedStars as any, supabase);
     }
 
-    // Process modifications
-    for (const { old: oldStar, new: newStar } of diff.modified) {
-      await updateStar(
-        oldStar.id,
-        {
-          owner: newStar.owner,
-          repo: newStar.repo,
-          url: newStar.url,
-          description: newStar.description,
-          language: newStar.language,
-          stars: newStar.stars,
-          forks: newStar.forks,
-          updated: newStar.updated,
-        },
+    if (diff.modified.length > 0) {
+      const modifiedStars = diff.modified.map(({ old: oldStar, new: newStar }) => ({
+        id: oldStar.id,
+        user_id: userId,
+        owner: newStar.owner,
+        repo: newStar.repo,
+        url: newStar.url,
+        description: newStar.description,
+        language: newStar.language,
+        stars: newStar.stars,
+        forks: newStar.forks,
+        updated: newStar.updated,
+        updated_at: new Date().toISOString(),
+      }));
+      await bulkUpsertStars(modifiedStars as any, supabase);
+    }
+
+    if (diff.removed.length > 0) {
+      await bulkDeleteStars(
+        diff.removed.map((star) => star.id),
         userId,
         supabase
       );
-    }
-
-    // Process removals
-    for (const star of diff.removed) {
-      await deleteStar(star.id, userId, supabase);
     }
 
     return NextResponse.json({
@@ -120,6 +124,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Stars sync error:", error);
+    // #region agent log
+    fetch('http://127.0.0.1:7392/ingest/f8b1936f-fed7-4572-ac24-448b5672c1e9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d21e4d'},body:JSON.stringify({sessionId:'d21e4d',location:'stars/sync/route.ts:catch',message:'stars sync error',data:{errorMessage:error?.message||String(error)},timestamp:Date.now(),hypothesisId:'B,C,E'})}).catch(()=>{});
+    // #endregion
     return NextResponse.json(
       { error: error.message || "Sync failed" },
       { status: 500 }
