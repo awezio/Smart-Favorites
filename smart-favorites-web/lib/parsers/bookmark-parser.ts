@@ -19,6 +19,12 @@ export function parseBookmarksHtml(htmlContent: string): ParsedBookmark[] {
 
   const results: ParsedBookmark[] = [];
 
+  function joinFolderPath(basePath: string, folderName: string) {
+    if (!folderName) return basePath;
+    if (!basePath || basePath === "/") return `/${folderName}`;
+    return `${basePath}/${folderName}`;
+  }
+
   function walkDl(dl: cheerio.Cheerio<any>, basePath: string) {
     dl.children("dt").each((_: number, dt: any) => {
       const dtNode = $(dt);
@@ -27,13 +33,14 @@ export function parseBookmarksHtml(htmlContent: string): ParsedBookmark[] {
 
       if (h3.length) {
         const folderName = h3.text().trim();
-        const nextDl = dtNode.next("dl");
-        const folderPath = folderName
-          ? `${basePath}/${folderName}`
-          : basePath;
+        const nestedDl = dtNode.children("dl").first();
+        const siblingDl = dtNode.next("dl").first();
+        const folderPath = joinFolderPath(basePath, folderName);
 
-        if (nextDl.length) {
-          walkDl(nextDl, folderPath);
+        if (nestedDl.length) {
+          walkDl(nestedDl, folderPath);
+        } else if (siblingDl.length) {
+          walkDl(siblingDl, folderPath);
         }
         return;
       }
