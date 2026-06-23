@@ -23,6 +23,18 @@ assert.match(
 
 assert.match(
   rootLayout,
+  /<html[^>]*className=["']light["']/,
+  "Root layout should render the default light html class on the server to match the first hydrated theme state."
+);
+
+assert.match(
+  rootLayout,
+  /style=\{\{\s*colorScheme:\s*["']light["']\s*\}\}/,
+  "Root layout should render the default light color-scheme on the server to match the first hydrated theme state."
+);
+
+assert.match(
+  rootLayout,
   /data-immersive-translate-/,
   "Hydration sanitizer should remove observed immersive-translate html attributes."
 );
