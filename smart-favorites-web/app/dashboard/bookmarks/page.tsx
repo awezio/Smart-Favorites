@@ -171,14 +171,26 @@ export default function BookmarksPage() {
 
     async function detectExtension() {
       setCheckingExtension(true);
-      const detected = await pingInstalledExtension();
-      if (cancelled) {
-        return;
-      }
+      try {
+        const detected = await pingInstalledExtension();
+        if (cancelled) {
+          return;
+        }
 
-      setExtensionId(detected?.extensionId ?? null);
-      setExtensionVersion(detected?.version ?? null);
-      setCheckingExtension(false);
+        setExtensionId(detected?.extensionId ?? null);
+        setExtensionVersion(detected?.version ?? null);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setExtensionId(null);
+        setExtensionVersion(null);
+      } finally {
+        if (!cancelled) {
+          setCheckingExtension(false);
+        }
+      }
     }
 
     detectExtension();

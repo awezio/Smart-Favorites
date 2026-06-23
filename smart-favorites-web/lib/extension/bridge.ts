@@ -18,16 +18,25 @@ export type ExtensionSyncResult = {
   error?: string;
 };
 
+const EXTENSION_MESSAGE_TIMEOUT_MS = 2500;
+const DEFAULT_EXTENSION_IDS = [
+  "iikmkjmpaadaobahmlepeloendndfphd",
+  "bmmjjmpmhadcoebhenfhielebpollmnn",
+];
+
 function getConfiguredExtensionIds(): string[] {
-  const raw =
+  const configured =
     process.env.NEXT_PUBLIC_SMART_FAVORITES_EXTENSION_IDS ||
     process.env.NEXT_PUBLIC_SMART_FAVORITES_EXTENSION_ID ||
-    "bmmjjmpmhadcoebhenfhielebpollmnn";
+    "";
 
-  return raw
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  return Array.from(
+    new Set(
+      [...configured.split(","), ...DEFAULT_EXTENSION_IDS]
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 function getChromeRuntime(): ChromeRuntime | null {
@@ -49,16 +58,34 @@ function sendExtensionMessage<T>(
   }
 
   return new Promise((resolve) => {
+    let settled = false;
+    let timeoutId: number | undefined;
+    const finish = (value: T | null) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      resolve(value);
+    };
+
+    timeoutId = window.setTimeout(() => {
+      finish(null);
+    }, EXTENSION_MESSAGE_TIMEOUT_MS);
+
     try {
       runtime.sendMessage(extensionId, message, (response) => {
         if (runtime.lastError) {
-          resolve(null);
+          finish(null);
           return;
         }
-        resolve(response as T);
+        finish(response as T);
       });
     } catch {
-      resolve(null);
+      finish(null);
     }
   });
 }

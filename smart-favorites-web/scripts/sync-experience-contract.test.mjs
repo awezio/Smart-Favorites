@@ -87,6 +87,31 @@ assert.match(
   "Extension background should answer web-page ping requests for install detection."
 );
 assert.match(
+  extensionBridge,
+  /EXTENSION_MESSAGE_TIMEOUT_MS/,
+  "Web-to-extension messages should have a timeout so extension detection never stays loading forever."
+);
+assert.match(
+  extensionBridge,
+  /window\.setTimeout/,
+  "Web-to-extension message timeout should settle missing extension responses."
+);
+assert.match(
+  extensionBridge,
+  /window\.clearTimeout/,
+  "Web-to-extension message timeout should be cleared after a real extension response."
+);
+assert.match(
+  extensionBridge,
+  /iikmkjmpaadaobahmlepeloendndfphd/,
+  "Default extension detection should include the currently installed development extension ID."
+);
+assert.match(
+  bookmarksPage,
+  /finally\s*\{[\s\S]*setCheckingExtension\(false\)/,
+  "Bookmarks page should always leave extension detection state, even if ping fails or times out."
+);
+assert.match(
   extensionBackground,
   /action === 'triggerSync'/,
   "Extension background should allow the web page to trigger bookmark sync directly."
