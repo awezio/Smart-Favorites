@@ -124,13 +124,13 @@ async function resolveProviderKey(userId: string, provider: string) {
 }
 
 function buildRagPrompt(query: string, sources: SearchResult[]) {
-  const evidence = sources.slice(0, 8).map((source, index) => {
+  const evidence = sources.slice(0, 12).map((source, index) => {
     if (source.type === "bookmark" && source.bookmark) {
-      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nDescription: ${source.bookmark.description || ""}`;
+      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nFolder: ${source.bookmark.folder_path || ""}\nDescription: ${source.bookmark.description_zh || source.bookmark.description || source.bookmark.description_en || ""}`;
     }
 
     if (source.type === "star" && source.star) {
-      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description || ""}`;
+      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description_zh || source.star.description || source.star.description_en || ""}`;
     }
 
     if (source.type === "document" && source.document) {
@@ -146,7 +146,7 @@ function buildRagPrompt(query: string, sources: SearchResult[]) {
     return `${index + 1}. ${source.id}`;
   });
 
-  return `Question: ${query}\n\nPersonal knowledge evidence:\n${evidence.join("\n\n") || "No matching evidence."}\n\nAnswer in the user's language. Include concrete item names and URLs when useful.`;
+  return `Question: ${query}\n\nPersonal knowledge evidence:\n${evidence.join("\n\n") || "No matching evidence."}\n\nAnswer in the user's language. If the user asks to find, search, or list saved resources, enumerate the most relevant evidence with concrete item names and URLs. Do not say no matching items were found when evidence is present; instead explain any uncertainty briefly.`;
 }
 
 async function logAiCall({
@@ -192,7 +192,7 @@ function buildFallbackAnswer(
     return `${historyHint}我现在无法连接所选模型。你可以稍后重试，或切换到另一个已配置模型。`;
   }
 
-  const topLines = sources.slice(0, 3).map((source, index) => {
+  const topLines = sources.slice(0, 8).map((source, index) => {
     if (source.type === "bookmark" && source.bookmark) {
       return `${index + 1}. ${source.bookmark.title} (${source.bookmark.url})`;
     }

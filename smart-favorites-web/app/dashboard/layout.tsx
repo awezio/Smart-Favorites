@@ -52,6 +52,7 @@ export default function DashboardLayout({
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const supabase = useMemo(() => createClient(), []);
+  const isChatPage = pathname.startsWith("/dashboard/chat");
 
   useEffect(() => {
     const getUser = async () => {
@@ -246,7 +247,9 @@ export default function DashboardLayout({
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto max-w-6xl p-6">{children}</div>
+          <div className={cn(isChatPage ? "h-full" : "container mx-auto max-w-6xl p-6")}>
+            {children}
+          </div>
         </main>
       </div>
     </div>

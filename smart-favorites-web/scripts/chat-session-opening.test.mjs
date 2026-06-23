@@ -21,8 +21,14 @@ assert.match(
 
 assert.match(
   source,
-  /onClick=\{\(\)\s*=>\s*\{\s*openSession\(session\);?\s*\}\s*\}/s,
-  "The conversation list item click handler should call openSession(session)."
+  /onOpenSession=\{openSession\}/,
+  "Chat page should pass openSession into the conversation sidebar."
+);
+
+assert.match(
+  source,
+  /onOpen=\{\(\)\s*=>\s*onOpenSession\(session\)\}/,
+  "The conversation list row should call onOpenSession(session)."
 );
 
 assert.doesNotMatch(

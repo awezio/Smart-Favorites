@@ -76,8 +76,18 @@ assert.match(
 );
 assert.match(
   searchLib,
-  /searchDocuments\(query, topK, threshold, userId, client\)/,
-  "Unified search should include document results."
+  /searchDocuments\(query, perTypeLimit, threshold, userId, client\)/,
+  "Unified search should include document results with the expanded per-type limit."
+);
+assert.match(
+  searchLib,
+  /searchBookmarksByDirectMatch/,
+  "Search should include direct bookmark field matching for short domain queries such as 3D."
+);
+assert.match(
+  searchLib,
+  /description_zh|description_en/,
+  "Search should consider bilingual descriptions during direct matching."
 );
 assert.match(
   searchLib,

@@ -4,6 +4,7 @@ import type { SearchResult } from "@/types";
 
 export type SupabaseQueryClient = {
   rpc: ReturnType<typeof createAdminClient>["rpc"];
+  from: ReturnType<typeof createAdminClient>["from"];
 };
 
 export async function searchBookmarks(
@@ -14,12 +15,13 @@ export async function searchBookmarks(
   client?: SupabaseQueryClient
 ): Promise<SearchResult[]> {
   const supabase = client || createAdminClient();
-  const [semantic, keyword] = await Promise.all([
+  const results = await Promise.allSettled([
     searchBookmarksByEmbedding(supabase, query, topK, threshold, userId),
     searchBookmarksByKeyword(supabase, query, topK, userId),
+    searchBookmarksByDirectMatch(supabase, query, topK, userId),
   ]);
 
-  return mergeSearchResults([...semantic, ...keyword], topK);
+  return mergeSearchResults(flattenSettledResults(results), topK);
 }
 
 export async function searchStars(
@@ -30,12 +32,13 @@ export async function searchStars(
   client?: SupabaseQueryClient
 ): Promise<SearchResult[]> {
   const supabase = client || createAdminClient();
-  const [semantic, keyword] = await Promise.all([
+  const results = await Promise.allSettled([
     searchStarsByEmbedding(supabase, query, topK, threshold, userId),
     searchStarsByKeyword(supabase, query, topK, userId),
+    searchStarsByDirectMatch(supabase, query, topK, userId),
   ]);
 
-  return mergeSearchResults([...semantic, ...keyword], topK);
+  return mergeSearchResults(flattenSettledResults(results), topK);
 }
 
 export async function searchDocuments(
@@ -72,10 +75,11 @@ export async function searchAll(
   userId?: string,
   client?: SupabaseQueryClient
 ): Promise<SearchResult[]> {
+  const perTypeLimit = Math.max(topK, 12);
   const [bookmarksResult, starsResult, documentsResult] = await Promise.allSettled([
-    searchBookmarks(query, topK, threshold, userId, client),
-    searchStars(query, topK, threshold, userId, client),
-    searchDocuments(query, topK, threshold, userId, client),
+    searchBookmarks(query, perTypeLimit, threshold, userId, client),
+    searchStars(query, perTypeLimit, threshold, userId, client),
+    searchDocuments(query, perTypeLimit, threshold, userId, client),
   ]);
 
   // Each search type degrades independently so one missing RPC
@@ -179,6 +183,63 @@ async function searchBookmarksByKeyword(
   );
 }
 
+async function searchBookmarksByDirectMatch(
+  supabase: SupabaseQueryClient,
+  query: string,
+  topK: number,
+  userId?: string
+): Promise<SearchResult[]> {
+  const terms = extractLexicalSearchTerms(query);
+  if (terms.length === 0) {
+    return [];
+  }
+
+  const orFilter = terms
+    .flatMap((term) => [
+      `title.ilike.%${escapeIlikeTerm(term)}%`,
+      `url.ilike.%${escapeIlikeTerm(term)}%`,
+      `description.ilike.%${escapeIlikeTerm(term)}%`,
+      `description_zh.ilike.%${escapeIlikeTerm(term)}%`,
+      `description_en.ilike.%${escapeIlikeTerm(term)}%`,
+      `folder_path.ilike.%${escapeIlikeTerm(term)}%`,
+    ])
+    .join(",");
+
+  let request = supabase
+    .from("bookmarks")
+    .select(
+      "id,user_id,title,url,description,description_zh,description_en,description_metadata,folder_path,add_date,icon,created_at,updated_at"
+    )
+    .or(orFilter)
+    .limit(Math.max(topK * 3, 24));
+
+  if (userId) {
+    request = request.eq("user_id", userId);
+  }
+
+  const { data, error } = await request;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data || []) as Array<any>)
+    .map((row) =>
+      toBookmarkResult({
+        ...row,
+        similarity: scoreDirectMatch(query, terms, [
+          row.title,
+          row.url,
+          row.description,
+          row.description_zh,
+          row.description_en,
+          row.folder_path,
+        ]),
+      })
+    )
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, topK);
+}
+
 async function searchStarsByKeyword(
   supabase: SupabaseQueryClient,
   query: string,
@@ -198,6 +259,65 @@ async function searchStarsByKeyword(
   return ((data || []) as Array<any>).map((row) =>
     toStarResult({ ...row, similarity: row.rank ?? 0.5 })
   );
+}
+
+async function searchStarsByDirectMatch(
+  supabase: SupabaseQueryClient,
+  query: string,
+  topK: number,
+  userId?: string
+): Promise<SearchResult[]> {
+  const terms = extractLexicalSearchTerms(query);
+  if (terms.length === 0) {
+    return [];
+  }
+
+  const orFilter = terms
+    .flatMap((term) => [
+      `owner.ilike.%${escapeIlikeTerm(term)}%`,
+      `repo.ilike.%${escapeIlikeTerm(term)}%`,
+      `url.ilike.%${escapeIlikeTerm(term)}%`,
+      `description.ilike.%${escapeIlikeTerm(term)}%`,
+      `description_zh.ilike.%${escapeIlikeTerm(term)}%`,
+      `description_en.ilike.%${escapeIlikeTerm(term)}%`,
+      `language.ilike.%${escapeIlikeTerm(term)}%`,
+    ])
+    .join(",");
+
+  let request = supabase
+    .from("github_stars")
+    .select(
+      "id,user_id,owner,repo,url,description,description_zh,description_en,description_metadata,language,stars,forks,updated,created_at,updated_at"
+    )
+    .or(orFilter)
+    .limit(Math.max(topK * 3, 24));
+
+  if (userId) {
+    request = request.eq("user_id", userId);
+  }
+
+  const { data, error } = await request;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data || []) as Array<any>)
+    .map((row) =>
+      toStarResult({
+        ...row,
+        similarity: scoreDirectMatch(query, terms, [
+          row.owner,
+          row.repo,
+          row.url,
+          row.description,
+          row.description_zh,
+          row.description_en,
+          row.language,
+        ]),
+      })
+    )
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, topK);
 }
 
 async function searchDocumentsByKeyword(
@@ -220,6 +340,93 @@ async function searchDocumentsByKeyword(
     toDocumentResult({ ...row, similarity: row.rank ?? row.similarity ?? 0.5 })
   );
 }
+
+function flattenSettledResults(
+  results: PromiseSettledResult<SearchResult[]>[]
+): SearchResult[] {
+  return results.flatMap((result) =>
+    result.status === "fulfilled" ? result.value : []
+  );
+}
+
+function extractLexicalSearchTerms(query: string): string[] {
+  const normalized = query.trim().toLowerCase();
+  const terms = new Set<string>();
+
+  for (const match of normalized.matchAll(/[a-z0-9][a-z0-9.+#-]*/gi)) {
+    const term = match[0].toLowerCase();
+    if (term.length >= 2 && !ENGLISH_STOP_WORDS.has(term)) {
+      terms.add(term);
+    }
+  }
+
+  for (const term of CHINESE_DOMAIN_TERMS) {
+    if (normalized.includes(term.toLowerCase())) {
+      terms.add(term);
+    }
+  }
+
+  if (normalized.includes("3d") || normalized.includes("3D".toLowerCase())) {
+    terms.add("3d");
+  }
+
+  return Array.from(terms).slice(0, 8);
+}
+
+function escapeIlikeTerm(term: string): string {
+  return term.replace(/[%_,]/g, "");
+}
+
+function scoreDirectMatch(
+  query: string,
+  terms: string[],
+  fields: Array<string | null | undefined>
+): number {
+  const haystack = fields.filter(Boolean).join(" ").toLowerCase();
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchedTerms = terms.filter((term) => haystack.includes(term.toLowerCase()));
+  if (matchedTerms.length === 0) {
+    return 0.4;
+  }
+
+  const coverage = matchedTerms.length / Math.max(terms.length, 1);
+  const exactQueryBoost =
+    normalizedQuery.length >= 2 && haystack.includes(normalizedQuery) ? 0.08 : 0;
+  const compactQueryBoost =
+    normalizedQuery.includes("3d") && /3d|3d模型|3d建模/i.test(haystack) ? 0.08 : 0;
+
+  return Math.min(0.98, 0.72 + coverage * 0.14 + exactQueryBoost + compactQueryBoost);
+}
+
+const ENGLISH_STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "find",
+  "search",
+  "bookmarks",
+  "bookmark",
+  "my",
+  "about",
+  "related",
+]);
+
+const CHINESE_DOMAIN_TERMS = [
+  "3D",
+  "3d",
+  "建模",
+  "模型",
+  "渲染",
+  "纹理",
+  "材质",
+  "贴图",
+  "动画",
+  "点云",
+  "生成器",
+  "设计",
+];
 
 function mergeSearchResults(results: SearchResult[], topK: number): SearchResult[] {
   const merged = new Map<string, SearchResult>();
@@ -249,6 +456,9 @@ function toBookmarkResult(row: any): SearchResult {
       title: row.title,
       url: row.url,
       description: row.description,
+      description_zh: row.description_zh,
+      description_en: row.description_en,
+      description_metadata: row.description_metadata,
       folder_path: row.folder_path,
       add_date: row.add_date,
       icon: row.icon,
@@ -271,6 +481,9 @@ function toStarResult(row: any): SearchResult {
       repo: row.repo,
       url: row.url,
       description: row.description,
+      description_zh: row.description_zh,
+      description_en: row.description_en,
+      description_metadata: row.description_metadata,
       language: row.language,
       stars: row.stars,
       forks: row.forks,

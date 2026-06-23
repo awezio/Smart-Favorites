@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const result = await ragChat(
       query,
       chatHistory,
-      5,
+      12,
       userId,
       providerOverride,
       modelOverride,
