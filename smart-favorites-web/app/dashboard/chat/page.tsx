@@ -211,7 +211,9 @@ export default function ChatPage() {
       const missingModelProviders = configured.filter(
         (provider) => !savedProviderModels[provider]?.length
       );
-      await Promise.all(missingModelProviders.map((provider) => loadProviderModels(provider)));
+      void Promise.allSettled(
+        missingModelProviders.map((provider) => loadProviderModels(provider))
+      );
     } catch (error) {
       console.error("Failed to load AI settings:", error);
     }
@@ -225,14 +227,19 @@ export default function ChatPage() {
   useEffect(() => {
     async function init() {
       setInitializing(true);
-      await loadAiSettings();
-      const list = await loadSessions();
-      if (list.length > 0) {
-        await openSession(list[0]);
-      } else {
-        await createNewSession();
+      try {
+        await loadAiSettings();
+        const list = await loadSessions();
+        if (list.length > 0) {
+          void openSession(list[0]);
+        } else {
+          void createNewSession();
+        }
+      } catch (error) {
+        console.error("Failed to initialize chat page:", error);
+      } finally {
+        setInitializing(false);
       }
-      setInitializing(false);
     }
 
     init();

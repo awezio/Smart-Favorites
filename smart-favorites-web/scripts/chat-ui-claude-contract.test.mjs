@@ -49,6 +49,16 @@ assert.match(
   /knowledgeModeLabels/,
   "Composer should expose knowledge routing controls."
 );
+assert.doesNotMatch(
+  chatPage,
+  /await Promise\.all\(missingModelProviders/,
+  "Chat initialization should not block first render on external provider model refreshes."
+);
+assert.match(
+  chatPage,
+  /finally\s*{[\s\S]*setInitializing\(false\);[\s\S]*}/,
+  "Chat initialization should always release the loading state."
+);
 assert.match(
   dashboardLayout,
   /isChatPage[\s\S]*h-full/,
