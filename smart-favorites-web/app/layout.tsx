@@ -24,6 +24,7 @@ const rootHydrationSanitizerScript = `
 (() => {
   const htmlAttributePrefixes = ["data-immersive-translate-"];
   const bodyAttributePrefixes = ["youmind-"];
+  const randomTokenPattern = /^[a-z0-9]{8,}$/i;
 
   const removeMatchingAttributes = (node, prefixes) => {
     if (!node || !node.attributes) return;
@@ -34,19 +35,61 @@ const rootHydrationSanitizerScript = `
     }
   };
 
+  const isKnownExtensionOverlay = (node) => {
+    if (!(node instanceof HTMLElement) || node.tagName !== "DIV") return false;
+
+    const inlineStyle = node.getAttribute("style") || "";
+    const className = typeof node.className === "string" ? node.className.trim() : "";
+    const hasRandomSignature =
+      randomTokenPattern.test(node.id || "") && randomTokenPattern.test(className);
+    const hasFloatingOverlayStyle =
+      inlineStyle.includes("position: fixed") &&
+      inlineStyle.includes("z-index: 100000") &&
+      (inlineStyle.includes("width: 369px") ||
+        inlineStyle.includes("right: 100px") ||
+        inlineStyle.includes("top: 150px"));
+
+    return hasRandomSignature && hasFloatingOverlayStyle;
+  };
+
+  const removeKnownInjectedNodes = (root) => {
+    if (!root) return;
+    if (isKnownExtensionOverlay(root)) {
+      root.remove();
+      return;
+    }
+
+    if (!root.querySelectorAll) return;
+    for (const node of Array.from(root.querySelectorAll("div[style]"))) {
+      if (isKnownExtensionOverlay(node)) {
+        node.remove();
+      }
+    }
+  };
+
   const clean = () => {
     removeMatchingAttributes(document.documentElement, htmlAttributePrefixes);
     removeMatchingAttributes(document.body, bodyAttributePrefixes);
+    removeKnownInjectedNodes(document.documentElement);
   };
 
   clean();
   const observer = new MutationObserver(clean);
-  observer.observe(document.documentElement, { attributes: true });
+  observer.observe(document.documentElement, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+  });
 
   const observeBody = () => {
     if (!document.body) return;
     removeMatchingAttributes(document.body, bodyAttributePrefixes);
-    observer.observe(document.body, { attributes: true });
+    removeKnownInjectedNodes(document.body);
+    observer.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
   };
 
   observeBody();
