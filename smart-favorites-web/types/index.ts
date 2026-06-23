@@ -104,10 +104,17 @@ export interface ChatSession {
   updated_at: string;
 }
 
+export interface ChatRoutingMetadata {
+  mode: "chat" | "knowledge";
+  useKnowledge: boolean;
+  reason: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   sources?: SearchResult[];
+  routing?: ChatRoutingMetadata;
   timestamp: string;
 }
 

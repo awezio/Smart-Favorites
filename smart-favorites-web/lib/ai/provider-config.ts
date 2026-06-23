@@ -26,6 +26,18 @@ export type ProviderConfig = {
   envKey?: string;
 };
 
+export class ProviderApiError extends Error {
+  status: number;
+  body: string;
+
+  constructor(status: number, body: string) {
+    super(`API 错误 (${status})`);
+    this.name = "ProviderApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 export const PROVIDER_ENDPOINTS: Record<string, ProviderConfig> = Object.fromEntries(
   Object.values(PROVIDER_MAP).map((provider) => [
     provider.id,
@@ -193,6 +205,11 @@ function toProviderMessages(messages: LLMMessage[]) {
   }));
 }
 
+async function throwProviderApiError(response: Response): Promise<never> {
+  const body = (await response.text()).slice(0, 1000);
+  throw new ProviderApiError(response.status, body);
+}
+
 export async function callProviderChat({
   provider,
   apiKey,
@@ -229,7 +246,7 @@ export async function callProviderChat({
       }),
       signal: AbortSignal.timeout(30000),
     });
-    if (!response.ok) throw new Error(`API 错误 (${response.status})`);
+    if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
     return {
       content: data.message?.content || data.response || "",
@@ -258,7 +275,7 @@ export async function callProviderChat({
       }),
       signal: AbortSignal.timeout(30000),
     });
-    if (!response.ok) throw new Error(`API 错误 (${response.status}): ${(await response.text()).slice(0, 200)}`);
+    if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
     const text = (data.content || []).map((part: any) => part.text || "").join("");
     return { content: text, model: selectedModel, usage: data.usage };
@@ -285,7 +302,7 @@ export async function callProviderChat({
         signal: AbortSignal.timeout(30000),
       }
     );
-    if (!response.ok) throw new Error(`API 错误 (${response.status}): ${(await response.text()).slice(0, 200)}`);
+    if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
     const content = (data.candidates?.[0]?.content?.parts || [])
       .map((part: any) => part.text || "")
@@ -307,7 +324,7 @@ export async function callProviderChat({
       }),
       signal: AbortSignal.timeout(30000),
     });
-    if (!response.ok) throw new Error(`API 错误 (${response.status}): ${(await response.text()).slice(0, 200)}`);
+    if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
     const content = Array.isArray(data.message?.content)
       ? data.message.content.map((part: any) => part.text || "").join("")
@@ -334,7 +351,7 @@ export async function callProviderChat({
 
   const latency = Date.now() - start;
   if (!response.ok) {
-    throw new Error(`API 错误 (${response.status}): ${(await response.text()).slice(0, 200)}`);
+    await throwProviderApiError(response);
   }
 
   const data = await response.json();

@@ -1,12 +1,23 @@
 import { searchAll, type SupabaseQueryClient } from "@/lib/rag/search";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callProviderChat, getEnvProviderKey, isSupportedProvider } from "@/lib/ai/provider-config";
+import {
+  ProviderApiError,
+  callProviderChat,
+  getEnvProviderKey,
+  isSupportedProvider,
+} from "@/lib/ai/provider-config";
+import { classifyChatRoute, type ChatKnowledgeMode, type ChatRoutingMetadata } from "@/lib/chat/routing";
 import { decryptSecret } from "@/lib/server/secrets";
 import type { SearchResult, LLMMessage } from "@/types";
 
 type RagResponse = {
   answer: string;
   sources: SearchResult[];
+  routing: ChatRoutingMetadata;
+  error?: {
+    type: "rate_limited" | "provider_error";
+    message: string;
+  };
 };
 
 export async function ragChat(
@@ -16,9 +27,14 @@ export async function ragChat(
   userId: string,
   provider?: string,
   model?: string,
-  client?: SupabaseQueryClient
+  client?: SupabaseQueryClient,
+  knowledgeMode: ChatKnowledgeMode = "auto"
 ): Promise<RagResponse> {
-  const sources = await searchAll(query, topK, 0.3, userId, client);
+  const route = classifyChatRoute(query, knowledgeMode);
+  let sources: SearchResult[] = [];
+  if (route.useKnowledge) {
+    sources = await searchAll(query, topK, 0.3, userId, client);
+  }
   const fallback = buildFallbackAnswer(query, sources, chatHistory);
   const savedDefaults = await getDefaultAiSelection(userId);
   const selectedProvider = provider && isSupportedProvider(provider) ? provider : savedDefaults.provider;
@@ -26,7 +42,7 @@ export async function ragChat(
 
   try {
     const apiKey = await resolveProviderKey(userId, selectedProvider);
-    const prompt = buildRagPrompt(query, sources);
+    const prompt = route.useKnowledge ? buildRagPrompt(query, sources) : query;
     const response = await callProviderChat({
       provider: selectedProvider,
       apiKey,
@@ -34,8 +50,9 @@ export async function ragChat(
       messages: [
         {
           role: "system",
-          content:
-            "You are Smart Favorites, a concise personal knowledge assistant. Answer from the provided bookmarks, GitHub stars, and documents. If evidence is thin, say so.",
+          content: route.useKnowledge
+            ? "You are Smart Favorites, a concise personal knowledge assistant. Answer from the provided bookmarks, GitHub stars, and documents. If evidence is thin, say so."
+            : "You are Smart Favorites, a concise assistant. For ordinary direct chat, answer naturally without claiming that you searched the user's knowledge base.",
         },
         ...chatHistory.slice(-8),
         { role: "user", content: prompt },
@@ -51,17 +68,26 @@ export async function ragChat(
     });
 
     const answer = response.content?.trim() || fallback;
-    return { answer, sources };
+    return { answer, sources, routing: route };
   } catch (error: any) {
+    const providerError = classifyProviderError(error);
     await logAiCall({
       userId,
       provider: selectedProvider,
       model: selectedModel || "",
       status: "error",
-      error: error.message,
+      error: providerError.logMessage,
     });
-    const answer = `${fallback}\n\n(Model call failed: ${error.message})`;
-    return { answer, sources };
+
+    return {
+      answer: providerError.userMessage || fallback,
+      sources,
+      routing: route,
+      error: {
+        type: providerError.type,
+        message: providerError.userMessage,
+      },
+    };
   }
 
 }
@@ -163,7 +189,7 @@ function buildFallbackAnswer(
   const historyHint = chatHistory.length > 0 ? "Based on your recent context, " : "";
 
   if (sources.length === 0) {
-    return `${historyHint}I could not find matching items for "${query}". Try refining keywords or syncing more data.`;
+    return `${historyHint}我现在无法连接所选模型。你可以稍后重试，或切换到另一个已配置模型。`;
   }
 
   const topLines = sources.slice(0, 3).map((source, index) => {
@@ -183,4 +209,34 @@ function buildFallbackAnswer(
   });
 
   return `${historyHint}Here are the closest matches for "${query}":\n${topLines.join("\n")}`;
+}
+
+function classifyProviderError(error: unknown): {
+  type: "rate_limited" | "provider_error";
+  userMessage: string;
+  logMessage: string;
+} {
+  const status = error instanceof ProviderApiError ? error.status : undefined;
+  const body = error instanceof ProviderApiError ? error.body : "";
+  const message = error instanceof Error ? error.message : String(error);
+  const diagnostic = `${message} ${body}`;
+  const isRateLimited =
+    status === 429 ||
+    /"code"\s*:\s*"?(1302|rate[_-]?limit)/i.test(diagnostic) ||
+    /rate limit|too many requests|速率限制|请求频率|限流/i.test(diagnostic);
+
+  if (isRateLimited) {
+    return {
+      type: "rate_limited",
+      userMessage:
+        "当前模型达到请求速率限制。请稍后再试，或切换到另一个已配置模型；我不会把原始 API 错误当作回答展示。",
+      logMessage: diagnostic.slice(0, 500),
+    };
+  }
+
+  return {
+    type: "provider_error",
+    userMessage: "当前模型调用失败。请稍后重试，或切换到另一个已配置模型。",
+    logMessage: diagnostic.slice(0, 500),
+  };
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bot,
   ChevronDown,
+  Database,
   ExternalLink,
   FileText,
   Loader2,
@@ -20,7 +21,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
-import type { ChatMessage, ChatSession, LLMProvider, SearchResult } from "@/types";
+import type {
+  ChatMessage,
+  ChatRoutingMetadata,
+  ChatSession,
+  LLMProvider,
+  SearchResult,
+} from "@/types";
 import { CHAT_PROVIDER_OPTIONS, type ChatModelOption } from "@/lib/chat-models";
 
 export default function ChatPage() {
@@ -253,6 +260,7 @@ export default function ChatPage() {
         role: "assistant",
         content: normalizeAssistantAnswer(data.answer, sources),
         sources,
+        routing: normalizeChatRouting(data.routing),
         timestamp: new Date().toISOString(),
       };
       const savedMessages = [...nextMessages, assistantMessage];
@@ -364,7 +372,7 @@ export default function ChatPage() {
           {loading && (
             <Card className="max-w-[80%]">
               <CardContent className="pt-4 text-sm text-muted-foreground">
-                正在检索知识库...
+                正在生成回答...
               </CardContent>
             </Card>
           )}
@@ -510,6 +518,7 @@ function normalizeChatMessages(messages: unknown): ChatMessage[] {
         role,
         content: role === "assistant" ? normalizeAssistantAnswer(rawContent, sources) : rawContent,
         sources,
+        routing: normalizeChatRouting(message.routing),
         timestamp: typeof message.timestamp === "string" ? message.timestamp : "",
       };
     });
@@ -517,6 +526,20 @@ function normalizeChatMessages(messages: unknown): ChatMessage[] {
 
 function normalizeChatSources(sources: unknown): SearchResult[] | undefined {
   return Array.isArray(sources) ? (sources as SearchResult[]) : undefined;
+}
+
+function normalizeChatRouting(routing: unknown): ChatRoutingMetadata | undefined {
+  if (!routing || typeof routing !== "object") {
+    return undefined;
+  }
+
+  const item = routing as Partial<ChatRoutingMetadata>;
+  const mode = item.mode === "knowledge" ? "knowledge" : "chat";
+  return {
+    mode,
+    useKnowledge: Boolean(item.useKnowledge),
+    reason: typeof item.reason === "string" ? item.reason : "",
+  };
 }
 
 function normalizeAssistantAnswer(answer: unknown, sources?: SearchResult[]): string {
@@ -535,6 +558,7 @@ function normalizeAssistantAnswer(answer: unknown, sources?: SearchResult[]): st
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
   const sources = message.sources || [];
+  const routing = message.routing;
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -556,6 +580,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                     <Sparkles className="h-3.5 w-3.5" />
                   </span>
                   <span>Smart Favorites</span>
+                  {routing && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[11px]">
+                      <Database className="h-3 w-3" />
+                      {routing.useKnowledge ? "已搜索知识库" : "未搜索知识库"}
+                    </span>
+                  )}
                 </div>
                 <div className="prose prose-sm max-w-none rounded-xl bg-muted/20 px-4 py-3 dark:prose-invert">
                   <MarkdownRenderer content={normalizeAssistantAnswer(message.content, sources)} />

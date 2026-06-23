@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { query, sessionId, chatHistory = [], provider, model } = body;
+    const { query, sessionId, chatHistory = [], provider, model, knowledgeMode } = body;
 
     if (!query || typeof query !== "string") {
       return NextResponse.json(
@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
       typeof provider === "string" && isSupportedProvider(provider) ? provider : undefined;
     const modelOverride =
       typeof model === "string" && model.trim() ? model.trim() : undefined;
+    const knowledgeModeOverride =
+      knowledgeMode === "always" || knowledgeMode === "never" ? knowledgeMode : "auto";
 
     const supabase = await createServerSupabaseClient();
     const result = await ragChat(
@@ -37,12 +39,15 @@ export async function POST(request: NextRequest) {
       userId,
       providerOverride,
       modelOverride,
-      supabase
+      supabase,
+      knowledgeModeOverride
     );
 
     return NextResponse.json({
       answer: result.answer,
       sources: result.sources,
+      routing: result.routing,
+      error: result.error,
       sessionId,
     });
   } catch (error: any) {
