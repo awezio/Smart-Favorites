@@ -8,7 +8,14 @@ export interface Bookmark {
   description_zh?: string;
   description_en?: string;
   description_metadata?: Record<string, any> | null;
+  tags?: string[];
   folder_path?: string;
+  snapshot_url?: string | null;
+  snapshot_storage_path?: string | null;
+  snapshot_taken_at?: string | null;
+  snapshot_status?: "pending" | "capturing" | "ready" | "failed" | "unavailable";
+  snapshot_error?: string | null;
+  snapshot_metadata?: Record<string, any> | null;
   add_date?: string;
   icon?: string;
   embedding?: number[];

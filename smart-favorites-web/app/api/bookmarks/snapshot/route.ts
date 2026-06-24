@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     // Get all bookmarks for this user
     const { data: bookmarks, error: fetchError } = await supabase
       .from("bookmarks")
-      .select("id, title, url, description, folder_path, add_date, icon, created_at")
+      .select("id, title, url, description, description_zh, description_en, description_metadata, tags, folder_path, snapshot_url, snapshot_storage_path, snapshot_taken_at, snapshot_status, snapshot_error, snapshot_metadata, add_date, icon, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 

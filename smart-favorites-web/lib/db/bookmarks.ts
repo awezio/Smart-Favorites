@@ -14,7 +14,26 @@ type BookmarkUpdate = Partial<Omit<Bookmark, "id" | "user_id" | "created_at">> &
   updated_at?: string;
 };
 
-const SYNC_BOOKMARK_COLUMNS = "id, user_id, title, url, description, description_zh, description_en, description_metadata, folder_path, add_date, icon";
+const SYNC_BOOKMARK_COLUMNS = [
+  "id",
+  "user_id",
+  "title",
+  "url",
+  "description",
+  "description_zh",
+  "description_en",
+  "description_metadata",
+  "tags",
+  "folder_path",
+  "snapshot_url",
+  "snapshot_storage_path",
+  "snapshot_taken_at",
+  "snapshot_status",
+  "snapshot_error",
+  "snapshot_metadata",
+  "add_date",
+  "icon",
+].join(", ");
 const DB_BATCH_SIZE = 200;
 const POSTGREST_PAGE_SIZE = 1000;
 
@@ -60,7 +79,7 @@ export async function getBookmarks(
       break;
     }
 
-    results.push(...(data as Bookmark[]));
+    results.push(...(data as unknown as Bookmark[]));
     remaining -= data.length;
     currentOffset += data.length;
 
@@ -96,7 +115,7 @@ export async function getBookmarksForSync(
       break;
     }
 
-    results.push(...(data as Bookmark[]));
+    results.push(...(data as unknown as Bookmark[]));
     if (data.length < 1000) {
       break;
     }

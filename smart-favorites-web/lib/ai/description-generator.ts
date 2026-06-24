@@ -38,6 +38,9 @@ type AiSelection = {
   apiKey: string;
 };
 
+const BOOKMARK_PROMPT_INSTRUCTION =
+  "请访问这个网站并浏览，总结这个网站是什么、具体用途和受众人群。";
+
 export async function generateBookmarkDescription(
   url: string,
   title?: string,
@@ -48,7 +51,7 @@ export async function generateBookmarkDescription(
 
   return generateWithAiOrFallback({
     userId: options.userId,
-    prompt: buildBookmarkPrompt({ title: safeTitle, url, page }),
+    prompt: `${BOOKMARK_PROMPT_INSTRUCTION}\n\n${buildBookmarkPrompt({ title: safeTitle, url, page })}`,
     fallback: buildFallbackDescription({
       title: safeTitle,
       url,

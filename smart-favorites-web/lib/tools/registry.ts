@@ -227,6 +227,7 @@ const registry: ToolRegistration[] = [
         title,
         url,
         description,
+        tags,
         folder_path: tags.length ? tags.join("/") : undefined,
         embedding,
         updated_at: new Date().toISOString(),

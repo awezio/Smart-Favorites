@@ -39,7 +39,112 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { type DashboardLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type { GitHubStar } from "@/types";
+
+const pageCopy = {
+  zh: {
+    title: "GitHub Stars",
+    subtitle: (count: number, total: string) => `共 ${count} 个项目，${total} Stars`,
+    doneEditing: "完成",
+    edit: "编辑",
+    metricTotal: "项目总数",
+    metricTotalStars: "累计 Stars",
+    metricLanguages: "语言种类",
+    topLanguageHint: (name: string) => `Top: ${name}`,
+    metricHasDescription: "有描述",
+    coverageHint: (percent: number) => `${percent}% 覆盖率`,
+    donutTitle: "语言分布 (Top 10)",
+    donutCenterLabel: "项目",
+    unknownLanguage: "未知语言",
+    barsTitle: "Star 数分布",
+    syncTitle: "一键同步 GitHub Stars",
+    syncDescription: "使用 GitHub 登录后可直接同步；未用 GitHub 登录时，可临时填写公开用户名。",
+    usernameLabel: "GitHub 用户名（可选）",
+    usernamePlaceholder: "留空使用 GitHub 登录账号",
+    syncing: "同步中...",
+    sync: "同步",
+    searchPlaceholder: "搜索项目...",
+    allLanguages: "全部语言",
+    all: "全部",
+    hasDescription: "有描述",
+    noDescription: "无描述",
+    sortStarsDesc: "Stars 多到少",
+    sortStarsAsc: "Stars 少到多",
+    sortRepoAsc: "名称 A-Z",
+    sortCreatedDesc: "最新添加",
+    sortLanguageAsc: "按语言",
+    delete: (count: number) => `删除 (${count})`,
+    emptyNoStarsTitle: "还没有 GitHub Stars",
+    emptyNoStarsDescription: "输入你的 GitHub 用户名并点击「同步」开始导入",
+    emptyNoStarsAction: "开始同步",
+    emptyNoMatchTitle: "没有匹配的项目",
+    emptyNoMatchDescription: "试试调整搜索关键词或筛选条件",
+    noDescriptionText: "暂无描述",
+    enPrefix: "EN",
+    selectAria: (owner: string, repo: string) => `选择 ${owner}/${repo}`,
+    deleteConfirm: (count: number) => `确定删除 ${count} 个项目？`,
+    deleteLoading: "正在删除...",
+    deleteSuccess: (count: number) => `已删除 ${count} 个项目`,
+    deleteFailed: "删除失败",
+    syncLoading: "正在同步 GitHub Stars...",
+    syncSuccess: (added: number, modified: number, removed: number) =>
+      `同步完成！新增: ${added}, 修改: ${modified}, 删除: ${removed}`,
+    syncFailed: (message: string) => `同步失败: ${message}`,
+    unknownError: "未知错误",
+  },
+  en: {
+    title: "GitHub Stars",
+    subtitle: (count: number, total: string) => `${count} projects, ${total} Stars`,
+    doneEditing: "Done",
+    edit: "Edit",
+    metricTotal: "Total projects",
+    metricTotalStars: "Total Stars",
+    metricLanguages: "Languages",
+    topLanguageHint: (name: string) => `Top: ${name}`,
+    metricHasDescription: "Has description",
+    coverageHint: (percent: number) => `${percent}% coverage`,
+    donutTitle: "Language distribution (Top 10)",
+    donutCenterLabel: "Projects",
+    unknownLanguage: "Unknown",
+    barsTitle: "Star distribution",
+    syncTitle: "Sync GitHub Stars in one click",
+    syncDescription:
+      "Sign in with GitHub to sync directly. If you didn't sign in with GitHub, you can temporarily enter a public username.",
+    usernameLabel: "GitHub username (optional)",
+    usernamePlaceholder: "Leave empty to use your GitHub login",
+    syncing: "Syncing...",
+    sync: "Sync",
+    searchPlaceholder: "Search projects...",
+    allLanguages: "All languages",
+    all: "All",
+    hasDescription: "Has description",
+    noDescription: "No description",
+    sortStarsDesc: "Stars high to low",
+    sortStarsAsc: "Stars low to high",
+    sortRepoAsc: "Name A-Z",
+    sortCreatedDesc: "Recently added",
+    sortLanguageAsc: "By language",
+    delete: (count: number) => `Delete (${count})`,
+    emptyNoStarsTitle: "No GitHub Stars yet",
+    emptyNoStarsDescription: "Enter your GitHub username and click \"Sync\" to start importing",
+    emptyNoStarsAction: "Start sync",
+    emptyNoMatchTitle: "No matching projects",
+    emptyNoMatchDescription: "Try adjusting your search keywords or filters",
+    noDescriptionText: "No description",
+    enPrefix: "EN",
+    selectAria: (owner: string, repo: string) => `Select ${owner}/${repo}`,
+    deleteConfirm: (count: number) => `Delete ${count} items?`,
+    deleteLoading: "Deleting...",
+    deleteSuccess: (count: number) => `Deleted ${count} items`,
+    deleteFailed: "Delete failed",
+    syncLoading: "Syncing GitHub Stars...",
+    syncSuccess: (added: number, modified: number, removed: number) =>
+      `Sync complete! Added: ${added}, modified: ${modified}, removed: ${removed}`,
+    syncFailed: (message: string) => `Sync failed: ${message}`,
+    unknownError: "Unknown error",
+  },
+} as const;
 
 function StarListSkeleton() {
   return (
@@ -132,6 +237,12 @@ function starDescriptionEn(star: GitHubStar) {
   return star.description_en || "";
 }
 
+function starDescriptionForLanguage(star: GitHubStar, language: DashboardLanguage) {
+  return language === "zh"
+    ? (star.description_zh || star.description || star.description_en || "")
+    : (star.description_en || star.description || star.description_zh || "");
+}
+
 function hasStarDescription(star: GitHubStar) {
   return Boolean(starDescription(star).trim() || starDescriptionEn(star).trim());
 }
@@ -156,6 +267,8 @@ async function readApiError(response: Response, fallback: string) {
 }
 
 export default function StarsPage() {
+  const [language] = useDashboardLanguage();
+  const t = pageCopy[language];
   const [stars, setStars] = useState<GitHubStar[]>([]);
   const [filter, setFilter] = useState("");
   const [username, setUsername] = useState("");
@@ -197,7 +310,7 @@ export default function StarsPage() {
 
   const handleSync = async () => {
     setLoading(true);
-    toast.loading("正在同步 GitHub Stars...", { id: "sync-stars" });
+    toast.loading(t.syncLoading, { id: "sync-stars" });
     try {
       const response = await fetch("/api/stars/sync", {
         method: "POST",
@@ -206,22 +319,25 @@ export default function StarsPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        toast.success(`同步完成！新增: ${data.summary.added}, 修改: ${data.summary.modified}, 删除: ${data.summary.removed}`, { id: "sync-stars" });
+        toast.success(
+          t.syncSuccess(data.summary.added, data.summary.modified, data.summary.removed),
+          { id: "sync-stars" }
+        );
         await loadStars();
       } else {
-        const message = await readApiError(response, "未知错误");
-        toast.error(`同步失败: ${message}`, { id: "sync-stars" });
+        const message = await readApiError(response, t.unknownError);
+        toast.error(t.syncFailed(message), { id: "sync-stars" });
       }
     } catch (error: any) {
-      toast.error(`同步失败: ${error.message}`, { id: "sync-stars" });
+      toast.error(t.syncFailed(error.message), { id: "sync-stars" });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (ids: string[]) => {
-    if (!confirm(`确定删除 ${ids.length} 个项目？`)) return;
-    toast.loading("正在删除...", { id: "delete" });
+    if (!confirm(t.deleteConfirm(ids.length))) return;
+    toast.loading(t.deleteLoading, { id: "delete" });
     try {
       const response = await fetch("/api/stars", {
         method: "DELETE",
@@ -229,14 +345,14 @@ export default function StarsPage() {
         body: JSON.stringify({ ids }),
       });
       if (response.ok) {
-        toast.success(`已删除 ${ids.length} 个项目`, { id: "delete" });
+        toast.success(t.deleteSuccess(ids.length), { id: "delete" });
         setSelectedIds(new Set());
         await loadStars();
       } else {
-        toast.error("删除失败", { id: "delete" });
+        toast.error(t.deleteFailed, { id: "delete" });
       }
     } catch {
-      toast.error("删除失败", { id: "delete" });
+      toast.error(t.deleteFailed, { id: "delete" });
     }
   };
 
@@ -250,14 +366,14 @@ export default function StarsPage() {
   const langStats = useMemo(() => {
     const map = new Map<string, number>();
     stars.forEach((s) => {
-      const l = s.language || "Unknown";
+      const l = s.language || t.unknownLanguage;
       map.set(l, (map.get(l) || 0) + 1);
     });
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
-  }, [stars]);
+  }, [stars, t.unknownLanguage]);
 
   const starsRangeStats = useMemo(() => {
     const ranges = [
@@ -347,9 +463,9 @@ export default function StarsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">GitHub Stars</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
           <p className="text-muted-foreground mt-1">
-            共 {stars.length} 个项目，{totalStarsCount.toLocaleString()} Stars
+            {t.subtitle(stars.length, totalStarsCount.toLocaleString())}
           </p>
         </div>
         <Button
@@ -358,9 +474,9 @@ export default function StarsPage() {
           onClick={() => setIsEditing(!isEditing)}
         >
           {isEditing ? (
-            <><Check className="h-4 w-4 mr-1" />完成</>
+            <><Check className="h-4 w-4 mr-1" />{t.doneEditing}</>
           ) : (
-            <><Pencil className="h-4 w-4 mr-1" />编辑</>
+            <><Pencil className="h-4 w-4 mr-1" />{t.edit}</>
           )}
         </Button>
       </div>
@@ -370,40 +486,40 @@ export default function StarsPage() {
         <StatsOverview
           metrics={[
             {
-              label: "项目总数",
+              label: t.metricTotal,
               value: stars.length,
               icon: Github,
               accent: "primary",
             },
             {
-              label: "累计 Stars",
+              label: t.metricTotalStars,
               value: totalStarsCount.toLocaleString(),
               icon: TrendingUp,
-              accent: "violet",
+              accent: "sky",
             },
             {
-              label: "语言种类",
+              label: t.metricLanguages,
               value: languages.length,
-              hint: topLanguage !== "—" ? `Top: ${topLanguage}` : undefined,
+              hint: topLanguage !== "—" ? t.topLanguageHint(topLanguage) : undefined,
               icon: Code2,
-              accent: "emerald",
+              accent: "blue",
             },
             {
-              label: "有描述",
+              label: t.metricHasDescription,
               value: starsWithDesc,
-              hint: `${Math.round((starsWithDesc / stars.length) * 100)}% 覆盖率`,
+              hint: t.coverageHint(Math.round((starsWithDesc / stars.length) * 100)),
               icon: Layers,
-              accent: "amber",
+              accent: "cyan",
             },
           ]}
           donut={{
-            title: "语言分布 (Top 10)",
+            title: t.donutTitle,
             data: langStats,
-            centerLabel: "项目",
+            centerLabel: t.donutCenterLabel,
             centerValue: String(stars.length),
           }}
           bars={{
-            title: "Star 数分布",
+            title: t.barsTitle,
             data: starsRangeStats,
           }}
         />
@@ -414,21 +530,21 @@ export default function StarsPage() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base tracking-tight">
             <Github className="h-4 w-4" />
-            一键同步 GitHub Stars
+            {t.syncTitle}
           </CardTitle>
           <CardDescription className="flex items-start gap-1.5">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500" />
-            使用 GitHub 登录后可直接同步；未用 GitHub 登录时，可临时填写公开用户名。
+            {t.syncDescription}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex-1 min-w-[200px]">
               <Label className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                GitHub 用户名（可选）
+                {t.usernameLabel}
               </Label>
               <Input
-                placeholder="留空使用 GitHub 登录账号"
+                placeholder={t.usernamePlaceholder}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="mt-1 rounded-xl border-border/60"
@@ -436,14 +552,14 @@ export default function StarsPage() {
             </div>
             <Button onClick={handleSync} disabled={loading} className="rounded-xl">
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              {loading ? "同步中..." : "同步"}
+              {loading ? t.syncing : t.sync}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <FilterToolbar
-        searchPlaceholder="搜索项目..."
+        searchPlaceholder={t.searchPlaceholder}
         searchValue={filter}
         onSearchChange={setFilter}
         showSelectAll={filteredStars.length > 0}
@@ -459,7 +575,7 @@ export default function StarsPage() {
             onChange: setFilterLang,
             className: "max-w-[180px]",
             options: [
-              { value: "all", label: "全部语言" },
+              { value: "all", label: t.allLanguages },
               ...languages.map((lang) => ({ value: lang, label: lang })),
             ],
           },
@@ -468,9 +584,9 @@ export default function StarsPage() {
             value: filterDesc,
             onChange: setFilterDesc,
             options: [
-              { value: "all", label: "全部" },
-              { value: "has_desc", label: "有描述" },
-              { value: "no_desc", label: "无描述" },
+              { value: "all", label: t.all },
+              { value: "has_desc", label: t.hasDescription },
+              { value: "no_desc", label: t.noDescription },
             ],
           },
           {
@@ -482,11 +598,11 @@ export default function StarsPage() {
               setSortAsc(direction === "asc");
             },
             options: [
-              { value: "stars-desc", label: "Stars 多到少" },
-              { value: "stars-asc", label: "Stars 少到多" },
-              { value: "repo-asc", label: "名称 A-Z" },
-              { value: "created_at-desc", label: "最新添加" },
-              { value: "language-asc", label: "按语言" },
+              { value: "stars-desc", label: t.sortStarsDesc },
+              { value: "stars-asc", label: t.sortStarsAsc },
+              { value: "repo-asc", label: t.sortRepoAsc },
+              { value: "created_at-desc", label: t.sortCreatedDesc },
+              { value: "language-asc", label: t.sortLanguageAsc },
             ],
           },
         ]}
@@ -499,7 +615,7 @@ export default function StarsPage() {
               onClick={() => handleDelete(Array.from(selectedIds))}
             >
               <Trash2 className="h-4 w-4 mr-1" />
-              删除 ({selectedIds.size})
+              {t.delete(selectedIds.size)}
             </Button>
           ) : null
         }
@@ -520,19 +636,19 @@ export default function StarsPage() {
       {filteredStars.length === 0 && stars.length === 0 ? (
         <EmptyState
           icon={Star}
-          title="还没有 GitHub Stars"
-          description="输入你的 GitHub 用户名并点击「同步」开始导入"
+          title={t.emptyNoStarsTitle}
+          description={t.emptyNoStarsDescription}
           action={
-            <Button variant="outline" onClick={() => document.querySelector<HTMLInputElement>('input[placeholder="输入用户名"]')?.focus()}>
-              <RefreshCw className="h-4 w-4 mr-2" />开始同步
+            <Button variant="outline" onClick={() => document.querySelector<HTMLInputElement>(`input[placeholder="${t.usernamePlaceholder}"]`)?.focus()}>
+              <RefreshCw className="h-4 w-4 mr-2" />{t.emptyNoStarsAction}
             </Button>
           }
         />
       ) : filteredStars.length === 0 ? (
         <EmptyState
           icon={Star}
-          title="没有匹配的项目"
-          description="试试调整搜索关键词或筛选条件"
+          title={t.emptyNoMatchTitle}
+          description={t.emptyNoMatchDescription}
         />
       ) : viewMode === "card" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -544,7 +660,7 @@ export default function StarsPage() {
                     checked={selectedIds.has(s.id)}
                     onChange={() => toggleSelect(s.id)}
                     className="mt-1"
-                    aria-label={`选择 ${s.owner}/${s.repo}`}
+                    aria-label={t.selectAria(s.owner, s.repo)}
                   />
                   <div className="flex-1 min-w-0">
                     <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-medium text-sm tracking-tight hover:text-primary truncate block">
@@ -558,11 +674,11 @@ export default function StarsPage() {
                   )}
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2 min-h-[2rem]">
-                  {starDescription(s) || "暂无描述"}
+                  {starDescriptionForLanguage(s, language) || t.noDescriptionText}
                 </p>
                 {starDescriptionEn(s) && (
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2">
-                    EN: {starDescriptionEn(s)}
+                    {t.enPrefix}: {starDescriptionEn(s)}
                   </p>
                 )}
                 <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
@@ -586,7 +702,7 @@ export default function StarsPage() {
                 checked={selectedIds.has(s.id)}
                 onChange={() => toggleSelect(s.id)}
                 className="h-3.5 w-3.5"
-                aria-label={`选择 ${s.owner}/${s.repo}`}
+                aria-label={t.selectAria(s.owner, s.repo)}
               />
               <div className="flex-1 min-w-0">
                 <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium tracking-tight hover:text-primary truncate block">
@@ -613,7 +729,7 @@ export default function StarsPage() {
                     checked={selectedIds.has(s.id)}
                     onChange={() => toggleSelect(s.id)}
                     className="mt-1"
-                    aria-label={`选择 ${s.owner}/${s.repo}`}
+                    aria-label={t.selectAria(s.owner, s.repo)}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -623,12 +739,12 @@ export default function StarsPage() {
                         </a>
                         {hasStarDescription(s) && (
                           <p className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2">
-                            {starDescription(s)}
+                            {starDescriptionForLanguage(s, language)}
                           </p>
                         )}
                         {starDescriptionEn(s) && (
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground/75 line-clamp-2">
-                            EN: {starDescriptionEn(s)}
+                            {t.enPrefix}: {starDescriptionEn(s)}
                           </p>
                         )}
                       </div>

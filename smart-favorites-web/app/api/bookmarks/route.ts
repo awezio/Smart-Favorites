@@ -4,6 +4,27 @@ import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
+function normalizeOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeTags(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/[,，、\n]/)
+      : [];
+
+  return Array.from(
+    new Set(
+      raw
+        .map((tag) => String(tag).trim())
+        .filter(Boolean)
+        .slice(0, 24)
+    )
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await getAuthUser();
@@ -38,7 +59,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, url, description, folder_path } = body;
+    const { title, url, description, description_zh, description_en, folder_path } = body;
+    const tags = normalizeTags(body.tags);
+    const descriptionZh = normalizeOptionalString(description_zh) || normalizeOptionalString(description);
+    const descriptionEn = normalizeOptionalString(description_en);
 
     if (!title || !url) {
       return NextResponse.json(
@@ -47,7 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const textToEmbed = `${title} ${description || ""} ${url}`;
+    const textToEmbed = `${title} ${descriptionZh || ""} ${descriptionEn || ""} ${tags.join(" ")} ${url}`;
     const embedding = await generateEmbedding(textToEmbed, { userId });
     const supabase = await createServerSupabaseClient();
 
@@ -55,7 +79,10 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       title,
       url,
-      description,
+      description: descriptionZh,
+      description_zh: descriptionZh,
+      description_en: descriptionEn,
+      tags,
       folder_path,
       embedding,
       updated_at: new Date().toISOString(),
@@ -75,7 +102,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, url, description, folder_path } = body;
+    const { id, title, url, description, description_zh, description_en, folder_path } = body;
 
     if (!id) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
@@ -84,11 +111,31 @@ export async function PUT(request: NextRequest) {
     const updates: any = {};
     if (title !== undefined) updates.title = title;
     if (url !== undefined) updates.url = url;
-    if (description !== undefined) updates.description = description;
+    if (description !== undefined || description_zh !== undefined) {
+      updates.description = normalizeOptionalString(description_zh) || normalizeOptionalString(description) || "";
+      updates.description_zh = updates.description;
+    }
+    if (description_en !== undefined) {
+      updates.description_en = normalizeOptionalString(description_en) || "";
+    }
+    if (body.tags !== undefined) updates.tags = normalizeTags(body.tags);
     if (folder_path !== undefined) updates.folder_path = folder_path;
 
-    if (title !== undefined || description !== undefined || url !== undefined) {
-      const textToEmbed = `${title || ""} ${description || ""} ${url || ""}`;
+    if (
+      title !== undefined ||
+      description !== undefined ||
+      description_zh !== undefined ||
+      description_en !== undefined ||
+      body.tags !== undefined ||
+      url !== undefined
+    ) {
+      const textToEmbed = [
+        title || "",
+        updates.description || "",
+        updates.description_en || "",
+        Array.isArray(updates.tags) ? updates.tags.join(" ") : "",
+        url || "",
+      ].join(" ");
       updates.embedding = await generateEmbedding(textToEmbed, { userId });
     }
 

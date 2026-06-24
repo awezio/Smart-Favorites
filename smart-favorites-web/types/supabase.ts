@@ -19,7 +19,14 @@ export interface Database {
           description_zh: string | null
           description_en: string | null
           description_metadata: Json | null
+          tags: string[]
           folder_path: string | null
+          snapshot_url: string | null
+          snapshot_storage_path: string | null
+          snapshot_taken_at: string | null
+          snapshot_status: string
+          snapshot_error: string | null
+          snapshot_metadata: Json
           add_date: string | null
           icon: string | null
           embedding: number[] | null
@@ -36,7 +43,14 @@ export interface Database {
           description_zh?: string | null
           description_en?: string | null
           description_metadata?: Json | null
+          tags?: string[]
           folder_path?: string | null
+          snapshot_url?: string | null
+          snapshot_storage_path?: string | null
+          snapshot_taken_at?: string | null
+          snapshot_status?: string
+          snapshot_error?: string | null
+          snapshot_metadata?: Json
           add_date?: string | null
           icon?: string | null
           embedding?: number[] | null
@@ -53,7 +67,14 @@ export interface Database {
           description_zh?: string | null
           description_en?: string | null
           description_metadata?: Json | null
+          tags?: string[]
           folder_path?: string | null
+          snapshot_url?: string | null
+          snapshot_storage_path?: string | null
+          snapshot_taken_at?: string | null
+          snapshot_status?: string
+          snapshot_error?: string | null
+          snapshot_metadata?: Json
           add_date?: string | null
           icon?: string | null
           embedding?: number[] | null

@@ -12,16 +12,72 @@ import { PostCard } from "@/components/square/post-card";
 import { CreatePostModal } from "@/components/square/create-post-modal";
 import { createClient } from "@/lib/supabase/client";
 import { SQUARE_TARGET_OPTIONS } from "@/lib/square";
+import { useDashboardLanguage } from "@/lib/dashboard-language";
 import type { SquareFeedStats, SquarePost } from "@/types";
 
 type FilterType = "all" | "bookmark" | "star" | "general";
 
-const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
-  { value: "all", label: "全部" },
-  { value: "bookmark", label: "书签" },
-  { value: "star", label: "Stars" },
-  { value: "general", label: "通用" },
-];
+const pageCopy = {
+  zh: {
+    filterAll: "全部",
+    filterBookmark: "书签",
+    filterStar: "Stars",
+    filterGeneral: "通用",
+    loadFailed: "加载失败，请重试",
+    voteFailed: "投票失败",
+    deleteConfirm: "确定删除这条发布？",
+    deleted: "已删除",
+    deleteFailed: "删除失败",
+    badgeCommunity: "社区广场",
+    heroTitle: "分享、评测、发现",
+    heroDescription: "这里是你整理书签、GitHub Stars 和灵感碎片的公共展示台。发帖、投票、晒资源，让好的信息更容易被看见。",
+    publish: "发布内容",
+    updatesOn: "最新动态已开启",
+    statPosts: "帖子",
+    statMedia: "媒体",
+    statAuthors: "作者",
+    statHelpfulVotes: "有用投票",
+    postsCountSuffix: "条发布",
+    targetGeneralDesc: "分享灵感、笔记或短评",
+    targetBookmarkDesc: "围绕你收藏的链接展开",
+    targetStarDesc: "面向 GitHub 项目和工具",
+    emptyTitle: "暂无内容",
+    emptyDescription: "成为第一个分享者吧！点击「发布」开始",
+    publishFirst: "发布第一条",
+    loadingMore: "加载中...",
+    loadMore: "加载更多",
+  },
+  en: {
+    filterAll: "All",
+    filterBookmark: "Bookmark",
+    filterStar: "Stars",
+    filterGeneral: "General",
+    loadFailed: "Failed to load, please retry",
+    voteFailed: "Vote failed",
+    deleteConfirm: "Delete this post?",
+    deleted: "Deleted",
+    deleteFailed: "Delete failed",
+    badgeCommunity: "Community Square",
+    heroTitle: "Share, Review, Discover",
+    heroDescription:
+      "A public stage for the bookmarks, GitHub Stars, and ideas you organize. Post, vote, and showcase resources so the best information gets seen.",
+    publish: "Publish",
+    updatesOn: "Latest updates on",
+    statPosts: "Posts",
+    statMedia: "Media",
+    statAuthors: "Authors",
+    statHelpfulVotes: "Helpful votes",
+    postsCountSuffix: "posts",
+    targetGeneralDesc: "Share ideas, notes, or quick reviews",
+    targetBookmarkDesc: "Around the links you saved",
+    targetStarDesc: "For GitHub projects and tools",
+    emptyTitle: "No content yet",
+    emptyDescription: "Be the first to share! Click \"Publish\" to start",
+    publishFirst: "Publish the first post",
+    loadingMore: "Loading...",
+    loadMore: "Load more",
+  },
+};
 
 const PAGE_SIZE = 20;
 
@@ -53,7 +109,35 @@ function PostCardSkeleton() {
   );
 }
 
+function getFilterLabel(value: FilterType, t: typeof pageCopy.zh) {
+  switch (value) {
+    case "all":
+      return t.filterAll;
+    case "bookmark":
+      return t.filterBookmark;
+    case "star":
+      return t.filterStar;
+    case "general":
+      return t.filterGeneral;
+  }
+}
+
+function getTargetDescription(value: FilterType, t: typeof pageCopy.zh) {
+  switch (value) {
+    case "bookmark":
+      return t.targetBookmarkDesc;
+    case "star":
+      return t.targetStarDesc;
+    case "general":
+      return t.targetGeneralDesc;
+    default:
+      return t.targetGeneralDesc;
+  }
+}
+
 export default function SquarePage() {
+  const [language] = useDashboardLanguage();
+  const t = pageCopy[language];
   const [posts, setPosts] = useState<SquarePost[]>([]);
   const [stats, setStats] = useState<SquareFeedStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,11 +188,11 @@ export default function SquarePage() {
       } catch (err) {
         console.error("Failed to load posts:", err);
         if (!append) {
-          toast.error("加载失败，请重试");
+          toast.error(t.loadFailed);
         }
       }
     },
-    [filter]
+    [filter, t.loadFailed]
   );
 
   const loadStats = useCallback(async () => {
@@ -190,14 +274,14 @@ export default function SquarePage() {
       void loadStats();
     } catch {
       // Revert on error - refetch
-      toast.error("投票失败");
+      toast.error(t.voteFailed);
       fetchPosts(1);
       setPage(1);
     }
   };
 
   const handleDelete = async (postId: string) => {
-    if (!confirm("确定删除这条发布？")) return;
+    if (!confirm(t.deleteConfirm)) return;
 
     // Optimistic remove
     setPosts((prev) => prev.filter((p) => p.id !== postId));
@@ -207,10 +291,10 @@ export default function SquarePage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Delete failed");
-      toast.success("已删除");
+      toast.success(t.deleted);
       void loadStats();
     } catch {
-      toast.error("删除失败");
+      toast.error(t.deleteFailed);
       // Revert
       fetchPosts(1);
       setPage(1);
@@ -219,22 +303,22 @@ export default function SquarePage() {
 
   const heroStats = [
     {
-      label: "帖子",
+      label: t.statPosts,
       value: statsLoading ? "..." : String(stats?.total_posts ?? posts.length),
       icon: TrendingUp,
     },
     {
-      label: "媒体",
+      label: t.statMedia,
       value: statsLoading ? "..." : String(stats?.total_media ?? 0),
       icon: ImageIcon,
     },
     {
-      label: "作者",
+      label: t.statAuthors,
       value: statsLoading ? "..." : String(stats?.active_authors ?? 0),
       icon: Users,
     },
     {
-      label: "有用投票",
+      label: t.statHelpfulVotes,
       value: statsLoading ? "..." : String(stats?.helpful_votes ?? 0),
       icon: ThumbsUp,
     },
@@ -246,15 +330,12 @@ export default function SquarePage() {
     general: 0,
   };
 
-  const filterButtons = FILTER_OPTIONS.map((opt) => {
-    const count =
-      opt.value === "all" ? stats?.total_posts ?? posts.length : targetCounts[opt.value];
-
-    return {
-      ...opt,
-      count,
-    };
-  });
+  const filterButtons: { value: FilterType; label: string; count: number }[] = [
+    { value: "all", label: t.filterAll, count: stats?.total_posts ?? posts.length },
+    { value: "bookmark", label: t.filterBookmark, count: targetCounts.bookmark ?? 0 },
+    { value: "star", label: t.filterStar, count: targetCounts.star ?? 0 },
+    { value: "general", label: t.filterGeneral, count: targetCounts.general ?? 0 },
+  ];
 
   return (
     <div className="space-y-6">
@@ -268,15 +349,14 @@ export default function SquarePage() {
               className="w-fit border-white/20 bg-white/10 text-white"
             >
               <Sparkles className="mr-1 h-3.5 w-3.5" />
-              社区广场
+              {t.badgeCommunity}
             </Badge>
             <div className="space-y-2">
               <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-                分享、评测、发现
+                {t.heroTitle}
               </h1>
               <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-base">
-                这里是你整理书签、GitHub Stars 和灵感碎片的公共展示台。
-                发帖、投票、晒资源，让好的信息更容易被看见。
+                {t.heroDescription}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -285,11 +365,11 @@ export default function SquarePage() {
                 className="bg-white text-slate-950 hover:bg-white/90"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                发布内容
+                {t.publish}
               </Button>
               <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white/80">
                 <TrendingUp className="h-4 w-4" />
-                最新动态已开启
+                {t.updatesOn}
               </div>
             </div>
           </div>
@@ -317,22 +397,26 @@ export default function SquarePage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        {SQUARE_TARGET_OPTIONS.map((option) => (
-          <Card key={option.value} className="border-dashed bg-card/80">
-            <CardContent className="flex items-center justify-between gap-4 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{option.label}</p>
-                <p className="text-xs text-muted-foreground">{option.description}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-semibold">
-                  {targetCounts[option.value]}
+        {SQUARE_TARGET_OPTIONS.map((option) => {
+          const label = getFilterLabel(option.value as FilterType, t);
+          const description = getTargetDescription(option.value as FilterType, t);
+          return (
+            <Card key={option.value} className="border-dashed bg-card/80">
+              <CardContent className="flex items-center justify-between gap-4 p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{label}</p>
+                  <p className="text-xs text-muted-foreground">{description}</p>
                 </div>
-                <div className="text-xs text-muted-foreground">条发布</div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="text-right">
+                  <div className="text-lg font-semibold">
+                    {targetCounts[option.value]}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{t.postsCountSuffix}</div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -362,15 +446,15 @@ export default function SquarePage() {
       ) : posts.length === 0 ? (
         <EmptyState
           icon={Globe}
-          title="暂无内容"
-          description="成为第一个分享者吧！点击「发布」开始"
+          title={t.emptyTitle}
+          description={t.emptyDescription}
           action={
             <Button
               variant="outline"
               onClick={() => setShowCreateModal(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
-              发布第一条
+              {t.publishFirst}
             </Button>
           }
         />
@@ -397,10 +481,10 @@ export default function SquarePage() {
                 {loadingMore ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    加载中...
+                    {t.loadingMore}
                   </>
                 ) : (
-                  "加载更多"
+                  t.loadMore
                 )}
               </Button>
             </div>

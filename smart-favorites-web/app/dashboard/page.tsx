@@ -12,9 +12,71 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type { SearchResult } from "@/types";
 
+const pageCopy = {
+  zh: {
+    title: "智能搜索",
+    subtitle: "使用 AI 语义搜索查找您的收藏内容",
+    placeholder: "输入关键词或自然语言问题...",
+    searching: "搜索中...",
+    search: "搜索",
+    filterAll: "全部",
+    filterBookmarks: "书签",
+    filterStars: "GitHub Stars",
+    filterDocuments: "Documents",
+    searchFailedRetry: "搜索失败，请稍后重试",
+    searchFailedNetwork: "搜索失败，请检查网络后重试",
+    resultCount: "找到 {count} 个结果",
+    noResults: "未找到相关结果",
+    noDescription: "暂无描述",
+    badgeBookmark: "书签",
+    badgeDocument: "文档",
+    badgeStar: "Star",
+    pageLabel: "第",
+    pageSuffix: "页",
+  },
+  en: {
+    title: "Smart Search",
+    subtitle: "Use AI semantic search to find your saved content",
+    placeholder: "Enter a keyword or a natural language question...",
+    searching: "Searching...",
+    search: "Search",
+    filterAll: "All",
+    filterBookmarks: "Bookmarks",
+    filterStars: "GitHub Stars",
+    filterDocuments: "Documents",
+    searchFailedRetry: "Search failed, please try again later",
+    searchFailedNetwork: "Search failed, please check your network and try again",
+    resultCount: "{count} results found",
+    noResults: "No matching results found",
+    noDescription: "No description",
+    badgeBookmark: "Bookmark",
+    badgeDocument: "Document",
+    badgeStar: "Star",
+    pageLabel: "Page ",
+    pageSuffix: "",
+  },
+} as const;
+
+function filterLabel(language: DashboardLanguage, type: "all" | "bookmarks" | "stars" | "documents") {
+  const t = pageCopy[language];
+  switch (type) {
+    case "all":
+      return t.filterAll;
+    case "bookmarks":
+      return t.filterBookmarks;
+    case "stars":
+      return t.filterStars;
+    case "documents":
+      return t.filterDocuments;
+  }
+}
+
 export default function SearchPage() {
+  const [language] = useDashboardLanguage();
+  const t = pageCopy[language];
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,12 +103,12 @@ export default function SearchPage() {
       } else {
         const data = await response.json().catch(() => ({}));
         setResults([]);
-        setError(data.error || "搜索失败，请稍后重试");
+        setError(data.error || t.searchFailedRetry);
       }
     } catch (error) {
       console.error("Search error:", error);
       setResults([]);
-      setError("搜索失败，请检查网络后重试");
+      setError(t.searchFailedNetwork);
     } finally {
       setLoading(false);
     }
@@ -55,9 +117,9 @@ export default function SearchPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">智能搜索</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
         <p className="text-muted-foreground mt-2">
-          使用 AI 语义搜索查找您的收藏内容
+          {t.subtitle}
         </p>
       </div>
 
@@ -65,7 +127,7 @@ export default function SearchPage() {
         <CardContent className="pt-6">
           <div className="flex gap-2">
             <Input
-              placeholder="输入关键词或自然语言问题..."
+              placeholder={t.placeholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -73,7 +135,7 @@ export default function SearchPage() {
             />
             <Button onClick={handleSearch} disabled={loading}>
               <Search className="h-4 w-4 mr-2" />
-              {loading ? "搜索中..." : "搜索"}
+              {loading ? t.searching : t.search}
             </Button>
           </div>
 
@@ -85,13 +147,7 @@ export default function SearchPage() {
                 size="sm"
                 onClick={() => setSearchType(type)}
               >
-                {type === "all"
-                  ? "全部"
-                  : type === "bookmarks"
-                    ? "书签"
-                    : type === "stars"
-                      ? "GitHub Stars"
-                      : "Documents"}
+                {filterLabel(language, type)}
               </Button>
             ))}
           </div>
@@ -109,18 +165,18 @@ export default function SearchPage() {
 
         {results.length > 0 && (
           <p className="text-sm text-muted-foreground">
-            找到 {results.length} 个结果
+            {t.resultCount.replace("{count}", String(results.length))}
           </p>
         )}
 
         {results.map((result, index) => (
-          <ResultCard key={index} result={result} />
+          <ResultCard key={index} result={result} language={language} />
         ))}
 
         {results.length === 0 && query && !loading && !error && (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              未找到相关结果
+              {t.noResults}
             </CardContent>
           </Card>
         )}
@@ -129,7 +185,14 @@ export default function SearchPage() {
   );
 }
 
-function ResultCard({ result }: { result: SearchResult }) {
+function ResultCard({
+  result,
+  language,
+}: {
+  result: SearchResult;
+  language: DashboardLanguage;
+}) {
+  const t = pageCopy[language];
   const isBookmark = result.type === "bookmark";
   const isDocument = result.type === "document";
 
@@ -146,10 +209,16 @@ function ResultCard({ result }: { result: SearchResult }) {
 
   const description =
     isBookmark && result.bookmark
-      ? result.bookmark.description
+      ? language === "zh"
+        ? result.bookmark.description_zh || result.bookmark.description || result.bookmark.description_en
+        : result.bookmark.description_en || result.bookmark.description || result.bookmark.description_zh
       : isDocument && result.document
         ? result.document.content
-      : result.star?.description;
+      : result.star
+        ? language === "zh"
+          ? result.star.description_zh || result.star.description || result.star.description_en
+          : result.star.description_en || result.star.description || result.star.description_zh
+        : undefined;
 
   const url =
     isBookmark && result.bookmark
@@ -164,7 +233,7 @@ function ResultCard({ result }: { result: SearchResult }) {
             <div className="flex items-center gap-2">
               <CardTitle className="text-lg">{title}</CardTitle>
               <Badge variant={isBookmark ? "default" : "secondary"}>
-                {isBookmark ? "书签" : isDocument ? "Document" : "Star"}
+                {isBookmark ? t.badgeBookmark : isDocument ? t.badgeDocument : t.badgeStar}
               </Badge>
             </div>
             {result.star?.language && (
@@ -178,7 +247,7 @@ function ResultCard({ result }: { result: SearchResult }) {
           </div>
         </div>
         <CardDescription className="mt-2">
-          {description || "暂无描述"}
+          {description || t.noDescription}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -201,7 +270,14 @@ function ResultCard({ result }: { result: SearchResult }) {
         {result.document && (
           <div className="mt-2 text-sm text-muted-foreground">
             {result.document.file_name && <span>{result.document.file_name}</span>}
-            {result.document.page_number && <span> · Page {result.document.page_number}</span>}
+            {result.document.page_number && (
+              <span>
+                {" · "}
+                {pickLanguage(language, t.pageLabel, "Page ")}
+                {result.document.page_number}
+                {pickLanguage(language, t.pageSuffix, "")}
+              </span>
+            )}
             {result.document.section_title && <span> · {result.document.section_title}</span>}
           </div>
         )}

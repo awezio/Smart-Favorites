@@ -202,13 +202,14 @@ async function searchBookmarksByDirectMatch(
       `description_zh.ilike.%${escapeIlikeTerm(term)}%`,
       `description_en.ilike.%${escapeIlikeTerm(term)}%`,
       `folder_path.ilike.%${escapeIlikeTerm(term)}%`,
+      `tags.cs.{${escapePostgrestArrayTerm(term)}}`,
     ])
     .join(",");
 
   let request = supabase
     .from("bookmarks")
     .select(
-      "id,user_id,title,url,description,description_zh,description_en,description_metadata,folder_path,add_date,icon,created_at,updated_at"
+      "id,user_id,title,url,description,description_zh,description_en,description_metadata,tags,folder_path,snapshot_url,snapshot_storage_path,snapshot_taken_at,snapshot_status,snapshot_error,snapshot_metadata,add_date,icon,created_at,updated_at"
     )
     .or(orFilter)
     .limit(Math.max(topK * 3, 24));
@@ -232,6 +233,7 @@ async function searchBookmarksByDirectMatch(
           row.description,
           row.description_zh,
           row.description_en,
+          Array.isArray(row.tags) ? row.tags.join(" ") : "",
           row.folder_path,
         ]),
       })
@@ -377,6 +379,10 @@ function escapeIlikeTerm(term: string): string {
   return term.replace(/[%_,]/g, "");
 }
 
+function escapePostgrestArrayTerm(term: string): string {
+  return term.replace(/[{}"',\\]/g, "").trim();
+}
+
 function scoreDirectMatch(
   query: string,
   terms: string[],
@@ -459,7 +465,14 @@ function toBookmarkResult(row: any): SearchResult {
       description_zh: row.description_zh,
       description_en: row.description_en,
       description_metadata: row.description_metadata,
+      tags: Array.isArray(row.tags) ? row.tags : [],
       folder_path: row.folder_path,
+      snapshot_url: row.snapshot_url,
+      snapshot_storage_path: row.snapshot_storage_path,
+      snapshot_taken_at: row.snapshot_taken_at,
+      snapshot_status: row.snapshot_status,
+      snapshot_error: row.snapshot_error,
+      snapshot_metadata: row.snapshot_metadata,
       add_date: row.add_date,
       icon: row.icon,
       created_at: row.created_at || now,

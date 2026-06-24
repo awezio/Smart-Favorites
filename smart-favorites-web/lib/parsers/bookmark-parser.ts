@@ -73,8 +73,11 @@ export function toBookmarkRecord(parsed: ParsedBookmark): Omit<Bookmark, "id" | 
   return {
     title: parsed.title,
     url: parsed.url,
-    description: "",
-    folder_path: parsed.folder_path || "",
+  description: "",
+  tags: parsed.folder_path
+    ? parsed.folder_path.split("/").map((part) => part.trim()).filter(Boolean)
+    : [],
+  folder_path: parsed.folder_path || "",
     add_date: parsed.add_date,
     icon: parsed.icon,
     created_at: new Date().toISOString(),
@@ -143,6 +146,9 @@ function toBookmark(item: Bookmark | ParsedBookmark): Bookmark {
     title: item.title,
     url: item.url,
     description: "",
+    tags: item.folder_path
+      ? item.folder_path.split("/").map((part) => part.trim()).filter(Boolean)
+      : [],
     folder_path: item.folder_path || "",
     add_date: item.add_date,
     icon: item.icon,

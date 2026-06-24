@@ -5,6 +5,13 @@ import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function tagsFromFolderPath(folderPath?: string | null) {
+  return (folderPath || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId, user } = await getAuthUser(request);
@@ -38,6 +45,7 @@ export async function POST(request: NextRequest) {
       title: pb.title,
       url: pb.url,
       description: '',
+      tags: tagsFromFolderPath(pb.folder_path),
       folder_path: pb.folder_path,
       add_date: pb.add_date,
       icon: pb.icon,
@@ -54,6 +62,7 @@ export async function POST(request: NextRequest) {
       title: bookmark.title,
       url: bookmark.url,
       description: bookmark.description,
+      tags: bookmark.tags?.length ? bookmark.tags : tagsFromFolderPath(bookmark.folder_path),
       folder_path: bookmark.folder_path,
       add_date: bookmark.add_date,
       icon: bookmark.icon,
@@ -71,6 +80,7 @@ export async function POST(request: NextRequest) {
         title: newBookmark.title,
         url: newBookmark.url,
         description: newBookmark.description,
+        tags: Array.isArray(oldBookmark.tags) ? oldBookmark.tags : [],
         folder_path: newBookmark.folder_path,
         add_date: newBookmark.add_date,
         icon: newBookmark.icon,
