@@ -159,13 +159,16 @@ function parseTagsInput(value: string) {
 function bookmarkSnapshotSrc(bookmark: Bookmark) {
   const snapshot_url = bookmark.snapshot_url;
   const snapshot_status = bookmark.snapshot_status;
+  let base = "";
   if (snapshot_url && snapshot_status === "ready") {
-    return snapshot_url;
+    base = snapshot_url;
+  } else if (bookmark.snapshot_storage_path && snapshot_status === "ready") {
+    base = `/api/bookmarks/snapshot-page?id=${encodeURIComponent(bookmark.id)}`;
   }
-  if (bookmark.snapshot_storage_path && snapshot_status === "ready") {
-    return `/api/bookmarks/snapshot-page?id=${encodeURIComponent(bookmark.id)}`;
-  }
-  return "";
+  if (!base) return "";
+  if (!bookmark.snapshot_taken_at) return base;
+  const separator = base.includes("?") ? "&" : "?";
+  return `${base}${separator}v=${encodeURIComponent(bookmark.snapshot_taken_at)}`;
 }
 
 function snapshotLabel(bookmark: Bookmark, language: DashboardLanguage) {
@@ -206,6 +209,17 @@ const pageCopy = {
     deleteCount: (n: number) => `删除 (${n})`,
     generateDescCount: (n: number) => `一键生成描述 (${n})`,
     generateDesc: "生成描述",
+    oneClickSnapshot: "一键快照",
+    snapshotCount: (n: number) => `一键快照 (${n})`,
+    selectFirstSnapshot: "请先选择要生成快照的书签",
+    capturingSnapshot: "正在生成网站快照...",
+    batchSnapshotGenerating: (n: number) => `正在生成 ${n} 个网站快照...`,
+    batchSnapshotDone: (n: number) => `已为 ${n} 个书签保存快照`,
+    batchSnapshotPartial: (success: number, failed: number) =>
+      `快照完成：${success} 成功，${failed} 失败`,
+    snapshotSaved: "网站快照已保存",
+    snapshotFailed: "快照生成失败",
+    snapshotUnavailable: "当前环境无法生成快照",
     searchPlaceholder: "搜索书签...",
     statusAll: "全部状态",
     statusHasDesc: "有描述",
@@ -303,6 +317,17 @@ const pageCopy = {
     deleteCount: (n: number) => `Delete (${n})`,
     generateDescCount: (n: number) => `Generate descriptions (${n})`,
     generateDesc: "Generate description",
+    oneClickSnapshot: "Snapshot",
+    snapshotCount: (n: number) => `Snapshot (${n})`,
+    selectFirstSnapshot: "Please select bookmarks to capture snapshots for first.",
+    capturingSnapshot: "Capturing website snapshot...",
+    batchSnapshotGenerating: (n: number) => `Capturing ${n} website snapshot(s)...`,
+    batchSnapshotDone: (n: number) => `Saved snapshots for ${n} bookmark(s)`,
+    batchSnapshotPartial: (success: number, failed: number) =>
+      `Snapshots done: ${success} succeeded, ${failed} failed`,
+    snapshotSaved: "Website snapshot saved",
+    snapshotFailed: "Snapshot capture failed",
+    snapshotUnavailable: "Snapshot capture is unavailable",
     searchPlaceholder: "Search bookmarks...",
     statusAll: "All status",
     statusHasDesc: "Has description",
@@ -403,6 +428,7 @@ export default function BookmarksPage() {
   // Batch operations
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [generatingBatch, setGeneratingBatch] = useState(false);
+  const [generatingBatchSnapshots, setGeneratingBatchSnapshots] = useState(false);
   const [extensionId, setExtensionId] = useState<string | null>(null);
   const [extensionVersion, setExtensionVersion] = useState<string | null>(null);
   const [checkingExtension, setCheckingExtension] = useState(true);
@@ -742,11 +768,15 @@ export default function BookmarksPage() {
     }
   };
 
-  const captureSnapshot = async (bookmark: Bookmark) => {
-    setCapturingSnapshotId(bookmark.id);
-    toast.loading(language === "zh" ? "正在生成网站快照..." : "Capturing website snapshot...", {
-      id: `snapshot-${bookmark.id}`,
-    });
+  const captureSnapshot = async (
+    bookmark: Bookmark,
+    options?: { quiet?: boolean }
+  ): Promise<boolean> => {
+    const toastId = `snapshot-${bookmark.id}`;
+    if (!options?.quiet) {
+      setCapturingSnapshotId(bookmark.id);
+      toast.loading(t.capturingSnapshot, { id: toastId });
+    }
     try {
       const response = await fetch("/api/bookmarks/snapshot-page", {
         method: "POST",
@@ -754,25 +784,69 @@ export default function BookmarksPage() {
         body: JSON.stringify({ id: bookmark.id }),
       });
       const data = await response.json().catch(() => ({}));
-      await loadBookmarks();
+      if (!options?.quiet) {
+        await loadBookmarks();
+      }
 
       if (response.ok && data.snapshot_status === "ready") {
-        toast.success(language === "zh" ? "网站快照已保存" : "Website snapshot saved", {
-          id: `snapshot-${bookmark.id}`,
-        });
-      } else {
+        if (!options?.quiet) {
+          toast.success(t.snapshotSaved, { id: toastId });
+        }
+        return true;
+      }
+
+      if (!options?.quiet) {
         toast.error(
-          data.snapshot_error ||
-            (language === "zh" ? "当前环境无法生成快照" : "Snapshot capture is unavailable"),
-          { id: `snapshot-${bookmark.id}` }
+          data.snapshot_error || data.error || t.snapshotUnavailable,
+          { id: toastId }
         );
       }
+      return false;
     } catch {
-      toast.error(language === "zh" ? "快照生成失败" : "Snapshot capture failed", {
-        id: `snapshot-${bookmark.id}`,
-      });
+      if (!options?.quiet) {
+        toast.error(t.snapshotFailed, { id: toastId });
+      }
+      return false;
     } finally {
-      setCapturingSnapshotId(null);
+      if (!options?.quiet) {
+        setCapturingSnapshotId(null);
+      }
+    }
+  };
+
+  const batchCaptureSnapshots = async () => {
+    const selected = filteredBookmarks.filter((bookmark) =>
+      selectedIds.has(bookmark.id)
+    );
+    if (selected.length === 0) {
+      toast.error(t.selectFirstSnapshot);
+      return;
+    }
+
+    setGeneratingBatchSnapshots(true);
+    toast.loading(t.batchSnapshotGenerating(selected.length), {
+      id: "batch-snapshot",
+    });
+    let success = 0;
+    let failed = 0;
+
+    for (const bookmark of selected) {
+      const ok = await captureSnapshot(bookmark, { quiet: true });
+      if (ok) {
+        success += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    await loadBookmarks();
+    setGeneratingBatchSnapshots(false);
+    setSelectedIds(new Set());
+
+    if (failed === 0) {
+      toast.success(t.batchSnapshotDone(success), { id: "batch-snapshot" });
+    } else {
+      toast.error(t.batchSnapshotPartial(success, failed), { id: "batch-snapshot" });
     }
   };
 
@@ -948,14 +1022,16 @@ export default function BookmarksPage() {
             variant="outline"
             className="h-7 text-xs"
             disabled={isCapturing}
-            onClick={() => captureSnapshot(bookmark)}
+            onClick={() => {
+              void captureSnapshot(bookmark);
+            }}
           >
             {isCapturing ? (
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             ) : (
               <Camera className="h-3 w-3 mr-1" />
             )}
-            {language === "zh" ? "快照" : "Snapshot"}
+            {t.oneClickSnapshot}
           </Button>
         </div>
       </div>
@@ -1177,20 +1253,36 @@ export default function BookmarksPage() {
             ]}
             actions={
               selectedIds.size > 0 ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={generatingBatch}
-                  onClick={batchGenerateDescriptions}
-                  className="h-10"
-                >
-                  {generatingBatch ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-1" />
-                  )}
-                  {t.generateDescCount(selectedIds.size)}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={generatingBatchSnapshots || generatingBatch}
+                    onClick={batchCaptureSnapshots}
+                    className="h-10"
+                  >
+                    {generatingBatchSnapshots ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4 mr-1" />
+                    )}
+                    {t.snapshotCount(selectedIds.size)}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={generatingBatch || generatingBatchSnapshots}
+                    onClick={batchGenerateDescriptions}
+                    className="h-10"
+                  >
+                    {generatingBatch ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-1" />
+                    )}
+                    {t.generateDescCount(selectedIds.size)}
+                  </Button>
+                </div>
               ) : null
             }
             viewToggle={

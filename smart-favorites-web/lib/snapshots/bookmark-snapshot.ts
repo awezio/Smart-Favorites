@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { maskSensitiveSnapshotText } from "@/lib/snapshots/redaction";
 
 export const BOOKMARK_SNAPSHOT_BUCKET = "bookmark_snapshots";
 
@@ -46,81 +45,115 @@ export async function captureBookmarkSnapshot({
     });
   }
 
-  let browser: Awaited<
-    ReturnType<typeof import("playwright-core").chromium.launch>
-  > | null = null;
-  try {
-    const runtime = await loadPlaywrightRuntime();
-    browser = await launchChromium(runtime);
+  let lastError: unknown = null;
+  for (const runtime of await getPlaywrightRuntimeCandidates()) {
+    let browser: Awaited<
+      ReturnType<typeof import("playwright-core").chromium.launch>
+    > | null = null;
+    try {
+      browser = await launchChromium(runtime);
 
-    const page = await browser.newPage({
-      viewport: { width: 1365, height: 768 },
-      deviceScaleFactor: 1,
-    });
-    await page.goto(normalized.url, {
-      waitUntil: "domcontentloaded",
-      timeout: 25000,
-    });
-    await page.waitForTimeout(1200);
+      const page = await browser.newPage({
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1,
+      });
+      await page.goto(normalized.url, {
+        waitUntil: "load",
+        timeout: 30000,
+      });
+      await page.waitForTimeout(600);
 
-    const redaction = await maskSensitiveSnapshotText(page);
-    const screenshot = await page.screenshot({
-      type: "png",
-      fullPage: false,
-      animations: "disabled",
-    });
-
-    const storagePath = `${userId}/${bookmarkId}.png`;
-    const supabase = createAdminClient();
-    const { error } = await supabase.storage
-      .from(BOOKMARK_SNAPSHOT_BUCKET)
-      .upload(storagePath, Buffer.from(screenshot), {
-        contentType: "image/png",
-        cacheControl: "3600",
-        upsert: true,
+      const screenshot = await page.screenshot({
+        type: "png",
+        fullPage: false,
+        animations: "disabled",
       });
 
-    if (error) {
-      return snapshotFailure("failed", error.message, {
-        original_url: url,
-        fetched_url: page.url(),
-        redaction,
-      });
-    }
+      const storagePath = `${userId}/${bookmarkId}.png`;
+      const supabase = createAdminClient();
+      const { error } = await supabase.storage
+        .from(BOOKMARK_SNAPSHOT_BUCKET)
+        .upload(storagePath, Buffer.from(screenshot), {
+          contentType: "image/png",
+          cacheControl: "3600",
+          upsert: true,
+        });
 
-    const takenAt = new Date().toISOString();
-    return {
-      snapshot_url: `/api/bookmarks/snapshot-page?id=${encodeURIComponent(bookmarkId)}`,
-      snapshot_storage_path: storagePath,
-      snapshot_taken_at: takenAt,
-      snapshot_status: "ready",
-      snapshot_error: null,
-      snapshot_metadata: {
-        original_url: url,
-        fetched_url: page.url(),
-        title,
-        viewport: { width: 1365, height: 768 },
-        redaction,
-        generated_at: takenAt,
-        runtime: runtime.runtimeLabel,
-      },
-    };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Snapshot capture failed.";
-    const missingRuntime =
-      /Snapshot runtime is unavailable|Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|playwright|ENOENT|executable/i.test(
-        message
-      );
-    return snapshotFailure(missingRuntime ? "unavailable" : "failed", message, {
-      original_url: url,
-      title,
-      requires_runtime: "playwright-core",
-    });
-  } finally {
-    if (browser) {
-      await browser.close().catch(() => undefined);
+      if (error) {
+        return snapshotFailure("failed", error.message, {
+          original_url: url,
+          fetched_url: page.url(),
+          runtime: runtime.runtimeLabel,
+        });
+      }
+
+      const takenAt = new Date().toISOString();
+      return {
+        snapshot_url: `/api/bookmarks/snapshot-page?id=${encodeURIComponent(bookmarkId)}`,
+        snapshot_storage_path: storagePath,
+        snapshot_taken_at: takenAt,
+        snapshot_status: "ready",
+        snapshot_error: null,
+        snapshot_metadata: {
+          original_url: url,
+          fetched_url: page.url(),
+          title,
+          viewport: { width: 1280, height: 720 },
+          generated_at: takenAt,
+          runtime: runtime.runtimeLabel,
+        },
+      };
+    } catch (error: unknown) {
+      lastError = error;
+    } finally {
+      if (browser) {
+        await browser.close().catch(() => undefined);
+      }
     }
   }
+
+  const message =
+    lastError instanceof Error
+      ? lastError.message
+      : "Snapshot capture failed.";
+  const missingRuntime =
+    /Snapshot runtime is unavailable|Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|playwright|ENOENT|executable/i.test(
+      message
+    );
+  return snapshotFailure(missingRuntime ? "unavailable" : "failed", message, {
+    original_url: url,
+    title,
+    requires_runtime: "playwright-core",
+  });
+}
+
+async function getPlaywrightRuntimeCandidates(): Promise<
+  Array<PlaywrightLaunchConfig & { runtimeLabel: string }>
+> {
+  const candidates: Array<PlaywrightLaunchConfig & { runtimeLabel: string }> =
+    [];
+
+  if (!isServerlessSnapshotEnvironment()) {
+    try {
+      candidates.push(await loadLocalPlaywrightRuntime());
+    } catch {
+      // Local Chrome/Edge may be unavailable inside the Next.js dev bundle.
+    }
+  }
+
+  try {
+    candidates.push(await loadServerlessPlaywrightRuntime());
+  } catch {
+    // Remote Sparticuz pack is the production fallback.
+  }
+
+  if (candidates.length === 0) {
+    throw new Error(
+      "Snapshot runtime is unavailable. Install Chrome or Edge locally, or allow downloading the Sparticuz Chromium pack."
+    );
+  }
+
+  return candidates;
 }
 
 function isServerlessSnapshotEnvironment() {
@@ -135,15 +168,6 @@ function isServerlessSnapshotEnvironment() {
       process.env.AWS_LAMBDA_FUNCTION_NAME ||
       process.env.AWS_EXECUTION_ENV
   );
-}
-
-async function loadPlaywrightRuntime(): Promise<
-  PlaywrightLaunchConfig & { runtimeLabel: string }
-> {
-  if (isServerlessSnapshotEnvironment()) {
-    return loadServerlessPlaywrightRuntime();
-  }
-  return loadLocalPlaywrightRuntime();
 }
 
 async function loadServerlessPlaywrightRuntime(): Promise<

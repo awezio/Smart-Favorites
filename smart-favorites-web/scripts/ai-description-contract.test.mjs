@@ -183,8 +183,8 @@ assert.match(
 );
 assert.match(
   snapshotService,
-  /maskSensitiveSnapshotText[\s\S]*storage[\s\S]*upload/,
-  "Snapshot capture should redact likely sensitive content before uploading."
+  /page\.goto[\s\S]*page\.screenshot[\s\S]*storage[\s\S]*upload/,
+  "Snapshot capture should open the page and upload a screenshot."
 );
 assert.match(
   snapshotService,
@@ -203,8 +203,8 @@ assert.match(
 );
 assert.match(
   snapshotService,
-  /isServerlessSnapshotEnvironment|VERCEL|PLAYWRIGHT_CHROMIUM_CHANNEL/,
-  "Snapshot runtime should branch between local Chrome/Edge and serverless Chromium."
+  /getPlaywrightRuntimeCandidates[\s\S]*loadServerlessPlaywrightRuntime/,
+  "Snapshot runtime should fall back to serverless Chromium when local launch fails."
 );
 assert.doesNotMatch(
   snapshotService,
@@ -240,7 +240,17 @@ assert.match(
 assert.match(
   bookmarksPage,
   /snapshot_url[\s\S]*snapshot_status[\s\S]*captureSnapshot/,
-  "Bookmark management should show website snapshots and let users refresh them."
+  "Bookmark management should show website snapshots and let users capture them."
+);
+assert.match(
+  bookmarksPage,
+  /batchCaptureSnapshots[\s\S]*snapshotCount/,
+  "Bookmark management should support batch one-click snapshot capture for selected bookmarks."
+);
+assert.match(
+  bookmarksPage,
+  /oneClickSnapshot/,
+  "Bookmark snapshot actions should use the one-click snapshot label."
 );
 assert.match(
   bookmarksPage,
