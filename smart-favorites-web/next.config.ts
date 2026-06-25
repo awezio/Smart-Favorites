@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium",
     "playwright-core",
   ],
+  outputFileTracingIncludes: {
+    "/api/bookmarks/snapshot-page": [
+      "./node_modules/@sparticuz/chromium/**",
+    ],
+    "/api/ai/describe": ["./node_modules/@sparticuz/chromium/**"],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

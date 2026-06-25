@@ -198,6 +198,11 @@ assert.match(
 );
 assert.match(
   snapshotService,
+  /CHROMIUM_REMOTE_EXEC_PATH|chromium-v\d+\.\d+\.\d+-pack/,
+  "Snapshot runtime should resolve Chromium from a remote Sparticuz pack on serverless."
+);
+assert.match(
+  snapshotService,
   /isServerlessSnapshotEnvironment|VERCEL|PLAYWRIGHT_CHROMIUM_CHANNEL/,
   "Snapshot runtime should branch between local Chrome/Edge and serverless Chromium."
 );

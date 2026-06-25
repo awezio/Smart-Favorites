@@ -5,6 +5,10 @@ import { maskSensitiveSnapshotText } from "@/lib/snapshots/redaction";
 
 export const BOOKMARK_SNAPSHOT_BUCKET = "bookmark_snapshots";
 
+// Keep in sync with the @sparticuz/chromium version in package.json.
+const SPARTICUZ_CHROMIUM_VERSION = "149.0.0";
+const DEFAULT_SERVERLESS_CHROMIUM_PACK_URL = `https://github.com/Sparticuz/chromium/releases/download/v${SPARTICUZ_CHROMIUM_VERSION}/chromium-v${SPARTICUZ_CHROMIUM_VERSION}-pack.x64.tar`;
+
 export type BookmarkSnapshotResult = {
   snapshot_url: string | null;
   snapshot_storage_path: string | null;
@@ -158,10 +162,12 @@ async function loadServerlessPlaywrightRuntime(): Promise<
     const chromiumPkg = serverlessChromium.default;
     chromiumPkg.setGraphicsMode = false;
 
-    const executablePath =
+    const chromiumInput =
       process.env.CHROMIUM_PATH ||
       process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
-      (await chromiumPkg.executablePath());
+      process.env.CHROMIUM_REMOTE_EXEC_PATH ||
+      DEFAULT_SERVERLESS_CHROMIUM_PACK_URL;
+    const executablePath = await chromiumPkg.executablePath(chromiumInput);
 
     return {
       chromium,
