@@ -1,5 +1,6 @@
 import { searchAll, type SupabaseQueryClient } from "@/lib/rag/search";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { structuredDescriptionToRagText } from "@/lib/ai/description-generator";
 import {
   ProviderApiError,
   callProviderChat,
@@ -126,11 +127,17 @@ async function resolveProviderKey(userId: string, provider: string) {
 function buildRagPrompt(query: string, sources: SearchResult[]) {
   const evidence = sources.slice(0, 12).map((source, index) => {
     if (source.type === "bookmark" && source.bookmark) {
-      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nFolder: ${source.bookmark.folder_path || ""}\nDescription: ${source.bookmark.description_zh || source.bookmark.description || source.bookmark.description_en || ""}`;
+      const structuredDetails = structuredDescriptionToRagText(
+        source.bookmark.description_metadata?.structured_description
+      );
+      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nFolder: ${source.bookmark.folder_path || ""}\nDescription: ${source.bookmark.description_zh || source.bookmark.description || source.bookmark.description_en || ""}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
     }
 
     if (source.type === "star" && source.star) {
-      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description_zh || source.star.description || source.star.description_en || ""}`;
+      const structuredDetails = structuredDescriptionToRagText(
+        source.star.description_metadata?.structured_description
+      );
+      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description_zh || source.star.description || source.star.description_en || ""}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
     }
 
     if (source.type === "document" && source.document) {

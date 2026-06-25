@@ -97,7 +97,7 @@ export async function captureBookmarkSnapshot({
   } catch (error: any) {
     const message = error?.message || "Snapshot capture failed.";
     const missingRuntime =
-      /Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|playwright/i.test(message);
+      /Snapshot runtime is unavailable|Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|playwright/i.test(message);
     return snapshotFailure(missingRuntime ? "unavailable" : "failed", message, {
       original_url: url,
       title,
@@ -111,14 +111,10 @@ export async function captureBookmarkSnapshot({
 }
 
 async function loadPlaywrightRuntime() {
-  const dynamicImport = new Function("specifier", "return import(specifier)") as (
-    specifier: string
-  ) => Promise<any>;
-
   try {
     const [{ chromium }, serverlessChromium] = await Promise.all([
-      dynamicImport("playwright-core"),
-      dynamicImport("@sparticuz/chromium"),
+      import("playwright-core"),
+      import("@sparticuz/chromium"),
     ]);
     if (!chromium) {
       throw new Error("playwright-core chromium runtime is unavailable.");
@@ -134,16 +130,16 @@ async function loadPlaywrightRuntime() {
       args: serverlessChromium.default.args,
     };
   } catch (error: any) {
-    const mod = await dynamicImport("playwright");
-    if (!mod?.chromium) {
-      throw error;
-    }
-    return {
-      chromium: mod.chromium,
-      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    };
+    throw new Error(`Snapshot runtime is unavailable. ${runtimeErrorMessage(error)}`);
   }
+}
+
+function runtimeErrorMessage(error: any) {
+  const message = String(error?.message || error || "");
+  if (/Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND/i.test(message)) {
+    return "The deployed function is missing the traced Chromium runtime dependency.";
+  }
+  return message.slice(0, 300) || "Chromium could not be initialized.";
 }
 
 function snapshotFailure(

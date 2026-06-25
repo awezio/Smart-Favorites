@@ -15,12 +15,14 @@ const migrations = readdirSync(migrationsDir)
 const types = read("types", "index.ts");
 const supabaseTypes = read("types", "supabase.ts");
 const generator = read("lib", "ai", "description-generator.ts");
+const bookmarkDescriptionPrompt = read("lib", "ai", "prompts", "bookmark-description.skill.ts");
 const bookmarksDb = read("lib", "db", "bookmarks.ts");
 const describeRoute = read("app", "api", "ai", "describe", "route.ts");
 const bookmarksRoute = read("app", "api", "bookmarks", "route.ts");
 const bookmarksPage = read("app", "dashboard", "bookmarks", "page.tsx");
 const starsPage = read("app", "dashboard", "stars", "page.tsx");
 const okfExporter = read("lib", "knowledge-format", "export.ts");
+const ragEngine = read("lib", "rag", "rag-engine.ts");
 const snapshotRoutePath = join(repoRoot, "app", "api", "bookmarks", "snapshot-page", "route.ts");
 const snapshotServicePath = join(repoRoot, "lib", "snapshots", "bookmark-snapshot.ts");
 const snapshotRedactionPath = join(repoRoot, "lib", "snapshots", "redaction.ts");
@@ -79,14 +81,24 @@ assert.match(
   "Description generation should use the configured AI provider instead of a string template."
 );
 assert.match(
-  generator,
-  /请访问这个网站并浏览，总结这个网站是什么、具体用途和受众人群/,
-  "Bookmark prompt should use the requested Chinese browsing-and-summary instruction."
+  bookmarkDescriptionPrompt,
+  /你是一位信息架构师/,
+  "Bookmark prompt should be kept in a skill-like injection template."
+);
+assert.match(
+  bookmarkDescriptionPrompt,
+  /purpose[\s\S]*content[\s\S]*audience/,
+  "Prompt template should require the structured purpose/content/audience JSON shape."
 );
 assert.match(
   generator,
-  /用途[\s\S]*内容[\s\S]*服务人群/,
-  "Prompt should require purpose, content, and audience coverage."
+  /BOOKMARK_DESCRIPTION_SYSTEM_PROMPT[\s\S]*role:\s*"system"/,
+  "Bookmark description generation should inject the skill-like template as the system prompt."
+);
+assert.match(
+  generator,
+  /structured_description[\s\S]*purpose[\s\S]*content[\s\S]*audience/,
+  "Generator should normalize model output into the requested structured website description."
 );
 assert.match(
   generator,
@@ -98,6 +110,11 @@ assert.match(
   describeRoute,
   /description_zh[\s\S]*description_en[\s\S]*description_metadata/,
   "AI describe API should persist both languages and metadata."
+);
+assert.match(
+  describeRoute,
+  /structuredDescriptionToRagText[\s\S]*generateEmbedding/,
+  "AI describe API should embed structured website description JSON for RAG."
 );
 assert.match(
   describeRoute,
@@ -155,6 +172,16 @@ assert.match(
   "Snapshot capture should redact likely sensitive content before uploading."
 );
 assert.match(
+  snapshotService,
+  /import\("playwright-core"\)[\s\S]*import\("@sparticuz\/chromium"\)/,
+  "Snapshot runtime imports should be traceable by Next/Vercel output tracing."
+);
+assert.doesNotMatch(
+  snapshotService,
+  /import\("playwright"\)|dynamicImport\("playwright"\)/,
+  "Snapshot runtime should not import the undeclared full playwright package in production."
+);
+assert.match(
   snapshotRedaction,
   /password|card|credit|称号|密码|卡号|account/i,
   "Snapshot redaction should cover likely sensitive account, password, and card labels."
@@ -177,6 +204,11 @@ assert.match(
 );
 assert.match(
   bookmarksPage,
+  /aria-label=\{language === "zh" \? "编辑描述" : "Edit description"\}[\s\S]*openBookmarkEditor\(b\)/,
+  "Bookmark management should expose per-item edit controls without entering a separate bulk edit mode."
+);
+assert.match(
+  bookmarksPage,
   /snapshot_url[\s\S]*snapshot_status[\s\S]*captureSnapshot/,
   "Bookmark management should show website snapshots and let users refresh them."
 );
@@ -189,6 +221,11 @@ assert.match(
   okfExporter,
   /description_zh[\s\S]*description_en[\s\S]*bilingualDescriptionMarkdown/,
   "OKF export should include bilingual AI descriptions in frontmatter and markdown body."
+);
+assert.match(
+  ragEngine,
+  /structuredDescriptionToRagText[\s\S]*Description details/,
+  "RAG prompt should include structured website description JSON details."
 );
 
 console.log("AI description contract passed");

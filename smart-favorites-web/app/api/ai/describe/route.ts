@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateBookmarkDescription, generateStarDescription } from "@/lib/ai/description-generator";
+import {
+  generateBookmarkDescription,
+  generateStarDescription,
+  structuredDescriptionToRagText,
+} from "@/lib/ai/description-generator";
 import { updateBookmark } from "@/lib/db/bookmarks";
 import { updateStar } from "@/lib/db/github-stars";
 import { generateEmbedding } from "@/lib/rag/embedding";
@@ -34,7 +38,8 @@ export async function POST(request: NextRequest) {
         title: item.title,
       });
 
-      const textToEmbed = `${item.title} ${generated.description_zh} ${generated.description_en} ${item.url}`;
+      const structuredText = structuredDescriptionToRagText(generated.structured_description);
+      const textToEmbed = `${item.title} ${generated.description_zh} ${generated.description_en} ${structuredText} ${item.url}`;
       const embedding = await generateEmbedding(textToEmbed, { userId });
 
       await updateBookmark(
@@ -59,6 +64,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         description: generated.description_zh,
+        structured_description: generated.structured_description,
         snapshot_url: snapshot.snapshot_url,
         snapshot_status: snapshot.snapshot_status,
         snapshot_error: snapshot.snapshot_error,

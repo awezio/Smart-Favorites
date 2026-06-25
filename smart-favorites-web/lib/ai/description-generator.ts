@@ -1,12 +1,33 @@
 import "server-only";
 
 import { callProviderChat, getEnvProviderKey, isSupportedProvider } from "@/lib/ai/provider-config";
+import {
+  BOOKMARK_DESCRIPTION_PROMPT_ID,
+  BOOKMARK_DESCRIPTION_SCHEMA_VERSION,
+  BOOKMARK_DESCRIPTION_SYSTEM_PROMPT,
+} from "@/lib/ai/prompts/bookmark-description.skill";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptSecret } from "@/lib/server/secrets";
+
+export type StructuredWebsiteDescription = {
+  purpose: {
+    zh: string;
+    en: string;
+  };
+  content: {
+    zh: string[];
+    en: string[];
+  };
+  audience: {
+    zh: string[];
+    en: string[];
+  };
+};
 
 export type GeneratedDescription = {
   description_zh: string;
   description_en: string;
+  structured_description?: StructuredWebsiteDescription;
   description_metadata: {
     reachable: boolean;
     fetched_url: string;
@@ -17,6 +38,9 @@ export type GeneratedDescription = {
     generated_at: string;
     provider?: string;
     model?: string;
+    prompt_template?: string;
+    schema_version?: string;
+    structured_description?: StructuredWebsiteDescription;
     fallback?: boolean;
     error?: string;
   };
@@ -38,9 +62,6 @@ type AiSelection = {
   apiKey: string;
 };
 
-const BOOKMARK_PROMPT_INSTRUCTION =
-  "请访问这个网站并浏览，总结这个网站是什么、具体用途和受众人群。";
-
 export async function generateBookmarkDescription(
   url: string,
   title?: string,
@@ -48,18 +69,49 @@ export async function generateBookmarkDescription(
 ): Promise<GeneratedDescription> {
   const page = await fetchPageContext(url);
   const safeTitle = title?.trim() || page.title || page.host || "Untitled bookmark";
-
-  return generateWithAiOrFallback({
-    userId: options.userId,
-    prompt: `${BOOKMARK_PROMPT_INSTRUCTION}\n\n${buildBookmarkPrompt({ title: safeTitle, url, page })}`,
-    fallback: buildFallbackDescription({
-      title: safeTitle,
-      url,
-      page,
-      kind: "bookmark",
-    }),
+  const fallback = buildFallbackDescription({
+    title: safeTitle,
+    url,
     page,
+    kind: "bookmark",
+    structured: true,
   });
+
+  try {
+    const selection = await resolveUserAiSelection(options.userId);
+    const response = await callProviderChat({
+      provider: selection.provider,
+      apiKey: selection.apiKey,
+      model: selection.model,
+      maxTokens: 900,
+      messages: [
+        {
+          role: "system",
+          content: BOOKMARK_DESCRIPTION_SYSTEM_PROMPT,
+        },
+        { role: "user", content: buildBookmarkWebsiteInfo({ title: safeTitle, url, page }) },
+      ],
+    });
+
+    const structured = parseStructuredDescriptionJson(response.content);
+    const generated = {
+      description_zh: structuredDescriptionToDisplayText(structured, "zh"),
+      description_en: structuredDescriptionToDisplayText(structured, "en"),
+      structured_description: structured,
+      description_metadata: {
+        ...baseMetadata(page),
+        provider: selection.provider,
+        model: response.model || selection.model,
+        prompt_template: BOOKMARK_DESCRIPTION_PROMPT_ID,
+        schema_version: BOOKMARK_DESCRIPTION_SCHEMA_VERSION,
+        structured_description: structured,
+      },
+    };
+
+    return generated;
+  } catch (error: any) {
+    return withFallbackError(fallback, error);
+  }
 }
 
 export async function generateStarDescription(
@@ -76,37 +128,17 @@ export async function generateStarDescription(
 ): Promise<GeneratedDescription> {
   const title = `${item.owner || "unknown"}/${item.repo || "repository"}`;
   const page = await fetchPageContext(item.url || `https://github.com/${title}`);
-
-  return generateWithAiOrFallback({
-    userId: options.userId,
-    prompt: buildStarPrompt({ title, item, page }),
-    fallback: buildFallbackDescription({
-      title,
-      url: item.url || page.url,
-      page,
-      kind: "GitHub star",
-      existingDescription: item.description,
-      language: item.language,
-    }),
+  const fallback = buildFallbackDescription({
+    title,
+    url: item.url || page.url,
     page,
+    kind: "GitHub star",
+    existingDescription: item.description,
+    language: item.language,
   });
-}
 
-async function generateWithAiOrFallback({
-  userId,
-  prompt,
-  fallback,
-  page,
-}: {
-  userId?: string;
-  prompt: string;
-  fallback: GeneratedDescription;
-  page: PageContext;
-}) {
   try {
-    if (!userId) throw new Error("Missing user id for AI provider resolution.");
-    const selection = await resolveUserAiSelection(userId);
-    if (!selection.apiKey) throw new Error(`No API key configured for ${selection.provider}.`);
+    const selection = await resolveUserAiSelection(options.userId);
     const response = await callProviderChat({
       provider: selection.provider,
       apiKey: selection.apiKey,
@@ -118,10 +150,11 @@ async function generateWithAiOrFallback({
           content:
             "You write detailed bilingual knowledge-base descriptions. Return strict JSON only.",
         },
-        { role: "user", content: prompt },
+        { role: "user", content: buildStarPrompt({ title, item, page }) },
       ],
     });
-    const parsed = parseDescriptionJson(response.content);
+
+    const parsed = parseFlatDescriptionJson(response.content);
     return {
       description_zh: parsed.description_zh,
       description_en: parsed.description_en,
@@ -132,18 +165,30 @@ async function generateWithAiOrFallback({
       },
     };
   } catch (error: any) {
-    return {
-      ...fallback,
-      description_metadata: {
-        ...fallback.description_metadata,
-        fallback: true,
-        error: error.message || "AI generation failed",
-      },
-    };
+    return withFallbackError(fallback, error);
   }
 }
 
-async function resolveUserAiSelection(userId: string): Promise<AiSelection> {
+export function structuredDescriptionToRagText(
+  structured: StructuredWebsiteDescription | null | undefined
+) {
+  if (!structured) return "";
+
+  return [
+    `Purpose zh: ${structured.purpose.zh}`,
+    `Purpose en: ${structured.purpose.en}`,
+    `Content zh: ${structured.content.zh.join(", ")}`,
+    `Content en: ${structured.content.en.join(", ")}`,
+    `Audience zh: ${structured.audience.zh.join(", ")}`,
+    `Audience en: ${structured.audience.en.join(", ")}`,
+  ]
+    .filter((line) => !line.endsWith(": "))
+    .join("\n");
+}
+
+async function resolveUserAiSelection(userId?: string): Promise<AiSelection> {
+  if (!userId) throw new Error("Missing user id for AI provider resolution.");
+
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("user_settings")
@@ -155,6 +200,7 @@ async function resolveUserAiSelection(userId: string): Promise<AiSelection> {
   const provider = isSupportedProvider(savedProvider) ? savedProvider : "deepseek";
   const saved = data?.api_keys?.[provider];
   const apiKey = saved ? decryptSecret(saved) : getEnvProviderKey(provider);
+  if (!apiKey) throw new Error(`No API key configured for ${provider}.`);
 
   return {
     provider,
@@ -266,7 +312,7 @@ function decodeHtml(value: string) {
     .trim();
 }
 
-function buildBookmarkPrompt({
+function buildBookmarkWebsiteInfo({
   title,
   url,
   page,
@@ -275,17 +321,7 @@ function buildBookmarkPrompt({
   url: string;
   page: PageContext;
 }) {
-  return `请利用网页可达性和抓取到的内容，为这个书签生成详细的双语知识库描述。
-
-必须覆盖：用途、内容、服务人群。网页可达时要基于网页内容总结；网页不可达时说明只能基于标题、URL 和已有元数据推断。
-
-Return JSON only:
-{
-  "description_zh": "中文。尽可能详细，覆盖用途、内容、服务人群。",
-  "description_en": "English. Detailed summary covering purpose, content, and target audience."
-}
-
-Bookmark:
+  return `网站信息：
 Title: ${title}
 URL: ${url}
 Reachable: ${page.reachable}
@@ -305,14 +341,11 @@ function buildStarPrompt({
   item: any;
   page: PageContext;
 }) {
-  return `请为这个 GitHub Star 生成详细的双语知识库描述，便于和书签、文档通过 OKF 知识库互相关联。
-
-必须覆盖：用途、内容、服务人群。可结合仓库名称、语言、stars/forks、已有描述和可抓取网页内容。
-
-Return JSON only:
+  return `Generate a detailed bilingual knowledge-base description for this GitHub Star.
+Cover purpose, content, and target audience. Return JSON only:
 {
-  "description_zh": "中文。尽可能详细，覆盖用途、内容、服务人群。",
-  "description_en": "English. Detailed summary covering purpose, content, and target audience."
+  "description_zh": "中文描述",
+  "description_en": "English description"
 }
 
 Repository: ${title}
@@ -326,18 +359,74 @@ Extracted content:
 ${page.text || ""}`;
 }
 
-function parseDescriptionJson(content: string) {
-  const jsonText =
-    content.match(/```json\s*([\s\S]*?)```/i)?.[1] ||
-    content.match(/\{[\s\S]*\}/)?.[0] ||
-    "{}";
-  const parsed = JSON.parse(jsonText);
-  const description_zh = String(parsed.description_zh || parsed.zh || "").trim();
-  const description_en = String(parsed.description_en || parsed.en || "").trim();
+function parseStructuredDescriptionJson(content: string): StructuredWebsiteDescription {
+  const parsed = JSON.parse(extractJsonObject(content));
+  const structured = {
+    purpose: {
+      zh: cleanText(parsed?.purpose?.zh),
+      en: cleanText(parsed?.purpose?.en),
+    },
+    content: {
+      zh: cleanArray(parsed?.content?.zh, 5),
+      en: cleanArray(parsed?.content?.en, 5),
+    },
+    audience: {
+      zh: cleanArray(parsed?.audience?.zh, 3),
+      en: cleanArray(parsed?.audience?.en, 3),
+    },
+  };
+
+  if (
+    !structured.purpose.zh ||
+    !structured.purpose.en ||
+    structured.content.zh.length === 0 ||
+    structured.content.en.length === 0 ||
+    structured.audience.zh.length === 0 ||
+    structured.audience.en.length === 0
+  ) {
+    throw new Error("Model response did not include purpose, content, and audience in both languages.");
+  }
+
+  return structured;
+}
+
+function parseFlatDescriptionJson(content: string) {
+  const parsed = JSON.parse(extractJsonObject(content));
+  const description_zh = cleanText(parsed.description_zh || parsed.zh);
+  const description_en = cleanText(parsed.description_en || parsed.en);
   if (!description_zh || !description_en) {
     throw new Error("Model response did not include both description_zh and description_en.");
   }
   return { description_zh, description_en };
+}
+
+function extractJsonObject(content: string) {
+  return (
+    content.match(/```json\s*([\s\S]*?)```/i)?.[1] ||
+    content.match(/\{[\s\S]*\}/)?.[0] ||
+    "{}"
+  );
+}
+
+function cleanText(value: unknown) {
+  return typeof value === "string" ? value.trim().slice(0, 500) : "";
+}
+
+function cleanArray(value: unknown, maxItems: number) {
+  return Array.isArray(value)
+    ? value.map(cleanText).filter(Boolean).slice(0, maxItems)
+    : [];
+}
+
+function structuredDescriptionToDisplayText(
+  structured: StructuredWebsiteDescription,
+  language: "zh" | "en"
+) {
+  if (language === "zh") {
+    return `${structured.purpose.zh} 内容：${structured.content.zh.join("、")}。受众：${structured.audience.zh.join("、")}。`;
+  }
+
+  return `${structured.purpose.en} Content: ${structured.content.en.join(", ")}. Audience: ${structured.audience.en.join(", ")}.`;
 }
 
 function buildFallbackDescription({
@@ -347,6 +436,7 @@ function buildFallbackDescription({
   kind,
   existingDescription,
   language,
+  structured = false,
 }: {
   title: string;
   url: string;
@@ -354,19 +444,68 @@ function buildFallbackDescription({
   kind: string;
   existingDescription?: string;
   language?: string;
+  structured?: boolean;
 }): GeneratedDescription {
   const host = page.host ? ` (${page.host})` : "";
   const source = page.reachable
     ? page.description || page.text?.slice(0, 240) || existingDescription || title
     : existingDescription || page.error || "The page could not be reached.";
-  const languageHint = language ? `，主要技术/语言为 ${language}` : "";
+  const languageHint = language ? `, primary technology language: ${language}` : "";
+  const structured_description = structured
+    ? buildFallbackStructuredDescription(title, url, host, source)
+    : undefined;
+
+  const description_zh = structured_description
+    ? structuredDescriptionToDisplayText(structured_description, "zh")
+    : `${title}${host} 是一个 ${kind}。当前摘要基于${page.reachable ? "可访问网页内容" : "标题、URL 和已有元数据"}生成${languageHint}。用途、内容和服务人群需要在配置 AI 模型后进一步细化。参考信息：${source}`;
+  const description_en = structured_description
+    ? structuredDescriptionToDisplayText(structured_description, "en")
+    : `${title}${host} is a ${kind}. This summary is based on ${page.reachable ? "reachable webpage content" : "the title, URL, and existing metadata"}${languageHint}. Its purpose, content, and target audience should be refined further once an AI model is configured. Reference: ${source}`;
 
   return {
-    description_zh: `${title}${host} 是一个 ${kind}。当前摘要基于${page.reachable ? "可访问网页内容" : "标题、URL 和已有元数据"}生成${languageHint}。用途、内容和服务人群需要在配置 AI 模型后进一步细化。参考信息：${source}`,
-    description_en: `${title}${host} is a ${kind}. This summary is based on ${page.reachable ? "reachable webpage content" : "the title, URL, and existing metadata"}. Its purpose, content, and target audience should be refined further once an AI model is configured. Reference: ${source}`,
+    description_zh,
+    description_en,
+    structured_description,
     description_metadata: {
       ...baseMetadata(page),
+      prompt_template: structured ? BOOKMARK_DESCRIPTION_PROMPT_ID : undefined,
+      schema_version: structured ? BOOKMARK_DESCRIPTION_SCHEMA_VERSION : undefined,
+      structured_description,
       fallback: true,
+    },
+  };
+}
+
+function buildFallbackStructuredDescription(
+  title: string,
+  url: string,
+  host: string,
+  source: string
+): StructuredWebsiteDescription {
+  const subject = `${title}${host}`.trim();
+  return {
+    purpose: {
+      zh: `${subject} 的网站用途摘要`,
+      en: `Website purpose summary for ${subject || url}`,
+    },
+    content: {
+      zh: ["网站标题与URL", "页面元数据", source.slice(0, 80)],
+      en: ["Site title and URL", "Page metadata", source.slice(0, 80)],
+    },
+    audience: {
+      zh: ["收藏该链接的用户", "需要快速理解网站价值的人"],
+      en: ["Users who saved this link", "People evaluating the site's value"],
+    },
+  };
+}
+
+function withFallbackError(fallback: GeneratedDescription, error: any): GeneratedDescription {
+  return {
+    ...fallback,
+    description_metadata: {
+      ...fallback.description_metadata,
+      fallback: true,
+      error: error.message || "AI generation failed",
     },
   };
 }

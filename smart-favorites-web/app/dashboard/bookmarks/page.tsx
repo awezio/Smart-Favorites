@@ -1284,15 +1284,19 @@ export default function BookmarksPage() {
                       <Sparkles className="h-3 w-3 mr-1" />AI
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 rounded-lg text-xs"
+                    aria-label={language === "zh" ? "编辑描述" : "Edit description"}
+                    onClick={() => openBookmarkEditor(b)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
                   {isEditing && (
-                    <>
-                      <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => openBookmarkEditor(b)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => handleDelete([b.id])}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </>
+                    <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => handleDelete([b.id])}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1331,16 +1335,15 @@ export default function BookmarksPage() {
                   </div>
                 )}
               </div>
-              {isEditing && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 rounded-lg p-0"
-                  onClick={() => openBookmarkEditor(b)}
-                >
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 rounded-lg p-0"
+                aria-label={language === "zh" ? "编辑描述" : "Edit description"}
+                onClick={() => openBookmarkEditor(b)}
+              >
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
               <a href={b.url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
               </a>
@@ -1388,25 +1391,24 @@ export default function BookmarksPage() {
                             {t.generateDesc}
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-xl p-0"
+                          aria-label={language === "zh" ? "编辑描述" : "Edit description"}
+                          onClick={() => openBookmarkEditor(b)}
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
                         {isEditing && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 rounded-xl p-0"
-                              onClick={() => openBookmarkEditor(b)}
-                            >
-                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 rounded-xl p-0"
-                              onClick={() => handleDelete([b.id])}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                          </>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-xl p-0"
+                            onClick={() => handleDelete([b.id])}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
                         )}
                       </div>
                     </div>

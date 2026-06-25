@@ -118,6 +118,27 @@ export async function PUT(request: NextRequest) {
     if (description_en !== undefined) {
       updates.description_en = normalizeOptionalString(description_en) || "";
     }
+    if (description !== undefined || description_zh !== undefined || description_en !== undefined) {
+      updates.description_metadata = {
+        schema_version: "manual_description_v1",
+        manual_edit: true,
+        manual_updated_at: new Date().toISOString(),
+        structured_description: {
+          purpose: {
+            zh: updates.description || "",
+            en: updates.description_en || "",
+          },
+          content: {
+            zh: [],
+            en: [],
+          },
+          audience: {
+            zh: [],
+            en: [],
+          },
+        },
+      };
+    }
     if (body.tags !== undefined) updates.tags = normalizeTags(body.tags);
     if (folder_path !== undefined) updates.folder_path = folder_path;
 
