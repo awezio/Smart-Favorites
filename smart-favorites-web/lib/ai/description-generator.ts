@@ -60,6 +60,7 @@ type AiSelection = {
   provider: string;
   model?: string;
   apiKey: string;
+  descriptionPrompt?: string;
 };
 
 export async function generateBookmarkDescription(
@@ -87,7 +88,7 @@ export async function generateBookmarkDescription(
       messages: [
         {
           role: "system",
-          content: BOOKMARK_DESCRIPTION_SYSTEM_PROMPT,
+          content: selection.descriptionPrompt || BOOKMARK_DESCRIPTION_SYSTEM_PROMPT,
         },
         { role: "user", content: buildBookmarkWebsiteInfo({ title: safeTitle, url, page }) },
       ],
@@ -102,7 +103,9 @@ export async function generateBookmarkDescription(
         ...baseMetadata(page),
         provider: selection.provider,
         model: response.model || selection.model,
-        prompt_template: BOOKMARK_DESCRIPTION_PROMPT_ID,
+        prompt_template: selection.descriptionPrompt
+          ? "user_settings.ai_description_prompt"
+          : BOOKMARK_DESCRIPTION_PROMPT_ID,
         schema_version: BOOKMARK_DESCRIPTION_SCHEMA_VERSION,
         structured_description: structured,
       },
@@ -192,7 +195,7 @@ async function resolveUserAiSelection(userId?: string): Promise<AiSelection> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("user_settings")
-    .select("default_llm_provider, default_llm_model, api_keys")
+    .select("default_llm_provider, default_llm_model, api_keys, ai_description_prompt")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -206,6 +209,10 @@ async function resolveUserAiSelection(userId?: string): Promise<AiSelection> {
     provider,
     model: typeof data?.default_llm_model === "string" ? data.default_llm_model : undefined,
     apiKey,
+    descriptionPrompt:
+      typeof data?.ai_description_prompt === "string" && data.ai_description_prompt.trim()
+        ? data.ai_description_prompt.trim()
+        : undefined,
   };
 }
 

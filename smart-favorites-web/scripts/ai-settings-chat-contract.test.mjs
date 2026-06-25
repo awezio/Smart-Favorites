@@ -48,6 +48,11 @@ assert.match(
 );
 assert.match(
   migrations,
+  /ai_description_prompt/i,
+  "Database migrations should persist the user's custom AI description prompt."
+);
+assert.match(
+  migrations,
   /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLE\s+public\.user_settings\s+TO\s+authenticated/i,
   "Database migrations should grant authenticated users Data API access to user_settings while RLS enforces row ownership."
 );
@@ -65,6 +70,16 @@ assert.match(
   settingsRoute,
   /providerModels[\s\S]*provider_models/,
   "Settings GET should return cached provider model lists from user_settings."
+);
+assert.match(
+  settingsRoute,
+  /aiDescriptionPrompt[\s\S]*ai_description_prompt/,
+  "Settings GET should return the user's custom AI description prompt."
+);
+assert.match(
+  settingsRoute,
+  /body\.ai_description_prompt[\s\S]*updateData\.ai_description_prompt/,
+  "Settings PUT should persist the user's custom AI description prompt."
 );
 assert.match(
   settingsRoute,
@@ -88,17 +103,17 @@ assert.match(
 );
 assert.match(
   chatPage,
-  /normalizeAssistantAnswer\(data\.answer,\s*sources\)/,
+  /normalizeAssistantAnswer\(data\.answer,\s*sources(?:,\s*language)?\)/,
   "Chat page should normalize assistant answers before saving messages so an empty model response cannot render as sources only."
 );
 assert.match(
   chatPage,
-  /normalizeAssistantAnswer\(message\.content,\s*sources\)/,
+  /normalizeAssistantAnswer\(message\.content,\s*sources(?:,\s*language)?\)/,
   "Chat message rendering should keep a visible assistant answer even when a saved session has blank content with sources."
 );
 assert.match(
   chatPage,
-  /<MarkdownRenderer content=\{normalizeAssistantAnswer\(message\.content,\s*sources\)\} \/>/,
+  /<MarkdownRenderer content=\{normalizeAssistantAnswer\(message\.content,\s*sources(?:,\s*language)?\)\} \/>/,
   "Assistant messages should render the answer body before citations."
 );
 assert.match(
@@ -108,7 +123,7 @@ assert.match(
 );
 assert.match(
   chatPage,
-  /<details[\s\S]*引用来源 · \{sources\.length\}/,
+  /<details[\s\S]*\{t\.sources\}\s*-\s*\{sources\.length\}/,
   "Chat citations should be a secondary expandable evidence block, not the only visible assistant content."
 );
 assert.match(
@@ -125,6 +140,16 @@ assert.match(
   settingsPage,
   /embeddingPreference/,
   "Settings page should expose the persisted embedding preference instead of only reporting it from the API."
+);
+assert.match(
+  settingsPage,
+  /aiDescriptionPrompt[\s\S]*setAiDescriptionPrompt[\s\S]*ai_description_prompt:\s*aiDescriptionPrompt/,
+  "Settings page should let users edit and save a custom AI description prompt."
+);
+assert.match(
+  settingsPage,
+  /<textarea[\s\S]*ai-description-prompt[\s\S]*value=\{aiDescriptionPrompt\}/,
+  "Settings page should expose the custom AI description prompt in a compact text area."
 );
 assert.match(
   embedding,

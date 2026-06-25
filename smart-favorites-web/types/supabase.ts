@@ -168,6 +168,56 @@ export interface Database {
           updated_at?: string
         }
       }
+      user_settings: {
+        Row: {
+          id: string
+          user_id: string
+          default_llm_provider: string | null
+          default_llm_model: string | null
+          api_keys: Json
+          provider_models: Json
+          github_username: string | null
+          github_token: string | null
+          embedding_preference: string | null
+          auto_generate_description: boolean | null
+          auto_snapshot: boolean | null
+          ai_description_prompt: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          default_llm_provider?: string | null
+          default_llm_model?: string | null
+          api_keys?: Json
+          provider_models?: Json
+          github_username?: string | null
+          github_token?: string | null
+          embedding_preference?: string | null
+          auto_generate_description?: boolean | null
+          auto_snapshot?: boolean | null
+          ai_description_prompt?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          default_llm_provider?: string | null
+          default_llm_model?: string | null
+          api_keys?: Json
+          provider_models?: Json
+          github_username?: string | null
+          github_token?: string | null
+          embedding_preference?: string | null
+          auto_generate_description?: boolean | null
+          auto_snapshot?: boolean | null
+          ai_description_prompt?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

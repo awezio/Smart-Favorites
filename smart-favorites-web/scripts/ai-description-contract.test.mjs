@@ -97,6 +97,21 @@ assert.match(
 );
 assert.match(
   generator,
+  /ai_description_prompt/,
+  "Bookmark description generation should load the user's custom prompt from settings."
+);
+assert.match(
+  generator,
+  /descriptionPrompt[\s\S]*content:\s*selection\.descriptionPrompt \|\| BOOKMARK_DESCRIPTION_SYSTEM_PROMPT/,
+  "Bookmark description generation should prefer the user's custom system prompt when configured."
+);
+assert.match(
+  generator,
+  /prompt_template:\s*selection\.descriptionPrompt[\s\S]*user_settings\.ai_description_prompt/,
+  "Bookmark description metadata should record when a user settings prompt was used."
+);
+assert.match(
+  generator,
   /structured_description[\s\S]*purpose[\s\S]*content[\s\S]*audience/,
   "Generator should normalize model output into the requested structured website description."
 );
@@ -211,6 +226,16 @@ assert.match(
   bookmarksPage,
   /snapshot_url[\s\S]*snapshot_status[\s\S]*captureSnapshot/,
   "Bookmark management should show website snapshots and let users refresh them."
+);
+assert.match(
+  bookmarksPage,
+  /existingDescriptionCount[\s\S]*confirm\(t\.confirmOverwriteDescriptions\(existingDescriptionCount\)\)/,
+  "Batch AI description generation should ask before overwriting selected bookmarks that already have descriptions."
+);
+assert.match(
+  bookmarksPage,
+  /const targets = selected;/,
+  "Batch AI description generation should include selected bookmarks after overwrite confirmation instead of silently skipping described items."
 );
 assert.match(
   starsPage,

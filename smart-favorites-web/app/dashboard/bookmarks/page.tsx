@@ -267,6 +267,8 @@ const pageCopy = {
     descGenerateFailed: "描述生成失败",
     selectFirst: "请先选择要生成描述的书签",
     allHaveDesc: "所选书签均已有描述",
+    confirmOverwriteDescriptions: (n: number) =>
+      `所选书签中有 ${n} 条已有描述，确定用 AI 重新生成并覆盖吗？`,
     batchGenerating: (n: number) => `正在生成 ${n} 条描述...`,
     batchDone: (n: number) => `已为 ${n} 个书签生成描述`,
     batchPartial: (success: number, failed: number) => `完成：${success} 成功，${failed} 失败`,
@@ -360,6 +362,8 @@ const pageCopy = {
     descGenerateFailed: "Failed to generate description",
     selectFirst: "Please select bookmarks to generate descriptions for first.",
     allHaveDesc: "All selected bookmarks already have descriptions.",
+    confirmOverwriteDescriptions: (n: number) =>
+      `${n} selected bookmark(s) already have descriptions. Regenerate with AI and overwrite them?`,
     batchGenerating: (n: number) => `Generating ${n} description(s)...`,
     batchDone: (n: number) => `Generated descriptions for ${n} bookmark(s)`,
     batchPartial: (success: number, failed: number) =>
@@ -780,11 +784,14 @@ export default function BookmarksPage() {
       return;
     }
 
-    const targets = selected.filter((bookmark) => !hasBookmarkDescription(bookmark));
-    if (targets.length === 0) {
-      toast.info(t.allHaveDesc);
+    const existingDescriptionCount = selected.filter(hasBookmarkDescription).length;
+    if (
+      existingDescriptionCount > 0 &&
+      !confirm(t.confirmOverwriteDescriptions(existingDescriptionCount))
+    ) {
       return;
     }
+    const targets = selected;
 
     setGeneratingBatch(true);
     toast.loading(t.batchGenerating(targets.length), { id: "batch-desc" });
