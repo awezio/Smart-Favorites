@@ -21,6 +21,13 @@ type CaptureInput = {
   title?: string;
 };
 
+type PlaywrightLaunchConfig = {
+  chromium: typeof import("playwright-core").chromium;
+  launchOptions: Parameters<
+    typeof import("playwright-core").chromium.launch
+  >[0];
+};
+
 export async function captureBookmarkSnapshot({
   bookmarkId,
   userId,
@@ -35,23 +42,22 @@ export async function captureBookmarkSnapshot({
     });
   }
 
-  let browser: any = null;
+  let browser: Awaited<
+    ReturnType<typeof import("playwright-core").chromium.launch>
+  > | null = null;
   try {
     const runtime = await loadPlaywrightRuntime();
-    browser = await runtime.chromium.launch({
-      headless: true,
-      args: runtime.args,
-      executablePath: runtime.executablePath,
-    });
+    browser = await launchChromium(runtime);
 
     const page = await browser.newPage({
       viewport: { width: 1365, height: 768 },
       deviceScaleFactor: 1,
     });
     await page.goto(normalized.url, {
-      waitUntil: "networkidle",
-      timeout: 20000,
+      waitUntil: "domcontentloaded",
+      timeout: 25000,
     });
+    await page.waitForTimeout(1200);
 
     const redaction = await maskSensitiveSnapshotText(page);
     const screenshot = await page.screenshot({
@@ -92,12 +98,15 @@ export async function captureBookmarkSnapshot({
         viewport: { width: 1365, height: 768 },
         redaction,
         generated_at: takenAt,
+        runtime: runtime.runtimeLabel,
       },
     };
-  } catch (error: any) {
-    const message = error?.message || "Snapshot capture failed.";
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Snapshot capture failed.";
     const missingRuntime =
-      /Snapshot runtime is unavailable|Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|playwright/i.test(message);
+      /Snapshot runtime is unavailable|Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|playwright|ENOENT|executable/i.test(
+        message
+      );
     return snapshotFailure(missingRuntime ? "unavailable" : "failed", message, {
       original_url: url,
       title,
@@ -110,32 +119,130 @@ export async function captureBookmarkSnapshot({
   }
 }
 
-async function loadPlaywrightRuntime() {
+function isServerlessSnapshotEnvironment() {
+  if (process.env.SNAPSHOT_USE_SERVERLESS_CHROMIUM === "1") {
+    return true;
+  }
+  if (process.env.SNAPSHOT_USE_SERVERLESS_CHROMIUM === "0") {
+    return false;
+  }
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.AWS_EXECUTION_ENV
+  );
+}
+
+async function loadPlaywrightRuntime(): Promise<
+  PlaywrightLaunchConfig & { runtimeLabel: string }
+> {
+  if (isServerlessSnapshotEnvironment()) {
+    return loadServerlessPlaywrightRuntime();
+  }
+  return loadLocalPlaywrightRuntime();
+}
+
+async function loadServerlessPlaywrightRuntime(): Promise<
+  PlaywrightLaunchConfig & { runtimeLabel: string }
+> {
   try {
     const [{ chromium }, serverlessChromium] = await Promise.all([
       import("playwright-core"),
       import("@sparticuz/chromium"),
     ]);
+
     if (!chromium) {
       throw new Error("playwright-core chromium runtime is unavailable.");
     }
 
+    const chromiumPkg = serverlessChromium.default;
+    chromiumPkg.setGraphicsMode = false;
+
     const executablePath =
+      process.env.CHROMIUM_PATH ||
       process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
-      (await serverlessChromium.default.executablePath());
+      (await chromiumPkg.executablePath());
 
     return {
       chromium,
-      executablePath,
-      args: serverlessChromium.default.args,
+      runtimeLabel: "serverless-chromium",
+      launchOptions: {
+        headless: true,
+        args: chromiumPkg.args,
+        executablePath,
+      },
     };
-  } catch (error: any) {
-    throw new Error(`Snapshot runtime is unavailable. ${runtimeErrorMessage(error)}`);
+  } catch (error: unknown) {
+    throw new Error(
+      `Snapshot runtime is unavailable. ${runtimeErrorMessage(error)}`
+    );
   }
 }
 
-function runtimeErrorMessage(error: any) {
-  const message = String(error?.message || error || "");
+async function loadLocalPlaywrightRuntime(): Promise<
+  PlaywrightLaunchConfig & { runtimeLabel: string }
+> {
+  try {
+    const { chromium } = await import("playwright-core");
+    if (!chromium) {
+      throw new Error("playwright-core chromium runtime is unavailable.");
+    }
+
+    const explicitPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+    if (explicitPath) {
+      return {
+        chromium,
+        runtimeLabel: "local-executable-path",
+        launchOptions: {
+          headless: true,
+          executablePath: explicitPath,
+        },
+      };
+    }
+
+    const channel =
+      process.env.PLAYWRIGHT_CHROMIUM_CHANNEL?.trim() || "chrome";
+
+    return {
+      chromium,
+      runtimeLabel: `local-channel:${channel}`,
+      launchOptions: {
+        headless: true,
+        channel,
+      },
+    };
+  } catch (error: unknown) {
+    throw new Error(
+      `Snapshot runtime is unavailable. ${runtimeErrorMessage(error)}`
+    );
+  }
+}
+
+async function launchChromium(runtime: PlaywrightLaunchConfig) {
+  try {
+    return await runtime.chromium.launch(runtime.launchOptions);
+  } catch (firstError) {
+    const channel = runtime.launchOptions?.channel;
+    if (channel === "chrome") {
+      return runtime.chromium.launch({ headless: true, channel: "msedge" });
+    }
+    if (channel === "msedge") {
+      throw enrichLocalBrowserError(firstError);
+    }
+    throw firstError;
+  }
+}
+
+function enrichLocalBrowserError(error: unknown) {
+  const base =
+    error instanceof Error ? error.message : "Chromium could not be launched.";
+  return new Error(
+    `${base} Install Google Chrome or Microsoft Edge locally, or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to a Chromium-based browser executable.`
+  );
+}
+
+function runtimeErrorMessage(error: unknown) {
+  const message = String(error instanceof Error ? error.message : error || "");
   if (/Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND/i.test(message)) {
     return "The deployed function is missing the traced Chromium runtime dependency.";
   }

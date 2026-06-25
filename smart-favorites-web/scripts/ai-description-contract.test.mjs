@@ -188,8 +188,18 @@ assert.match(
 );
 assert.match(
   snapshotService,
-  /import\("playwright-core"\)[\s\S]*import\("@sparticuz\/chromium"\)/,
-  "Snapshot runtime imports should be traceable by Next/Vercel output tracing."
+  /import\("playwright-core"\)/,
+  "Snapshot runtime should dynamically import playwright-core."
+);
+assert.match(
+  snapshotService,
+  /import\("@sparticuz\/chromium"\)/,
+  "Snapshot runtime should dynamically import serverless Chromium for Vercel."
+);
+assert.match(
+  snapshotService,
+  /isServerlessSnapshotEnvironment|VERCEL|PLAYWRIGHT_CHROMIUM_CHANNEL/,
+  "Snapshot runtime should branch between local Chrome/Edge and serverless Chromium."
 );
 assert.doesNotMatch(
   snapshotService,

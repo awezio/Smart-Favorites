@@ -1,1 +1,1 @@
-{"functions":{"app/api/chat/route.ts":{"maxDuration":300},"app/api/**/*.ts":{"maxDuration":60}}}
+{"functions":{"app/api/chat/route.ts":{"maxDuration":300},"app/api/bookmarks/snapshot-page/route.ts":{"maxDuration":60,"memory":1024},"app/api/ai/describe/route.ts":{"maxDuration":60,"memory":1024},"app/api/**/*.ts":{"maxDuration":60}}}
