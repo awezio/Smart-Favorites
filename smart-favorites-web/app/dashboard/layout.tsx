@@ -17,10 +17,12 @@ import {
   LogOut,
   User,
   Globe,
+  Check,
+  ChevronDown,
   Languages,
   Network,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -315,40 +317,111 @@ function LanguageSwitch({
   setLanguage: (language: DashboardLanguage) => void;
   compact?: boolean;
 }) {
-  const options: Array<{ value: DashboardLanguage; label: string }> = [
-    { value: "zh", label: "中文" },
-    { value: "en", label: "EN" },
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const options: Array<{ value: DashboardLanguage; label: string; shortLabel: string }> = [
+    { value: "zh", label: "中文", shortLabel: "中" },
+    { value: "en", label: "English", shortLabel: "EN" },
   ];
+  const activeOption = options.find((option) => option.value === language) || options[0];
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   return (
     <div
+      ref={menuRef}
       className={cn(
-        "inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 p-1 shadow-sm shadow-sky-100/50",
+        "relative inline-flex",
         compact ? "h-9" : "w-full"
       )}
-      aria-label="Language"
     >
-      <Languages className={cn("ml-2 h-4 w-4 text-sky-600", compact ? "hidden sm:block" : "")} />
-      {options.map((option) => {
-        const active = language === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={active}
-            onClick={() => setLanguage(option.value)}
-            className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-medium transition",
-              compact ? "min-w-12" : "flex-1",
-              active
-                ? "bg-white text-sky-700 shadow-sm"
-                : "text-slate-500 hover:bg-white/70 hover:text-sky-700"
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
+      <button
+        type="button"
+        aria-label="Language"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className={cn(
+          "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-sky-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-sky-50 hover:text-sky-700",
+          compact ? "w-9 px-0 sm:w-auto sm:px-3" : "w-full justify-between"
+        )}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Languages className="h-4 w-4 text-sky-600" />
+          <span className={cn(compact ? "hidden sm:inline" : "inline")}>{activeOption.label}</span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-slate-400 transition",
+            compact ? "hidden sm:block" : "",
+            open ? "rotate-180" : ""
+          )}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Language"
+          className={cn(
+            "absolute z-50 mt-2 min-w-36 overflow-hidden rounded-lg border border-sky-100 bg-white py-1 shadow-lg shadow-slate-200/70",
+            compact ? "right-0 top-full" : "left-0 top-full w-full"
+          )}
+        >
+          {options.map((option) => {
+            const active = language === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                onClick={() => {
+                  setLanguage(option.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition",
+                  active
+                    ? "bg-sky-50 text-sky-700"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
+                )}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-100 text-xs font-semibold text-sky-700">
+                    {option.shortLabel}
+                  </span>
+                  {option.label}
+                </span>
+                {active && <Check className="h-4 w-4" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
