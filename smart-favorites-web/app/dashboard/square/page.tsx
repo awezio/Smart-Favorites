@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Globe, Plus, Loader2, Sparkles, Users, Image as ImageIcon, ThumbsUp, TrendingUp } from "lucide-react";
+import { Globe, Plus, Loader2, Users, Image as ImageIcon, ThumbsUp, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
+import { FeedList, FeedListItem } from "@/components/layout/feed-list";
+import { DitheredSurface } from "@/components/layout/dithered-image";
 import { PostCard } from "@/components/square/post-card";
 import { CreatePostModal } from "@/components/square/create-post-modal";
 import { createClient } from "@/lib/supabase/client";
@@ -83,8 +84,8 @@ const PAGE_SIZE = 20;
 
 function PostCardSkeleton() {
   return (
-    <Card>
-      <CardContent className="p-5 space-y-3">
+    <article className="border border-border bg-card">
+      <div className="space-y-3 p-5">
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-8 rounded-full" />
           <div className="flex-1 space-y-1">
@@ -104,8 +105,8 @@ function PostCardSkeleton() {
           <Skeleton className="h-7 w-20" />
           <Skeleton className="h-7 w-20" />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }
 
@@ -338,37 +339,28 @@ export default function SquarePage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-900 p-6 text-white shadow-[0_20px_80px_-24px_rgba(15,23,42,0.75)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(34,197,94,0.16),transparent_28%)]" />
-        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white/10 to-transparent" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="page-stack">
+      <DitheredSurface className="p-6 sm:p-8 noise-overlay">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-4">
-            <Badge
-              variant="secondary"
-              className="w-fit border-white/20 bg-white/10 text-white"
-            >
-              <Sparkles className="mr-1 h-3.5 w-3.5" />
+            <p className="utility-label w-fit border border-border px-2 py-1">
               {t.badgeCommunity}
-            </Badge>
+            </p>
             <div className="space-y-2">
-              <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+              <h1 className="type-h1">
                 {t.heroTitle}
               </h1>
-              <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-base">
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
                 {t.heroDescription}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-white text-slate-950 hover:bg-white/90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
+              <Button onClick={() => setShowCreateModal(true)} variant="creative">
+                <Plus className="mr-2 h-4 w-4" />
                 {t.publish}
               </Button>
-              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-white/80">
-                <TrendingUp className="h-4 w-4" />
+              <div className="flex items-center gap-2 border border-border px-3 py-2 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4 text-primary" />
                 {t.updatesOn}
               </div>
             </div>
@@ -380,13 +372,13 @@ export default function SquarePage() {
               return (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"
+                  className="panel panel-pad"
                 >
-                  <div className="flex items-center justify-between text-white/75">
-                    <span className="text-xs font-medium uppercase tracking-[0.18em]">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="utility-label">
                       {item.label}
                     </span>
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 text-primary" />
                   </div>
                   <div className="mt-3 text-2xl font-semibold">{item.value}</div>
                 </div>
@@ -394,32 +386,32 @@ export default function SquarePage() {
             })}
           </div>
         </div>
-      </div>
+      </DitheredSurface>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <FeedList className="md:grid md:grid-cols-3 md:divide-y-0">
         {SQUARE_TARGET_OPTIONS.map((option) => {
           const label = getFilterLabel(option.value as FilterType, t);
           const description = getTargetDescription(option.value as FilterType, t);
           return (
-            <Card key={option.value} className="border-dashed bg-card/80">
-              <CardContent className="flex items-center justify-between gap-4 p-4">
+            <FeedListItem key={option.value}>
+              <div className="flex items-center justify-between gap-4 p-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">{label}</p>
                   <p className="text-xs text-muted-foreground">{description}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-semibold">
+                  <div className="text-lg font-semibold tabular-nums">
                     {targetCounts[option.value]}
                   </div>
-                  <div className="text-xs text-muted-foreground">{t.postsCountSuffix}</div>
+                  <div className="utility-label">{t.postsCountSuffix}</div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </FeedListItem>
           );
         })}
-      </div>
+      </FeedList>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border border-border bg-background p-3">
         {filterButtons.map((opt) => (
           <Button
             key={opt.value}
@@ -448,6 +440,7 @@ export default function SquarePage() {
           icon={Globe}
           title={t.emptyTitle}
           description={t.emptyDescription}
+          textured
           action={
             <Button
               variant="outline"
@@ -467,6 +460,7 @@ export default function SquarePage() {
               currentUserId={currentUserId}
               onVote={handleVote}
               onDelete={handleDelete}
+              layout="feed"
             />
           ))}
 

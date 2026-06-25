@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbedding } from "@/lib/rag/embedding";
+import { getRerankPoolSize, rerankSearchResults } from "@/lib/rag/rerank";
 import type { SearchResult } from "@/types";
 
 export type SupabaseQueryClient = {
@@ -21,7 +22,12 @@ export async function searchBookmarks(
     searchBookmarksByDirectMatch(supabase, query, topK, userId),
   ]);
 
-  return mergeSearchResults(flattenSettledResults(results), topK);
+  return reciprocalRankFusion(
+    results
+      .filter((result): result is PromiseFulfilledResult<SearchResult[]> => result.status === "fulfilled")
+      .map((result) => result.value),
+    topK
+  );
 }
 
 export async function searchStars(
@@ -38,7 +44,12 @@ export async function searchStars(
     searchStarsByDirectMatch(supabase, query, topK, userId),
   ]);
 
-  return mergeSearchResults(flattenSettledResults(results), topK);
+  return reciprocalRankFusion(
+    results
+      .filter((result): result is PromiseFulfilledResult<SearchResult[]> => result.status === "fulfilled")
+      .map((result) => result.value),
+    topK
+  );
 }
 
 export async function searchDocuments(
@@ -65,7 +76,7 @@ export async function searchDocuments(
   const keyword =
     keywordResult.status === "fulfilled" ? keywordResult.value : [];
 
-  return mergeSearchResults([...semantic, ...keyword], topK);
+  return reciprocalRankFusion([semantic, keyword].filter((list) => list.length > 0), topK);
 }
 
 export async function searchAll(
@@ -91,7 +102,15 @@ export async function searchAll(
   const documents =
     documentsResult.status === "fulfilled" ? documentsResult.value : [];
 
-  return mergeSearchResults([...bookmarks, ...stars, ...documents], topK);
+  return rerankSearchResults(
+    query,
+    reciprocalRankFusion(
+      [bookmarks, stars, documents].filter((list) => list.length > 0),
+      getRerankPoolSize(topK)
+    ),
+    topK,
+    userId
+  );
 }
 
 async function searchBookmarksByEmbedding(
@@ -434,19 +453,31 @@ const CHINESE_DOMAIN_TERMS = [
   "设计",
 ];
 
-function mergeSearchResults(results: SearchResult[], topK: number): SearchResult[] {
-  const merged = new Map<string, SearchResult>();
+function reciprocalRankFusion(lists: SearchResult[][], topK: number, k = 60): SearchResult[] {
+  const scores = new Map<string, { score: number; result: SearchResult }>();
 
-  for (const result of results) {
-    const key = `${result.type}:${result.id}`;
-    const existing = merged.get(key);
-    if (!existing || result.similarity > existing.similarity) {
-      merged.set(key, result);
-    }
+  for (const list of lists) {
+    list.forEach((result, rank) => {
+      const key = `${result.type}:${result.id}`;
+      const contribution = 1 / (k + rank + 1);
+      const existing = scores.get(key);
+      if (existing) {
+        existing.score += contribution;
+        if (result.similarity > existing.result.similarity) {
+          existing.result = result;
+        }
+      } else {
+        scores.set(key, { score: contribution, result });
+      }
+    });
   }
 
-  return Array.from(merged.values())
-    .sort((a, b) => b.similarity - a.similarity)
+  return Array.from(scores.values())
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => ({
+      ...entry.result,
+      similarity: Math.max(entry.result.similarity, Math.min(0.99, entry.score)),
+    }))
     .slice(0, topK);
 }
 

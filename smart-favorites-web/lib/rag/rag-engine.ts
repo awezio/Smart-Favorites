@@ -8,12 +8,28 @@ import {
   isSupportedProvider,
 } from "@/lib/ai/provider-config";
 import { classifyChatRoute, type ChatKnowledgeMode, type ChatRoutingMetadata } from "@/lib/chat/routing";
+import {
+  RAG_DIRECT_CHAT_SYSTEM_PROMPT,
+  RAG_KNOWLEDGE_SYSTEM_PROMPT,
+  buildRagAnswerInstructions,
+} from "@/lib/prompts/chat-rag";
+import { parseCitationsFromAnswer } from "@/lib/rag/citations";
 import { decryptSecret } from "@/lib/server/secrets";
+import {
+  type ChatStreamEvent,
+} from "@/lib/ai/chat-stream-shared";
+import {
+  formatSseEvent,
+  streamProviderChat,
+} from "@/lib/ai/provider-stream";
 import type { SearchResult, LLMMessage } from "@/types";
+
+export type { ChatStreamEvent };
 
 type RagResponse = {
   answer: string;
   sources: SearchResult[];
+  citations?: ReturnType<typeof parseCitationsFromAnswer>;
   routing: ChatRoutingMetadata;
   error?: {
     type: "rate_limited" | "provider_error";
@@ -31,6 +47,173 @@ export async function ragChat(
   client?: SupabaseQueryClient,
   knowledgeMode: ChatKnowledgeMode = "auto"
 ): Promise<RagResponse> {
+  const context = await buildRagChatContext(
+    query,
+    chatHistory,
+    topK,
+    userId,
+    provider,
+    model,
+    client,
+    knowledgeMode
+  );
+
+  try {
+    const response = await callProviderChat({
+      provider: context.selectedProvider,
+      apiKey: context.apiKey,
+      model: context.selectedModel,
+      maxTokens: context.route.useKnowledge ? 2000 : 800,
+      timeoutMs: context.route.useKnowledge ? 300_000 : 45_000,
+      messages: context.messages,
+    });
+
+    await logAiCall({
+      userId,
+      provider: context.selectedProvider,
+      model: response.model,
+      status: "success",
+      usage: response.usage,
+    });
+
+    const answer = response.content?.trim() || context.fallback;
+    const citations =
+      context.route.useKnowledge && context.sources.length > 0
+        ? parseCitationsFromAnswer(answer, context.sources.slice(0, 12))
+        : undefined;
+    return { answer, sources: context.sources, citations, routing: context.route };
+  } catch (error: any) {
+    const providerError = classifyProviderError(error);
+    await logAiCall({
+      userId,
+      provider: context.selectedProvider,
+      model: context.selectedModel || "",
+      status: "error",
+      error: providerError.logMessage,
+    });
+
+    return {
+      answer: buildProviderFailureAnswer(providerError, context.fallback, context.sources),
+      sources: context.sources,
+      routing: context.route,
+      error: {
+        type: providerError.type,
+        message: providerError.userMessage,
+      },
+    };
+  }
+}
+
+export async function* ragChatStream(
+  query: string,
+  chatHistory: LLMMessage[] = [],
+  topK: number,
+  userId: string,
+  provider?: string,
+  model?: string,
+  client?: SupabaseQueryClient,
+  knowledgeMode: ChatKnowledgeMode = "auto"
+): AsyncGenerator<ChatStreamEvent> {
+  const context = await buildRagChatContext(
+    query,
+    chatHistory,
+    topK,
+    userId,
+    provider,
+    model,
+    client,
+    knowledgeMode
+  );
+
+  yield { type: "routing", routing: context.route };
+  yield { type: "sources", sources: context.sources };
+
+  let answer = "";
+
+  try {
+    for await (const event of streamProviderChat({
+      provider: context.selectedProvider,
+      apiKey: context.apiKey,
+      model: context.selectedModel,
+      maxTokens: context.route.useKnowledge ? 2000 : 800,
+      timeoutMs: context.route.useKnowledge ? 300_000 : 45_000,
+      messages: context.messages,
+    })) {
+      if (event.type === "delta") {
+        answer += event.content;
+        yield event;
+      } else if (event.type === "error") {
+        yield event;
+        return;
+      } else if (event.type === "done") {
+        const finalAnswer = answer.trim() || context.fallback;
+        const citations =
+          context.route.useKnowledge && context.sources.length > 0
+            ? parseCitationsFromAnswer(finalAnswer, context.sources.slice(0, 12))
+            : undefined;
+
+        await logAiCall({
+          userId,
+          provider: context.selectedProvider,
+          model: event.model,
+          status: "success",
+        });
+
+        yield { type: "done", model: event.model, citations };
+      }
+    }
+  } catch (error: any) {
+    const providerError = classifyProviderError(error);
+    await logAiCall({
+      userId,
+      provider: context.selectedProvider,
+      model: context.selectedModel || "",
+      status: "error",
+      error: providerError.logMessage,
+    });
+    yield {
+      type: "error",
+      message: buildProviderFailureAnswer(providerError, context.fallback, context.sources),
+    };
+  }
+}
+
+export function createRagChatSseStream(
+  generator: AsyncGenerator<ChatStreamEvent>
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const event of generator) {
+          controller.enqueue(encoder.encode(formatSseEvent(event)));
+        }
+      } catch (error: any) {
+        controller.enqueue(
+          encoder.encode(
+            formatSseEvent({
+              type: "error",
+              message: error?.message || "Stream failed",
+            })
+          )
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+}
+
+async function buildRagChatContext(
+  query: string,
+  chatHistory: LLMMessage[],
+  topK: number,
+  userId: string,
+  provider?: string,
+  model?: string,
+  client?: SupabaseQueryClient,
+  knowledgeMode: ChatKnowledgeMode = "auto"
+) {
   const route = classifyChatRoute(query, knowledgeMode);
   let sources: SearchResult[] = [];
   if (route.useKnowledge) {
@@ -40,57 +223,27 @@ export async function ragChat(
   const savedDefaults = await getDefaultAiSelection(userId);
   const selectedProvider = provider && isSupportedProvider(provider) ? provider : savedDefaults.provider;
   const selectedModel = model || (!provider ? savedDefaults.model : undefined);
+  const apiKey = await resolveProviderKey(userId, selectedProvider);
+  const prompt = route.useKnowledge ? buildRagPrompt(query, sources) : query;
 
-  try {
-    const apiKey = await resolveProviderKey(userId, selectedProvider);
-    const prompt = route.useKnowledge ? buildRagPrompt(query, sources) : query;
-    const response = await callProviderChat({
-      provider: selectedProvider,
-      apiKey,
-      model: selectedModel,
-      messages: [
-        {
-          role: "system",
-          content: route.useKnowledge
-            ? "You are Smart Favorites, a concise personal knowledge assistant. Answer from the provided bookmarks, GitHub stars, and documents. If evidence is thin, say so."
-            : "You are Smart Favorites, a concise assistant. For ordinary direct chat, answer naturally without claiming that you searched the user's knowledge base.",
-        },
-        ...chatHistory.slice(-8),
-        { role: "user", content: prompt },
-      ],
-    });
-
-    await logAiCall({
-      userId,
-      provider: selectedProvider,
-      model: response.model,
-      status: "success",
-      usage: response.usage,
-    });
-
-    const answer = response.content?.trim() || fallback;
-    return { answer, sources, routing: route };
-  } catch (error: any) {
-    const providerError = classifyProviderError(error);
-    await logAiCall({
-      userId,
-      provider: selectedProvider,
-      model: selectedModel || "",
-      status: "error",
-      error: providerError.logMessage,
-    });
-
-    return {
-      answer: providerError.userMessage || fallback,
-      sources,
-      routing: route,
-      error: {
-        type: providerError.type,
-        message: providerError.userMessage,
+  return {
+    route,
+    sources,
+    fallback,
+    selectedProvider,
+    selectedModel,
+    apiKey,
+    messages: [
+      {
+        role: "system" as const,
+        content: route.useKnowledge
+          ? RAG_KNOWLEDGE_SYSTEM_PROMPT
+          : RAG_DIRECT_CHAT_SYSTEM_PROMPT,
       },
-    };
-  }
-
+      ...chatHistory.slice(-8),
+      { role: "user" as const, content: prompt },
+    ],
+  };
 }
 
 async function getDefaultAiSelection(userId: string) {
@@ -118,26 +271,50 @@ async function resolveProviderKey(userId: string, provider: string) {
 
   const saved = data?.api_keys?.[provider];
   if (saved) {
-    return decryptSecret(saved);
+    try {
+      const decrypted = decryptSecret(saved);
+      if (decrypted) {
+        return decrypted;
+      }
+    } catch {
+      // Stored key may be unreadable after encryption secret rotation; fall back to env.
+    }
   }
 
   return getEnvProviderKey(provider);
 }
 
+const RAG_DESCRIPTION_MAX_CHARS = 320;
+const RAG_DOCUMENT_MAX_CHARS = 480;
+const RAG_STRUCTURED_MAX_CHARS = 420;
+
+function truncateRagText(value: string | null | undefined, maxChars: number) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return "";
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}…`;
+}
+
 function buildRagPrompt(query: string, sources: SearchResult[]) {
   const evidence = sources.slice(0, 12).map((source, index) => {
     if (source.type === "bookmark" && source.bookmark) {
-      const structuredDetails = structuredDescriptionToRagText(
-        source.bookmark.description_metadata?.structured_description
+      const structuredDetails = truncateRagText(
+        structuredDescriptionToRagText(
+          source.bookmark.description_metadata?.structured_description
+        ),
+        RAG_STRUCTURED_MAX_CHARS
       );
-      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nFolder: ${source.bookmark.folder_path || ""}\nDescription: ${source.bookmark.description_zh || source.bookmark.description || source.bookmark.description_en || ""}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
+      return `${index + 1}. [bookmark] ${source.bookmark.title}\nURL: ${source.bookmark.url}\nFolder: ${source.bookmark.folder_path || ""}\nDescription: ${truncateRagText(source.bookmark.description_zh || source.bookmark.description || source.bookmark.description_en || "", RAG_DESCRIPTION_MAX_CHARS)}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
     }
 
     if (source.type === "star" && source.star) {
-      const structuredDetails = structuredDescriptionToRagText(
-        source.star.description_metadata?.structured_description
+      const structuredDetails = truncateRagText(
+        structuredDescriptionToRagText(
+          source.star.description_metadata?.structured_description
+        ),
+        RAG_STRUCTURED_MAX_CHARS
       );
-      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${source.star.description_zh || source.star.description || source.star.description_en || ""}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
+      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${truncateRagText(source.star.description_zh || source.star.description || source.star.description_en || "", RAG_DESCRIPTION_MAX_CHARS)}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
     }
 
     if (source.type === "document" && source.document) {
@@ -147,13 +324,18 @@ function buildRagPrompt(query: string, sources: SearchResult[]) {
         source.document.section_title ? `Section: ${source.document.section_title}` : "",
       ].filter(Boolean);
 
-      return `${index + 1}. [document] ${source.document.title}\n${location.join("\n")}\nContent: ${source.document.content}`;
+      return `${index + 1}. [document] ${source.document.title}\n${location.join("\n")}\nContent: ${truncateRagText(source.document.content, RAG_DOCUMENT_MAX_CHARS)}`;
     }
 
     return `${index + 1}. ${source.id}`;
   });
 
-  return `Question: ${query}\n\nPersonal knowledge evidence:\n${evidence.join("\n\n") || "No matching evidence."}\n\nAnswer in the user's language. If the user asks to find, search, or list saved resources, enumerate the most relevant evidence with concrete item names and URLs. Do not say no matching items were found when evidence is present; instead explain any uncertainty briefly.`;
+  const hasEvidence = evidence.length > 0;
+  const evidenceBlock = hasEvidence
+    ? evidence.join("\n\n")
+    : "No matching evidence.";
+
+  return `Question: ${query}\n\nPersonal knowledge evidence (sources [1]–[${evidence.length || 0}]):\n${evidenceBlock}\n\n${buildRagAnswerInstructions(hasEvidence)}`;
 }
 
 async function logAiCall({
@@ -218,6 +400,25 @@ function buildFallbackAnswer(
   return `${historyHint}Here are the closest matches for "${query}":\n${topLines.join("\n")}`;
 }
 
+function buildProviderFailureAnswer(
+  providerError: {
+    type: "rate_limited" | "provider_error";
+    userMessage: string;
+  },
+  fallback: string,
+  sources: SearchResult[]
+): string {
+  if (sources.length === 0) {
+    return providerError.userMessage;
+  }
+
+  if (providerError.type === "rate_limited") {
+    return providerError.userMessage;
+  }
+
+  return `${providerError.userMessage}\n\n${fallback}`;
+}
+
 function classifyProviderError(error: unknown): {
   type: "rate_limited" | "provider_error";
   userMessage: string;
@@ -227,6 +428,8 @@ function classifyProviderError(error: unknown): {
   const body = error instanceof ProviderApiError ? error.body : "";
   const message = error instanceof Error ? error.message : String(error);
   const diagnostic = `${message} ${body}`;
+  const isTimeout =
+    /timeout|timed out|aborted due to timeout|ETIMEDOUT|AbortError/i.test(diagnostic);
   const isRateLimited =
     status === 429 ||
     /"code"\s*:\s*"?(1302|rate[_-]?limit)/i.test(diagnostic) ||
@@ -237,6 +440,15 @@ function classifyProviderError(error: unknown): {
       type: "rate_limited",
       userMessage:
         "当前模型达到请求速率限制。请稍后再试，或切换到另一个已配置模型；我不会把原始 API 错误当作回答展示。",
+      logMessage: diagnostic.slice(0, 500),
+    };
+  }
+
+  if (isTimeout) {
+    return {
+      type: "provider_error",
+      userMessage:
+        "当前模型在生成回答时超时。我已保留检索到的来源，你也可以稍后重试或切换到响应更快的模型。",
       logMessage: diagnostic.slice(0, 500),
     };
   }

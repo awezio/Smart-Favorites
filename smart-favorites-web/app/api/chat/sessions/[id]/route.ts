@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { syncSessionSourcesFromMessages } from "@/lib/chat/session-sources-db";
+import type { ChatMessage } from "@/types";
 
 export async function GET(
   request: NextRequest,
@@ -42,13 +44,20 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { title, messages } = body;
+    const { title, messages, is_pinned, is_archived, title_status } = body;
 
     const supabase = await createServerSupabaseClient();
 
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
     if (title !== undefined) updates.title = title;
     if (messages !== undefined) updates.messages = messages;
+    if (is_pinned !== undefined) updates.is_pinned = Boolean(is_pinned);
+    if (is_archived !== undefined) updates.is_archived = Boolean(is_archived);
+    if (title_status !== undefined) updates.title_status = title_status;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No updates provided" }, { status: 400 });
+    }
 
     const { data: session, error } = await supabase
       .from("chat_sessions")
@@ -59,6 +68,15 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+
+    if (messages !== undefined && Array.isArray(messages)) {
+      await syncSessionSourcesFromMessages(
+        supabase,
+        id,
+        userId,
+        messages as ChatMessage[]
+      );
+    }
 
     return NextResponse.json({ session });
   } catch (error: any) {

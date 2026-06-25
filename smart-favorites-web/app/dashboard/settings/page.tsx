@@ -17,19 +17,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ProfileForm } from "@/components/profile-form";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { SectionPanel } from "@/components/layout/section-panel";
 import { createClient } from "@/lib/supabase/client";
 import { PROVIDER_DEFINITIONS } from "@/lib/ai/provider-registry";
 import { MASKED_SECRET_PREFIX } from "@/lib/secrets/constants";
 import { type DashboardLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -452,30 +447,29 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t.pageTitle}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t.pageSubtitle}
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          {t.saveSettings}
-        </Button>
-      </div>
+    <div className="page-stack max-w-5xl">
+      <PageHeader
+        title={t.pageTitle}
+        description={t.pageSubtitle}
+        actions={
+          <Button variant="creative" onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {t.saveSettings}
+          </Button>
+        }
+      />
 
       <ProfileForm />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>{t.accountBindingsTitle}</CardTitle>
-          <CardDescription>
-            {t.accountBindingsDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
+      <SectionPanel
+        title={t.accountBindingsTitle}
+        description={t.accountBindingsDescription}
+      >
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => linkIdentity("github")}>
             <Github className="mr-2 h-4 w-4" />
             {t.bindGithub}
@@ -483,17 +477,14 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={() => linkIdentity("google")}>
             {t.bindGoogle}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>{t.embeddingModelTitle}</CardTitle>
-          <CardDescription>
-            {t.embeddingModelDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
+      <SectionPanel
+        title={t.embeddingModelTitle}
+        description={t.embeddingModelDescription}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label>{t.currentModelLabel}</Label>
             <Input readOnly value={embeddingModel} className="h-9" />
@@ -512,20 +503,19 @@ export default function SettingsPage() {
               <option value="openai">{t.openaiEmbeddingsTitle}</option>
             </select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2">
+      <SectionPanel
+        title={
+          <span className="inline-flex items-center gap-2">
             <Smartphone className="h-5 w-5" />
             {t.extensionConnectionTitle}
-          </CardTitle>
-          <CardDescription>
-            {t.extensionConnectionDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+          </span>
+        }
+        description={t.extensionConnectionDescription}
+      >
+        <div className="space-y-3">
           {extensionTokenGenerated ? (
             <div className="flex gap-2">
               <Input readOnly value={extensionTokenGenerated} className="font-mono text-sm" />
@@ -548,17 +538,14 @@ export default function SettingsPage() {
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>{t.personalProviderTitle}</CardTitle>
-          <CardDescription>
-            {t.personalProviderDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SectionPanel
+        title={t.personalProviderTitle}
+        description={t.personalProviderDescription}
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
             <div className="space-y-1.5">
               <Label htmlFor="provider-select">{t.providerLabel}</Label>
@@ -745,20 +732,19 @@ export default function SettingsPage() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2">
+      <SectionPanel
+        title={
+          <span className="inline-flex items-center gap-2">
             <Github className="h-5 w-5" />
             {t.githubStarsTitle}
-          </CardTitle>
-          <CardDescription>
-            {t.githubStarsDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+          </span>
+        }
+        description={t.githubStarsDescription}
+      >
+        <div className="space-y-3">
           <div className="space-y-1.5">
             <Label>{t.githubUsernameLabel}</Label>
             <Input
@@ -780,14 +766,11 @@ export default function SettingsPage() {
                 : t.githubBindFirst}
             </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>{t.automationTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <SectionPanel title={t.automationTitle}>
+        <div className="space-y-3">
           <div className="grid gap-2 md:grid-cols-2">
             <label className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
               <span>{t.autoGenerateDescription}</span>
@@ -819,8 +802,8 @@ export default function SettingsPage() {
               className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
     </div>
   );
 }

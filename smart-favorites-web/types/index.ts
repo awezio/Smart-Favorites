@@ -102,13 +102,27 @@ export interface DocumentChunkRecord {
   created_at?: string;
 }
 
+export type ChatTitleStatus = "pending" | "generating" | "ready" | "failed";
+
 export interface ChatSession {
   id: string;
   user_id: string;
   title: string;
   messages: ChatMessage[];
+  title_status?: ChatTitleStatus;
+  title_generated_at?: string | null;
+  is_pinned?: boolean;
+  is_archived?: boolean;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CitationRef {
+  index: number;
+  sourceKey: string;
+  excerpt?: string;
+  usedInAnswer?: boolean;
 }
 
 export interface ChatRoutingMetadata {
@@ -121,6 +135,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   sources?: SearchResult[];
+  citations?: CitationRef[];
   routing?: ChatRoutingMetadata;
   timestamp: string;
 }
@@ -296,6 +311,8 @@ export type SquarePost = {
   target_url: string | null;
   created_at: string;
   updated_at: string;
+  snapshot_url?: string | null;
+  snapshot_status?: Bookmark["snapshot_status"] | null;
   author?: {
     display_name: string | null;
     avatar_url: string | null;

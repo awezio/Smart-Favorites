@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadChatQualityMetrics } from "@/lib/admin/chat-quality-metrics";
 import { requireAdminUser, adminErrorResponse } from "@/lib/auth/admin";
 
 export async function GET(request: NextRequest) {
@@ -8,12 +9,15 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminClient();
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await supabase
-      .from("ai_call_logs")
-      .select("id, provider, model, status, latency_ms, error_message, created_at")
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const [{ data, error }, chatQuality] = await Promise.all([
+      supabase
+        .from("ai_call_logs")
+        .select("id, provider, model, status, latency_ms, error_message, created_at")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      loadChatQualityMetrics(),
+    ]);
 
     if (error) throw error;
 
@@ -29,6 +33,7 @@ export async function GET(request: NextRequest) {
         errorRate,
       },
       recentErrors: errors.slice(0, 20),
+      chatQuality,
       rows,
     });
   } catch (error) {

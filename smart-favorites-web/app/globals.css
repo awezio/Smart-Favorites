@@ -5,7 +5,6 @@
 /* highlight.js theme for code blocks (light + dark) */
 @import "highlight.js/styles/github.min.css";
 
-/* Code blocks in chat - dark mode support via next-themes */
 .dark .hljs {
   background: hsl(var(--muted));
   color: hsl(var(--foreground));
@@ -13,58 +12,68 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --background: 40 30% 98%;
+    --foreground: 270 18% 12%;
+    --card: 40 25% 99%;
+    --card-foreground: 270 18% 12%;
+    --popover: 40 25% 99%;
+    --popover-foreground: 270 18% 12%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 20% 94%;
+    --secondary-foreground: 270 18% 20%;
+    --muted: 270 15% 94%;
+    --muted-foreground: 270 10% 45%;
+    --accent: 270 25% 92%;
+    --accent-foreground: 270 18% 15%;
+    --accent-creative: 32 95% 55%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 15% 88%;
+    --input: 270 15% 88%;
+    --ring: 262 83% 58%;
+    --radius: 0.625rem;
+    --shadow-soft: 0 4px 24px -4px hsl(262 40% 40% / 0.12);
+    --shadow-elevated: 0 20px 60px -20px hsl(262 40% 30% / 0.2);
+    --chart-1: 262 83% 58%;
+    --chart-2: 280 70% 55%;
+    --chart-3: 32 95% 55%;
+    --chart-4: 200 70% 50%;
+    --chart-5: 340 75% 55%;
+    --text-display: clamp(2.5rem, 5vw + 1rem, 4.5rem);
+    --text-h1: clamp(2rem, 3vw + 1rem, 3rem);
+    --text-h2: clamp(1.5rem, 2vw + 0.75rem, 2.25rem);
+    --text-h3: clamp(1.25rem, 1.5vw + 0.5rem, 1.5rem);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 265 30% 8%;
+    --foreground: 270 15% 95%;
+    --card: 265 28% 11%;
+    --card-foreground: 270 15% 95%;
+    --popover: 265 28% 11%;
+    --popover-foreground: 270 15% 95%;
+    --primary: 263 90% 70%;
+    --primary-foreground: 265 30% 8%;
+    --secondary: 265 25% 16%;
+    --secondary-foreground: 270 15% 90%;
+    --muted: 265 22% 16%;
+    --muted-foreground: 270 10% 60%;
+    --accent: 265 25% 18%;
+    --accent-foreground: 270 15% 92%;
+    --accent-creative: 32 90% 58%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 265 20% 20%;
+    --input: 265 20% 20%;
+    --ring: 263 90% 70%;
+    --shadow-soft: 0 4px 24px -4px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 20px 60px -20px hsl(0 0% 0% / 0.5);
+    --chart-1: 263 90% 70%;
+    --chart-2: 280 75% 65%;
+    --chart-3: 32 90% 58%;
+    --chart-4: 200 70% 55%;
+    --chart-5: 340 70% 60%;
   }
 }
 
@@ -72,7 +81,215 @@
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans text-base leading-relaxed antialiased;
+  }
+}
+
+@layer components {
+  .type-display {
+    @apply font-serif text-display font-semibold tracking-tight;
+  }
+
+  .type-h1 {
+    @apply font-serif text-h1 font-semibold tracking-tight;
+  }
+
+  .type-h2 {
+    @apply font-serif text-h2 font-semibold tracking-tight;
+  }
+
+  .type-h3 {
+    @apply font-serif text-h3 font-semibold tracking-tight;
+  }
+
+  .type-page-title {
+    @apply font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl;
+  }
+
+  .type-page-description {
+    @apply text-sm leading-relaxed text-muted-foreground sm:text-base;
+  }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8;
+  }
+
+  .page-stack {
+    @apply flex flex-col gap-8;
+  }
+
+  .editorial-column {
+    @apply mx-auto w-full max-w-3xl;
+  }
+
+  .panel {
+    @apply border border-border bg-card;
+  }
+
+  .panel-pad {
+    @apply p-4 sm:p-5;
+  }
+
+  .utility-label {
+    @apply font-mono text-xs uppercase tracking-wider text-muted-foreground;
+  }
+
+  .site-header {
+    @apply sticky top-0 z-50 h-16 border-b border-border bg-background;
+  }
+
+  .nav-link {
+    @apply text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground;
+  }
+
+  .content-block {
+    @apply border border-border bg-card p-4 sm:p-5;
+  }
+
+  .noise-overlay {
+    position: relative;
+  }
+
+  .noise-overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 128px 128px;
+  }
+
+  .texture-accent {
+    background-color: hsl(var(--muted) / 0.35);
+    background-image: linear-gradient(
+        hsl(var(--background) / 0.88),
+        hsl(var(--background) / 0.92)
+      ),
+      url("/images/editorial/hero-paper.jpg");
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* Low-tech Magazine ordered dither on photos (see solar.lowtechmagazine.com) */
+  .dither-image {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .dither-image :is(img, picture, video) {
+    filter: url(#sf-dither);
+  }
+
+  .dither-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    opacity: 0.28;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Crect width='2' height='2' fill='%23000' fill-opacity='0.55'/%3E%3Crect x='4' y='0' width='2' height='2' fill='%23000' fill-opacity='0.15'/%3E%3Crect x='0' y='4' width='2' height='2' fill='%23000' fill-opacity='0.35'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23000' fill-opacity='0.05'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='6' y='2' width='2' height='2' fill='%23000' fill-opacity='0.25'/%3E%3Crect x='2' y='6' width='2' height='2' fill='%23000' fill-opacity='0.65'/%3E%3Crect x='6' y='6' width='2' height='2' fill='%23000' fill-opacity='0.08'/%3E%3C/svg%3E");
+    background-size: 4px 4px;
+  }
+
+  .dither-surface {
+    border: 1px solid hsl(var(--border));
+  }
+
+  .dither-surface-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: url("/images/editorial/hero-paper.jpg");
+    background-size: cover;
+    background-position: center;
+    filter: url(#sf-dither);
+  }
+
+  .dither-surface-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    mix-blend-mode: overlay;
+    opacity: 0.28;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Crect width='2' height='2' fill='%23000' fill-opacity='0.55'/%3E%3Crect x='4' y='0' width='2' height='2' fill='%23000' fill-opacity='0.15'/%3E%3Crect x='0' y='4' width='2' height='2' fill='%23000' fill-opacity='0.35'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23000' fill-opacity='0.05'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='6' y='2' width='2' height='2' fill='%23000' fill-opacity='0.25'/%3E%3Crect x='2' y='6' width='2' height='2' fill='%23000' fill-opacity='0.65'/%3E%3Crect x='6' y='6' width='2' height='2' fill='%23000' fill-opacity='0.08'/%3E%3C/svg%3E");
+    background-size: 4px 4px;
+  }
+
+  .dither-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      hsl(var(--background) / 0.82),
+      hsl(var(--background) / 0.9)
+    );
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .dither-image :is(img, picture, video),
+    .dither-surface-bg {
+      filter: none;
+    }
+
+    .dither-image::after,
+    .dither-surface-bg::after {
+      display: none;
+    }
+  }
+}
+
+@layer utilities {
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .gradient-hero {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--primary) / 0.08) 0%,
+      hsl(var(--accent-creative) / 0.06) 50%,
+      hsl(var(--background)) 100%
+    );
+  }
+
+  .gradient-purple {
+    background: linear-gradient(
+      135deg,
+      hsl(262 83% 58%) 0%,
+      hsl(280 70% 45%) 100%
+    );
   }
 }

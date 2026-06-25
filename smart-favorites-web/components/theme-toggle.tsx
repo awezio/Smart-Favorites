@@ -57,7 +57,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border bg-popover p-1 shadow-md z-50">
+        <div className="absolute bottom-full left-0 right-0 z-50 mb-1 rounded-xl border border-border bg-popover p-1 shadow-elevated">
           {themes.map((t) => {
             const Icon = t.icon;
             const isActive = theme === t.value;

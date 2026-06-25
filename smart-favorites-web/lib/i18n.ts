@@ -4,16 +4,23 @@ export const translations = {
   zh: {
     nav: {
       features: "功能",
+      showcase: "展示",
       extension: "浏览器扩展",
       howItWorks: "工作方式",
       github: "GitHub",
       dashboard: "进入控制台",
     },
     hero: {
-      title: "Smart Favorites",
-      subtitle: "把浏览器收藏夹、GitHub Stars 和文档整理成可搜索、可对话的个人知识库。",
+      badge: "AI 驱动的个人知识库",
+      title: "在收藏中找到一切",
+      subtitle:
+        "把浏览器收藏夹、GitHub Stars 和文档整理成可搜索、可对话的个人知识库。语义检索，引用溯源，一站管理。",
       cta: "开始使用",
       ctaSecondary: "查看源码",
+    },
+    showcase: {
+      title: "精选快照",
+      subtitle: "像设计画廊一样浏览你收藏的网站与资源",
     },
     features: {
       title: "为个人知识库而设计",
@@ -57,6 +64,10 @@ export const translations = {
         { title: "检索问答", desc: "通过搜索、聊天和工具 API 调用知识库。" },
       ],
     },
+    cta: {
+      title: "开始智能管理你的收藏",
+      subtitle: "免费、开源、自托管。你的数据完全由你掌控。",
+    },
     footer: {
       desc: "个人知识库与 AI 工具平台",
       builtWith: "Built with Next.js and Supabase",
@@ -65,16 +76,23 @@ export const translations = {
   en: {
     nav: {
       features: "Features",
+      showcase: "Showcase",
       extension: "Extension",
       howItWorks: "How it works",
       github: "GitHub",
       dashboard: "Dashboard",
     },
     hero: {
-      title: "Smart Favorites",
-      subtitle: "Turn bookmarks, GitHub Stars, and documents into a searchable personal knowledge base.",
+      badge: "AI-powered personal knowledge base",
+      title: "Find everything in your favorites",
+      subtitle:
+        "Turn bookmarks, GitHub Stars, and documents into a searchable, conversational knowledge base. Semantic search, citations, one workspace.",
       cta: "Get started",
       ctaSecondary: "View source",
+    },
+    showcase: {
+      title: "Curated snapshots",
+      subtitle: "Browse your saved sites like a design gallery",
     },
     features: {
       title: "Built for personal knowledge",
@@ -117,6 +135,10 @@ export const translations = {
         { title: "Index", desc: "Parse content and write semantic vectors." },
         { title: "Use", desc: "Search, chat, and call tools from external AI apps." },
       ],
+    },
+    cta: {
+      title: "Start managing your favorites smartly",
+      subtitle: "Free, open-source, self-hosted. Your data, your control.",
     },
     footer: {
       desc: "Personal knowledge base and AI tools platform",

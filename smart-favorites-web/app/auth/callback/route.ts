@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getPostAuthRedirectPath } from "@/lib/auth/post-auth-redirect";
 
 function getSafeRedirect(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
@@ -65,9 +66,13 @@ export async function GET(request: Request) {
       }
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${redirectOrigin}${redirect}`);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const destination = getPostAuthRedirectPath(user, redirect);
+      return NextResponse.redirect(`${redirectOrigin}${destination}`);
     }
   }
 

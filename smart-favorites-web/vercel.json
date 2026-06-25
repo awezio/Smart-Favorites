@@ -1,1 +1,1 @@
-{"functions":{"app/api/**/*.ts":{"maxDuration":60}}}
+{"functions":{"app/api/chat/route.ts":{"maxDuration":300},"app/api/**/*.ts":{"maxDuration":60}}}

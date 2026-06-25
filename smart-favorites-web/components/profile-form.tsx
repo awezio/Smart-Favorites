@@ -17,13 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { SectionPanel } from "@/components/layout/section-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getDiceBearUrl, getAllStylePreviews, AVATAR_STYLES } from "@/lib/avatars";
@@ -163,31 +157,27 @@ export function ProfileForm() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <Skeleton className="h-24 w-24 rounded-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        </CardContent>
-      </Card>
+      <SectionPanel title="个人资料">
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-24 rounded-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      </SectionPanel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <SectionPanel
+      title={
+        <span className="flex items-center gap-2">
           <Camera className="h-5 w-5" />
           个人资料
-        </CardTitle>
-        <CardDescription>
-          管理你的头像、显示名称和个人简介
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Avatar */}
+        </span>
+      }
+      description="管理你的头像、显示名称和个人简介"
+    >
+      <div className="space-y-6">
         <div className="flex items-center gap-6">
           <div className="relative group">
             <Image
@@ -218,7 +208,7 @@ export function ProfileForm() {
         </div>
 
         {pickerOpen && (
-          <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-4 border-t border-border pt-4">
             <div className="flex items-center gap-3">
               <Label className="shrink-0">随机种子</Label>
               <Input
@@ -237,7 +227,7 @@ export function ProfileForm() {
                   key={style.id}
                   onClick={() => handleStyleSelect(style.id)}
                   className={cn(
-                    "flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all",
+                    "flex flex-col items-center gap-1 border-2 p-2 transition-all",
                     avatarStyle === style.id && !avatarUrl ? "border-primary bg-primary/5" : "border-transparent hover:border-border"
                   )}
                 >
@@ -247,7 +237,7 @@ export function ProfileForm() {
                     width={56}
                     height={56}
                     unoptimized
-                    className="h-14 w-14 rounded-lg bg-muted"
+                    className="h-14 w-14 bg-muted"
                   />
                   <span className="text-[10px] truncate w-full text-center">{style.name}</span>
                 </button>
@@ -256,7 +246,6 @@ export function ProfileForm() {
           </div>
         )}
 
-        {/* Display Name */}
         <div className="space-y-2">
           <Label htmlFor="profile-display-name">显示名称</Label>
           <Input
@@ -268,7 +257,6 @@ export function ProfileForm() {
           />
         </div>
 
-        {/* Bio */}
         <div className="space-y-2">
           <div className="flex justify-between">
             <Label htmlFor="profile-bio">个人简介</Label>
@@ -285,7 +273,6 @@ export function ProfileForm() {
           />
         </div>
 
-        {/* Email read-only */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <Mail className="h-4 w-4" /> 邮箱
@@ -297,7 +284,7 @@ export function ProfileForm() {
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           保存个人资料
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </SectionPanel>
   );
 }

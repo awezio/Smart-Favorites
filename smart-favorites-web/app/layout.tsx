@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterClient } from "@/components/toaster-client";
+import { DitherFilterDefs } from "@/components/layout/dither-filter-defs";
+import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -101,25 +103,42 @@ const rootHydrationSanitizerScript = `
 })();
 `;
 
+const themeInitScript = `
+(() => {
+  try {
+    const root = document.documentElement;
+    const stored = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = stored === "dark" || (stored !== "light" && prefersDark);
+    root.classList.toggle("dark", isDark);
+    root.style.colorScheme = isDark ? "dark" : "light";
+  } catch {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="zh-CN"
-      className="light"
-      style={{ colorScheme: "light" }}
-      suppressHydrationWarning
-    >
-      <body className="antialiased" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body
+        className={`${fontVariables} min-h-dvh antialiased`}
+        suppressHydrationWarning
+      >
+        <Script
+          id="sf-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
         <Script
           id="sf-root-hydration-sanitizer"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: rootHydrationSanitizerScript }}
         />
         <ThemeProvider>
+          <DitherFilterDefs />
           {children}
           <ToasterClient />
         </ThemeProvider>

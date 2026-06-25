@@ -103,7 +103,17 @@ function MermaidBlock({ code }: { code: string }) {
 }
 
 /* ── Main component ── */
-export function MarkdownRenderer({ content }: { content: string }) {
+export function MarkdownRenderer({
+  content,
+  onCitationClick,
+}: {
+  content: string;
+  onCitationClick?: (index: number) => void;
+}) {
+  const preparedContent = onCitationClick
+    ? content.replace(/\[(\d{1,2})\](?!\()/g, "[$1](#citation-$1)")
+    : content;
+
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none break-words">
       <ReactMarkdown
@@ -165,8 +175,23 @@ export function MarkdownRenderer({ content }: { content: string }) {
               <td className="border border-border px-3 py-2">{children}</td>
             );
           },
-          // Links open in new tab
+          // Links open in new tab, except inline citation anchors
           a({ href, children }) {
+            const citationMatch =
+              typeof href === "string" ? href.match(/^#citation-(\d{1,2})$/) : null;
+            if (citationMatch && onCitationClick) {
+              const citationIndex = Number(citationMatch[1]);
+              return (
+                <button
+                  type="button"
+                  onClick={() => onCitationClick(citationIndex)}
+                  className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary hover:bg-primary/20"
+                >
+                  {children}
+                </button>
+              );
+            }
+
             return (
               <a
                 href={href}
@@ -192,7 +217,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
           },
         }}
       >
-        {content}
+        {preparedContent}
       </ReactMarkdown>
     </div>
   );

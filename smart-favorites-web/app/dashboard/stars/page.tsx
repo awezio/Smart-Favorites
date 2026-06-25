@@ -23,22 +23,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StatsOverview } from "@/components/dashboard/stats-overview";
+import { StatsOverview } from "@/components/dashboard/stats-overview-dynamic";
 import {
   FilterToolbar,
+  ItemGrid,
   ItemSurface,
   ViewModeToggle,
 } from "@/components/dashboard/filter-toolbar";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { FeedList, FeedListItem } from "@/components/layout/feed-list";
+import { SectionPanel } from "@/components/layout/section-panel";
 import { type DashboardLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type { GitHubStar } from "@/types";
 
@@ -158,70 +155,57 @@ function StarListSkeleton() {
         <Skeleton className="h-8 w-24 rounded-md" />
       </div>
 
-      {/* Sync card skeleton */}
-      <Card>
-        <CardHeader className="pb-3">
-          <Skeleton className="h-5 w-24" />
-          <Skeleton className="h-4 w-56 mt-1" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 items-end flex-wrap">
-            <div className="flex-1 min-w-[200px] space-y-1">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-9 w-full" />
-            </div>
-            <div className="flex-1 min-w-[200px] space-y-1">
-              <Skeleton className="h-3 w-36" />
-              <Skeleton className="h-9 w-full" />
-            </div>
-            <Skeleton className="h-9 w-20" />
+      <SectionPanel title={<Skeleton className="h-5 w-48" />} description={<Skeleton className="h-4 w-64 mt-1" />}>
+        <div className="flex gap-3 items-end flex-wrap">
+          <div className="flex-1 min-w-[200px] space-y-1">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-9 w-full" />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Filter toolbar skeleton */}
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <div className="flex gap-2 flex-wrap items-center">
-            <Skeleton className="h-9 w-64" />
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="h-9 w-20" />
-            <Skeleton className="h-9 w-32" />
-            <div className="flex border rounded-md ml-auto">
-              <Skeleton className="h-9 w-9" />
-              <Skeleton className="h-9 w-9" />
-              <Skeleton className="h-9 w-9" />
-            </div>
+          <div className="flex-1 min-w-[200px] space-y-1">
+            <Skeleton className="h-3 w-36" />
+            <Skeleton className="h-9 w-full" />
           </div>
-        </CardContent>
-      </Card>
+          <Skeleton className="h-9 w-20" />
+        </div>
+      </SectionPanel>
 
-      {/* Star card skeletons */}
-      <div className="space-y-2">
+      <div className="border border-border bg-background p-3">
+        <div className="flex gap-2 flex-wrap items-center">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-32" />
+          <div className="flex border ml-auto">
+            <Skeleton className="h-9 w-9" />
+            <Skeleton className="h-9 w-9" />
+            <Skeleton className="h-9 w-9" />
+          </div>
+        </div>
+      </div>
+
+      <FeedList>
         {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="py-3">
-              <div className="flex items-start gap-3">
-                <Skeleton className="h-4 w-4 mt-1 rounded shrink-0" />
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <Skeleton className="h-5 w-[45%]" />
-                      <Skeleton className="h-4 w-[70%]" />
-                    </div>
-                    <Skeleton className="h-7 w-7 shrink-0 rounded" />
+          <div key={i} className="px-4 py-3">
+            <div className="flex items-start gap-3">
+              <Skeleton className="h-4 w-4 mt-1 rounded shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-5 w-[45%]" />
+                    <Skeleton className="h-4 w-[70%]" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                    <Skeleton className="h-4 w-12" />
-                    <Skeleton className="h-4 w-12" />
-                  </div>
+                  <Skeleton className="h-7 w-7 shrink-0" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-12" />
                 </div>
               </div>
-            </CardHeader>
-          </Card>
+            </div>
+          </div>
         ))}
-      </div>
+      </FeedList>
     </div>
   );
 }
@@ -399,7 +383,7 @@ export default function StarsPage() {
     [stars]
   );
 
-  const topLanguage = useMemo(() => langStats[0]?.name ?? "—", [langStats]);
+  const topLanguage = useMemo(() => langStats[0]?.name ?? "-", [langStats]);
 
   const filteredStars = useMemo(() => {
     let result = [...stars];
@@ -460,26 +444,24 @@ export default function StarsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
-          <p className="text-muted-foreground mt-1">
-            {t.subtitle(stars.length, totalStarsCount.toLocaleString())}
-          </p>
-        </div>
-        <Button
-          variant={isEditing ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIsEditing(!isEditing)}
-        >
-          {isEditing ? (
-            <><Check className="h-4 w-4 mr-1" />{t.doneEditing}</>
-          ) : (
-            <><Pencil className="h-4 w-4 mr-1" />{t.edit}</>
-          )}
-        </Button>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        title={t.title}
+        description={t.subtitle(stars.length, totalStarsCount.toLocaleString())}
+        actions={
+          <Button
+            variant={isEditing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            {isEditing ? (
+              <><Check className="mr-1 h-4 w-4" />{t.doneEditing}</>
+            ) : (
+              <><Pencil className="mr-1 h-4 w-4" />{t.edit}</>
+            )}
+          </Button>
+        }
+      />
 
       {/* Statistics */}
       {stars.length > 0 && (
@@ -500,7 +482,7 @@ export default function StarsPage() {
             {
               label: t.metricLanguages,
               value: languages.length,
-              hint: topLanguage !== "—" ? t.topLanguageHint(topLanguage) : undefined,
+              hint: topLanguage !== "-" ? t.topLanguageHint(topLanguage) : undefined,
               icon: Code2,
               accent: "blue",
             },
@@ -525,39 +507,38 @@ export default function StarsPage() {
         />
       )}
 
-      {/* Sync Card */}
-      <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base tracking-tight">
+      <SectionPanel
+        title={
+          <span className="inline-flex items-center gap-2">
             <Github className="h-4 w-4" />
             {t.syncTitle}
-          </CardTitle>
-          <CardDescription className="flex items-start gap-1.5">
+          </span>
+        }
+        description={
+          <span className="inline-flex items-start gap-1.5">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500" />
             {t.syncDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 items-end flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <Label className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                {t.usernameLabel}
-              </Label>
-              <Input
-                placeholder={t.usernamePlaceholder}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 rounded-xl border-border/60"
-              />
-            </div>
-            <Button onClick={handleSync} disabled={loading} className="rounded-xl">
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              {loading ? t.syncing : t.sync}
-            </Button>
+          </span>
+        }
+      >
+        <div className="flex gap-3 items-end flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <Label className="utility-label">{t.usernameLabel}</Label>
+            <Input
+              placeholder={t.usernamePlaceholder}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="mt-1"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={handleSync} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            {loading ? t.syncing : t.sync}
+          </Button>
+        </div>
+      </SectionPanel>
 
+      <SectionPanel noPadding>
       <FilterToolbar
         searchPlaceholder={t.searchPlaceholder}
         searchValue={filter}
@@ -611,7 +592,7 @@ export default function StarsPage() {
             <Button
               variant="destructive"
               size="sm"
-              className="h-10 rounded-xl"
+              className="h-10"
               onClick={() => handleDelete(Array.from(selectedIds))}
             >
               <Trash2 className="h-4 w-4 mr-1" />
@@ -631,6 +612,7 @@ export default function StarsPage() {
           />
         }
       />
+      </SectionPanel>
 
       {/* Stars Display */}
       {filteredStars.length === 0 && stars.length === 0 ? (
@@ -638,6 +620,7 @@ export default function StarsPage() {
           icon={Star}
           title={t.emptyNoStarsTitle}
           description={t.emptyNoStarsDescription}
+          textured
           action={
             <Button variant="outline" onClick={() => document.querySelector<HTMLInputElement>(`input[placeholder="${t.usernamePlaceholder}"]`)?.focus()}>
               <RefreshCw className="h-4 w-4 mr-2" />{t.emptyNoStarsAction}
@@ -651,9 +634,9 @@ export default function StarsPage() {
           description={t.emptyNoMatchDescription}
         />
       ) : viewMode === "card" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ItemGrid>
           {filteredStars.map((s) => (
-            <ItemSurface key={s.id} selected={selectedIds.has(s.id)}>
+            <ItemSurface key={s.id} inset selected={selectedIds.has(s.id)}>
               <div className="p-4">
                 <div className="flex items-start gap-2">
                   <Checkbox
@@ -668,7 +651,7 @@ export default function StarsPage() {
                     </a>
                   </div>
                   {s.language && (
-                    <Badge variant="outline" className="rounded-lg text-[10px] shrink-0">
+                    <Badge variant="outline" className="text-[10px] shrink-0">
                       {s.language}
                     </Badge>
                   )}
@@ -692,11 +675,11 @@ export default function StarsPage() {
               </div>
             </ItemSurface>
           ))}
-        </div>
+        </ItemGrid>
       ) : viewMode === "compact" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <ItemGrid columns="grid-cols-1 md:grid-cols-2">
           {filteredStars.map((s) => (
-            <ItemSurface key={s.id} selected={selectedIds.has(s.id)} className="px-3 py-2.5">
+            <ItemSurface key={s.id} inset selected={selectedIds.has(s.id)} className="px-3 py-2.5">
               <div className="flex items-center gap-2">
               <Checkbox
                 checked={selectedIds.has(s.id)}
@@ -710,7 +693,7 @@ export default function StarsPage() {
                 </a>
               </div>
               {s.language && (
-                <Badge variant="outline" className="rounded-lg text-[10px]">{s.language}</Badge>
+                <Badge variant="outline" className="text-[10px]">{s.language}</Badge>
               )}
               <span className="text-xs text-muted-foreground flex items-center gap-0.5 shrink-0 tabular-nums">
                 <Star className="h-3 w-3" /> {s.stars.toLocaleString()}
@@ -718,11 +701,11 @@ export default function StarsPage() {
               </div>
             </ItemSurface>
           ))}
-        </div>
+        </ItemGrid>
       ) : (
-        <div className="space-y-2">
+        <FeedList>
           {filteredStars.map((s) => (
-            <ItemSurface key={s.id} selected={selectedIds.has(s.id)}>
+            <FeedListItem key={s.id} selected={selectedIds.has(s.id)}>
               <div className="px-4 py-3">
                 <div className="flex items-start gap-3">
                   <Checkbox
@@ -752,7 +735,7 @@ export default function StarsPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 rounded-xl p-0 shrink-0"
+                          className="h-8 w-8 p-0 shrink-0"
                           onClick={() => handleDelete([s.id])}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -761,7 +744,7 @@ export default function StarsPage() {
                     </div>
                     <div className="mt-2 flex items-center gap-3 tabular-nums">
                       {s.language && (
-                        <Badge variant="outline" className="rounded-lg text-xs">{s.language}</Badge>
+                        <Badge variant="outline" className="text-xs">{s.language}</Badge>
                       )}
                       <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                         <Star className="h-3 w-3" /> {s.stars.toLocaleString()}
@@ -773,9 +756,9 @@ export default function StarsPage() {
                   </div>
                 </div>
               </div>
-            </ItemSurface>
+            </FeedListItem>
           ))}
-        </div>
+        </FeedList>
       )}
     </div>
   );

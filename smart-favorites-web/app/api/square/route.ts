@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSquareTargetType } from "@/lib/square";
 import type {
+  Bookmark,
   SquarePost,
   SquarePostCreateInput,
   SquarePostMedia,
@@ -122,6 +123,32 @@ export async function GET(request: NextRequest) {
       userVoteMap.set(v.post_id, v.helpful);
     }
 
+    const bookmarkTargetIds = posts
+      .filter((p) => p.target_type === "bookmark" && p.target_id)
+      .map((p) => p.target_id as string);
+
+    let bookmarkSnapshotMap = new Map<
+      string,
+      { snapshot_url: string | null; snapshot_status: string | null }
+    >();
+
+    if (bookmarkTargetIds.length > 0) {
+      const { data: bookmarks } = await supabase
+        .from("bookmarks")
+        .select("id, snapshot_url, snapshot_status")
+        .in("id", bookmarkTargetIds);
+
+      bookmarkSnapshotMap = new Map(
+        (bookmarks || []).map((b) => [
+          b.id,
+          {
+            snapshot_url: b.snapshot_url,
+            snapshot_status: b.snapshot_status,
+          },
+        ])
+      );
+    }
+
     // Assemble response
     const enrichedPosts: SquarePost[] = posts.map((post) => {
       const profile = profileMap.get(post.user_id);
@@ -139,6 +166,11 @@ export async function GET(request: NextRequest) {
         user_vote: userVote,
       };
 
+      const bookmarkSnapshot =
+        post.target_type === "bookmark" && post.target_id
+          ? bookmarkSnapshotMap.get(post.target_id)
+          : undefined;
+
       return {
         id: post.id,
         user_id: post.user_id,
@@ -150,6 +182,10 @@ export async function GET(request: NextRequest) {
         target_url: post.target_url,
         created_at: post.created_at,
         updated_at: post.updated_at,
+        snapshot_url: bookmarkSnapshot?.snapshot_url ?? null,
+        snapshot_status:
+          (bookmarkSnapshot?.snapshot_status as Bookmark["snapshot_status"] | null) ??
+          null,
         author: profile
           ? {
               display_name: profile.display_name,

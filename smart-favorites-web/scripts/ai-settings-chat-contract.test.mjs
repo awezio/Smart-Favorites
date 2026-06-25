@@ -113,13 +113,13 @@ assert.match(
 );
 assert.match(
   chatPage,
-  /<MarkdownRenderer content=\{normalizeAssistantAnswer\(message\.content,\s*sources(?:,\s*language)?\)\} \/>/,
+  /<MarkdownRenderer[\s\S]*content=\{normalizeAssistantAnswer\(message\.content,\s*sources(?:,\s*language)?\)\}[\s\S]*\/>/,
   "Assistant messages should render the answer body before citations."
 );
 assert.match(
   markdownRenderer,
-  /<ReactMarkdown[\s\S]*>\s*\{content\}\s*<\/ReactMarkdown>/,
-  "MarkdownRenderer should pass the content prop into ReactMarkdown so assistant answer text is visible."
+  /<ReactMarkdown[\s\S]*>\s*\{preparedContent\}\s*<\/ReactMarkdown>/,
+  "MarkdownRenderer should pass prepared content into ReactMarkdown so assistant answer text is visible."
 );
 assert.match(
   chatPage,

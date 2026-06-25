@@ -18,7 +18,7 @@ function loadBookmarkParser() {
       esModuleInterop: true,
     },
   }).outputText;
-  const module = { exports: {} };
+  const cjsModule = { exports: {} };
   const sandboxRequire = (id) => {
     if (id === "cheerio") return require("cheerio");
     if (id === "@/lib/utils/timestamp") {
@@ -43,12 +43,12 @@ function loadBookmarkParser() {
   };
 
   vm.runInNewContext(compiled, {
-    exports: module.exports,
-    module,
+    exports: cjsModule.exports,
+    module: cjsModule,
     require: sandboxRequire,
   });
 
-  return module.exports;
+  return cjsModule.exports;
 }
 
 const { parseBookmarksHtml } = loadBookmarkParser();

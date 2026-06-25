@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactNode, KeyboardEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,6 +32,7 @@ type FilterToolbarProps = {
   actions?: ReactNode;
   viewToggle?: ReactNode;
   className?: string;
+  onSearchKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 };
 
 export function FilterToolbar({
@@ -46,17 +47,18 @@ export function FilterToolbar({
   actions,
   viewToggle,
   className,
+  onSearchKeyDown,
 }: FilterToolbarProps) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/60 bg-muted/10 p-3 shadow-sm backdrop-blur-sm",
+        "border border-border bg-background p-3",
         className
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
         {showSelectAll && onToggleSelectAll && (
-          <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-background/70 px-3 py-2">
+          <div className="flex items-center gap-2 border border-border bg-background px-3 py-2">
             <Checkbox
               checked={allSelected}
               onChange={onToggleSelectAll}
@@ -74,7 +76,8 @@ export function FilterToolbar({
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="h-10 rounded-xl border-border/60 bg-background/80 pl-9 shadow-none focus-visible:ring-1"
+            onKeyDown={onSearchKeyDown}
+            className="h-10 border-border bg-background pl-9 focus-visible:ring-1"
           />
         </div>
 
@@ -84,7 +87,7 @@ export function FilterToolbar({
             value={select.value}
             onChange={(event) => select.onChange(event.target.value)}
             className={cn(
-              "h-10 rounded-xl border border-border/60 bg-background/80 px-3 text-sm text-foreground shadow-none outline-none transition-colors focus:border-primary/40",
+              "h-10 border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/40",
               select.className
             )}
           >
@@ -99,7 +102,7 @@ export function FilterToolbar({
         {actions}
 
         {viewToggle && (
-          <div className="ml-auto flex overflow-hidden rounded-xl border border-border/60 bg-background/70">
+          <div className="ml-auto flex overflow-hidden border border-border bg-background">
             {viewToggle}
           </div>
         )}
@@ -139,20 +142,48 @@ export function ViewModeToggle({
   );
 }
 
+export function ItemGrid({
+  children,
+  className,
+  columns = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+}: {
+  children: ReactNode;
+  className?: string;
+  columns?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid divide-x divide-y divide-border border border-border bg-card",
+        columns,
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ItemSurface({
   selected = false,
+  inset = false,
   className,
   children,
 }: {
   selected?: boolean;
+  inset?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/60 bg-card/90 shadow-sm transition-all duration-200 hover:border-border hover:shadow-md",
-        selected && "border-primary/50 bg-primary/[0.03] ring-1 ring-primary/20",
+        "bg-card transition-colors hover:bg-muted/30",
+        !inset && "border border-border",
+        inset && selected && "border-l-2 border-l-primary bg-primary/[0.03]",
+        !inset &&
+          selected &&
+          "border-primary/50 bg-primary/[0.03] ring-1 ring-primary/20",
         className
       )}
     >

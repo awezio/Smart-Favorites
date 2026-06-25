@@ -1,20 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, FileText, Loader2, RefreshCw, Search, Trash2, Upload } from "lucide-react";
+import { AlertCircle, FileText, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { PageHeader, StatCard } from "@/components/dashboard/page-header";
+import { FilterToolbar } from "@/components/dashboard/filter-toolbar";
+import { FeedList, FeedListItem } from "@/components/layout/feed-list";
+import { SectionPanel } from "@/components/layout/section-panel";
+import { EmptyState } from "@/components/empty-state";
 import { type DashboardLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type { DocumentRecord } from "@/types";
 
 const STATUS_STYLES: Record<DocumentRecord["status"], string> = {
-  pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  processing: "bg-blue-100 text-blue-800 border-blue-200",
-  completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  failed: "bg-red-100 text-red-800 border-red-200",
+  pending: "bg-accent-creative/15 text-accent-creative border-accent-creative/30",
+  processing: "bg-primary/10 text-primary border-primary/20",
+  completed: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400",
+  failed: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 const STATUS_COPY: Record<DashboardLanguage, Record<DocumentRecord["status"], string>> = {
@@ -205,77 +208,77 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-sky-100 bg-white/90 p-5 shadow-sm shadow-sky-100/60 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-950">{t.title}</h1>
-          <p className="mt-2 text-slate-500">
-            {t.subtitle}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.docx,.xlsx,.xls,.txt,.md,.html,.htm"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) uploadFile(file);
-            }}
-          />
-          <Button variant="outline" onClick={loadDocuments} disabled={loading} className="rounded-xl border-sky-100 text-slate-700 hover:bg-sky-50">
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            {t.refresh}
-          </Button>
-          <Button onClick={() => inputRef.current?.click()} disabled={uploading} className="rounded-xl bg-sky-600 hover:bg-sky-700">
-            {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-            {t.upload}
-          </Button>
-        </div>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        title={t.title}
+        description={t.subtitle}
+        actions={
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.docx,.xlsx,.xls,.txt,.md,.html,.htm"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) uploadFile(file);
+              }}
+            />
+            <Button variant="outline" onClick={loadDocuments} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              {t.refresh}
+            </Button>
+            <Button
+              variant="creative"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
+              {t.upload}
+            </Button>
+          </>
+        }
+      />
 
       {error && (
-        <Card className="rounded-2xl border-destructive/40 bg-destructive/5">
-          <CardContent className="flex items-center gap-2 py-4 text-sm text-destructive">
+        <SectionPanel className="border-destructive/40 bg-destructive/5">
+          <div className="flex items-center gap-2 text-sm text-destructive">
             <AlertCircle className="h-4 w-4" />
             {error}
-          </CardContent>
-        </Card>
+          </div>
+        </SectionPanel>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label={t.total} value={stats.total} />
-        <Metric label={t.readyForRag} value={stats.completed} />
-        <Metric label={t.pending} value={stats.pending} />
-        <Metric label={t.failed} value={stats.failed} />
+        <StatCard label={t.total} value={stats.total} icon={<FileText className="h-4 w-4 text-primary" />} />
+        <StatCard label={t.readyForRag} value={stats.completed} />
+        <StatCard label={t.pending} value={stats.pending} />
+        <StatCard label={t.failed} value={stats.failed} />
       </div>
 
-      <Card className="rounded-2xl border-sky-100 bg-white/90 shadow-sm shadow-sky-100/60">
-        <CardContent className="py-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              className="rounded-xl border-sky-100 pl-9 focus-visible:ring-sky-500"
-              placeholder={t.searchPlaceholder}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <SectionPanel noPadding>
+        <FilterToolbar
+          searchPlaceholder={t.searchPlaceholder}
+          searchValue={query}
+          onSearchChange={setQuery}
+        />
+      </SectionPanel>
 
-      <div className="grid gap-4">
-        {loading ? (
-          <Card className="rounded-2xl border-sky-100 bg-white/90">
-            <CardContent className="flex items-center justify-center py-12 text-slate-500">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {t.loading}
-            </CardContent>
-          </Card>
-        ) : filtered.length > 0 ? (
-          filtered.map((document) => (
-            <DocumentCard
+      {loading ? (
+        <SectionPanel>
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {t.loading}
+          </div>
+        </SectionPanel>
+      ) : filtered.length > 0 ? (
+        <FeedList>
+          {filtered.map((document) => (
+            <DocumentRow
               key={document.id}
               language={language}
               document={document}
@@ -283,31 +286,21 @@ export default function DocumentsPage() {
               onProcess={() => processDocument(document.id)}
               onDelete={() => deleteDocument(document.id)}
             />
-          ))
-        ) : (
-          <Card className="rounded-2xl border-sky-100 bg-white/90">
-            <CardContent className="py-12 text-center text-slate-500">
-              {t.noDocuments}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          ))}
+        </FeedList>
+      ) : (
+        <EmptyState
+          icon={FileText}
+          title={t.noDocuments}
+          description={t.subtitle}
+          textured
+        />
+      )}
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="rounded-2xl border-sky-100 bg-white/90 shadow-sm shadow-sky-100/60">
-      <CardContent className="py-5">
-        <p className="text-sm text-slate-500">{label}</p>
-        <p className="mt-2 text-2xl font-semibold text-slate-950">{value.toLocaleString()}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DocumentCard({
+function DocumentRow({
   language,
   document,
   processing,
@@ -326,51 +319,58 @@ function DocumentCard({
     : null;
 
   return (
-    <Card className="rounded-2xl border-sky-100 bg-white/90 shadow-sm shadow-sky-100/60">
-      <CardHeader className="pb-3">
+    <FeedListItem>
+      <div className="px-4 py-4 sm:px-5 sm:py-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileText className="h-5 w-5 shrink-0 text-sky-600" />
-              <span className="truncate">{document.title}</span>
-            </CardTitle>
-            <p className="mt-1 truncate text-sm text-slate-500">{document.file_name}</p>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <FileText className="h-4 w-4 shrink-0 text-primary" />
+              <h3 className="truncate font-serif text-base font-semibold sm:text-lg">
+                {document.title}
+              </h3>
+              <Badge variant="outline" className={STATUS_STYLES[document.status]}>
+                {STATUS_COPY[language][document.status]}
+              </Badge>
+            </div>
+            <p className="truncate text-sm text-muted-foreground">{document.file_name}</p>
+            <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-4 sm:text-sm">
+              <span>{formatBytes(document.file_size)}</span>
+              <span>{document.file_type || t.fileTypeUnknown}</span>
+              <span>{chunkCount !== null ? t.chunks(chunkCount) : t.noChunks}</span>
+              <span>
+                {new Date(document.created_at).toLocaleDateString(
+                  language === "zh" ? "zh-CN" : "en-US"
+                )}
+              </span>
+            </div>
+            {document.processing_error && (
+              <p className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {document.processing_error}
+              </p>
+            )}
           </div>
-          <Badge variant="outline" className={STATUS_STYLES[document.status]}>
-            {STATUS_COPY[language][document.status]}
-          </Badge>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onProcess}
+              disabled={processing || document.status === "processing"}
+            >
+              {processing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {document.status === "completed" ? t.reprocess : t.process}
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDelete}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t.delete}
+            </Button>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-2 text-sm text-slate-500 sm:grid-cols-4">
-          <span>{formatBytes(document.file_size)}</span>
-          <span>{document.file_type || t.fileTypeUnknown}</span>
-          <span>{chunkCount !== null ? t.chunks(chunkCount) : t.noChunks}</span>
-          <span>{new Date(document.created_at).toLocaleDateString(language === "zh" ? "zh-CN" : "en-US")}</span>
-        </div>
-        {document.processing_error && (
-          <p className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            {document.processing_error}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-sky-100 hover:bg-sky-50"
-            onClick={onProcess}
-            disabled={processing || document.status === "processing"}
-          >
-            {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            {document.status === "completed" ? t.reprocess : t.process}
-          </Button>
-          <Button variant="outline" size="sm" className="rounded-xl border-sky-100 hover:bg-sky-50" onClick={onDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            {t.delete}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </FeedListItem>
   );
 }
 

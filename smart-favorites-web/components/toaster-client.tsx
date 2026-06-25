@@ -10,5 +10,15 @@ export function ToasterClient() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
-  return <Toaster richColors position="top-right" />;
+  return (
+    <Toaster
+      richColors
+      position="top-right"
+      toastOptions={{
+        classNames: {
+          toast: "rounded-xl border border-border shadow-elevated",
+        },
+      }}
+    />
+  );
 }

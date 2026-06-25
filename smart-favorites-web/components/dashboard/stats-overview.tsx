@@ -46,9 +46,9 @@ type StatsOverviewProps = {
 
 const ACCENT_BAR: Record<NonNullable<StatMetric["accent"]>, string> = {
   primary: "bg-primary",
-  sky: "bg-sky-400",
-  blue: "bg-blue-500",
-  cyan: "bg-cyan-400",
+  sky: "bg-primary/70",
+  blue: "bg-chart-2",
+  cyan: "bg-chart-4",
 };
 
 const CHART_FILLS = [
@@ -75,10 +75,8 @@ function ChartTooltip({
 
   const item = payload[0];
   return (
-    <div className="rounded-xl border border-border/60 bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm">
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        {label ?? item.name}
-      </p>
+    <div className="border border-border bg-background px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label ?? item.name}</p>
       <p className="mt-0.5 text-sm font-semibold tabular-nums tracking-tight">
         {item.value?.toLocaleString()}
       </p>
@@ -98,14 +96,12 @@ function Panel({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-sky-100 bg-white/90 shadow-sm shadow-sky-100/60 backdrop-blur-sm",
+        "border border-border bg-card",
         className
       )}
     >
-      <div className="border-b border-sky-100 px-5 py-4">
-        <h3 className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-          {title}
-        </h3>
+      <div className="border-b border-border px-5 py-4">
+        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -123,13 +119,8 @@ export function StatsOverview({
   return (
     <div className={cn("space-y-5", className)}>
       <div className="flex items-end justify-between gap-4 px-1">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Overview
-          </p>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight">数据概览</h2>
-        </div>
-        <div className="hidden h-px flex-1 bg-sky-100 sm:block" aria-hidden />
+        <h2 className="text-lg font-semibold tracking-tight">数据概览</h2>
+        <div className="hidden h-px flex-1 bg-primary/10 sm:block" aria-hidden />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -139,7 +130,7 @@ export function StatsOverview({
           return (
             <article
               key={metric.label}
-              className="group relative overflow-hidden rounded-2xl border border-sky-100 bg-white/80 p-4 shadow-sm shadow-sky-100/50 transition-colors duration-200 hover:bg-sky-50/60"
+              className="group relative overflow-hidden border border-border bg-card p-4 transition-colors duration-200 hover:bg-muted/40"
             >
               <span
                 className={cn(
@@ -149,9 +140,7 @@ export function StatsOverview({
               />
               <div className="flex items-start justify-between gap-3 pl-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                    {metric.label}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{metric.label}</p>
                   <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight">
                     {typeof metric.value === "number"
                       ? metric.value.toLocaleString()
@@ -164,7 +153,7 @@ export function StatsOverview({
                   )}
                 </div>
                 {Icon && (
-                  <div className="rounded-xl border border-sky-100 bg-white p-2.5 text-slate-500 transition-colors group-hover:text-sky-700">
+                  <div className="border border-border bg-card p-2.5 text-muted-foreground transition-colors group-hover:text-primary">
                     <Icon className="h-4 w-4" strokeWidth={1.75} />
                   </div>
                 )}
@@ -206,7 +195,7 @@ export function StatsOverview({
                     {donut.centerValue ?? donutTotal.toLocaleString()}
                   </span>
                   {donut.centerLabel && (
-                    <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    <span className="mt-1 text-xs text-muted-foreground">
                       {donut.centerLabel}
                     </span>
                   )}

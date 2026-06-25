@@ -30,9 +30,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StatsOverview } from "@/components/dashboard/stats-overview";
+import { StatsOverview } from "@/components/dashboard/stats-overview-dynamic";
 import {
   FilterToolbar,
+  ItemGrid,
   ItemSurface,
   ViewModeToggle,
 } from "@/components/dashboard/filter-toolbar";
@@ -45,7 +46,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { FeedList, FeedListItem } from "@/components/layout/feed-list";
+import { SectionPanel } from "@/components/layout/section-panel";
 import type { Bookmark } from "@/types";
 import {
   getExtensionInstallUrl,
@@ -68,8 +72,8 @@ function BookmarkListSkeleton() {
       </div>
 
       {/* Toolbar skeleton */}
-      <Card>
-        <CardContent className="pt-6 space-y-4">
+      <div className="border border-border bg-background p-3">
+        <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
             <Skeleton className="h-9 w-28" />
             <Skeleton className="h-9 w-20" />
@@ -87,32 +91,29 @@ function BookmarkListSkeleton() {
               <Skeleton className="h-9 w-9" />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Bookmark card skeletons */}
-      <div className="space-y-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="py-3">
-              <div className="flex items-start gap-3">
-                <Skeleton className="h-4 w-4 mt-1 rounded shrink-0" />
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <Skeleton className="h-5 w-[60%]" />
-                      <Skeleton className="h-4 w-[40%]" />
-                    </div>
-                    <Skeleton className="h-7 w-20 shrink-0 rounded-md" />
-                  </div>
-                  <Skeleton className="h-4 w-[80%]" />
-                  <Skeleton className="h-5 w-24 rounded-full" />
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
+        </div>
       </div>
+
+      <FeedList>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="px-4 py-3">
+            <div className="flex items-start gap-3">
+              <Skeleton className="h-4 w-4 mt-1 rounded shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-5 w-[60%]" />
+                    <Skeleton className="h-4 w-[40%]" />
+                  </div>
+                  <Skeleton className="h-7 w-20 shrink-0" />
+                </div>
+                <Skeleton className="h-4 w-[80%]" />
+                <Skeleton className="h-5 w-24" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </FeedList>
     </div>
   );
 }
@@ -909,7 +910,7 @@ export default function BookmarksPage() {
     return (
       <div className="mt-2 flex flex-wrap gap-1.5">
         {tags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="rounded-lg text-[10px]">
+          <Badge key={tag} variant="secondary" className="text-[10px]">
             #{tag}
           </Badge>
         ))}
@@ -922,7 +923,7 @@ export default function BookmarksPage() {
     const isCapturing = capturingSnapshotId === bookmark.id;
 
     return (
-      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/20 p-2 sm:max-w-sm">
+      <div className="mt-3 flex flex-col gap-2 border border-border/70 bg-muted/20 p-2 sm:max-w-sm">
         {src ? (
           <a href={src} target="_blank" rel="noopener noreferrer" className="block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -945,7 +946,7 @@ export default function BookmarksPage() {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 rounded-lg text-xs"
+            className="h-7 text-xs"
             disabled={isCapturing}
             onClick={() => captureSnapshot(bookmark)}
           >
@@ -966,39 +967,33 @@ export default function BookmarksPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
-          <p className="text-muted-foreground mt-1">
-            {t.totalCount(bookmarks.length)}
-          </p>
-        </div>
-        <Button
-          variant={isEditing ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIsEditing(!isEditing)}
-        >
-          {isEditing ? (
-            <><Check className="h-4 w-4 mr-1" />{t.done}</>
-          ) : (
-            <><Pencil className="h-4 w-4 mr-1" />{t.edit}</>
-          )}
-        </Button>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        title={t.title}
+        description={t.totalCount(bookmarks.length)}
+        actions={
+          <Button
+            variant={isEditing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            {isEditing ? (
+              <><Check className="h-4 w-4 mr-1" />{t.done}</>
+            ) : (
+              <><Pencil className="h-4 w-4 mr-1" />{t.edit}</>
+            )}
+          </Button>
+        }
+      />
 
-      <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base tracking-tight">{t.syncCardTitle}</CardTitle>
-          <CardDescription>
-            {t.syncCardDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-2">
+      <SectionPanel
+        title={t.syncCardTitle}
+        description={t.syncCardDescription}
+      >
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={handleOneClickSync}
             disabled={loading || checkingExtension}
-            className="rounded-xl"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1011,7 +1006,6 @@ export default function BookmarksPage() {
           <Button
             variant={extensionId ? "secondary" : "default"}
             onClick={extensionId ? handleOpenExtension : openExtensionGuide}
-            className="rounded-xl"
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             {checkingExtension
@@ -1022,13 +1016,13 @@ export default function BookmarksPage() {
           </Button>
 
           <label>
-            <Button variant="outline" disabled={loading} asChild className="rounded-xl">
+            <Button variant="outline" disabled={loading} asChild>
               <span><Upload className="h-4 w-4 mr-2" />{t.importHtmlAlt}</span>
             </Button>
             <input type="file" accept=".html" className="hidden" onChange={handleImport} />
           </label>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
       {/* Statistics Panel */}
       {bookmarks.length > 0 && (
@@ -1074,14 +1068,11 @@ export default function BookmarksPage() {
         />
       )}
 
-      {/* Toolbar */}
-      <Card className="rounded-2xl border-border/60 bg-card/80 shadow-sm">
-        <CardContent className="pt-6 space-y-4">
+      <SectionPanel noPadding contentClassName="space-y-4 panel-pad">
           <div className="flex gap-2 flex-wrap">
             <Button
               onClick={handleOneClickSync}
               disabled={loading || checkingExtension}
-              className="rounded-xl"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1094,32 +1085,31 @@ export default function BookmarksPage() {
             <Button
               variant="outline"
               onClick={extensionId ? handleOpenExtension : openExtensionGuide}
-              className="rounded-xl"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               {t.syncCardTitle}
             </Button>
 
             <label>
-              <Button variant="outline" disabled={loading} asChild className="rounded-xl">
+              <Button variant="outline" disabled={loading} asChild>
                 <span><Upload className="h-4 w-4 mr-2" />{t.importHtml}</span>
               </Button>
               <input type="file" accept=".html" className="hidden" onChange={handleImport} />
             </label>
 
             <label>
-              <Button variant="outline" disabled={loading} asChild className="rounded-xl">
+              <Button variant="outline" disabled={loading} asChild>
                 <span><FileText className="h-4 w-4 mr-2" />{t.diff}</span>
               </Button>
               <input type="file" accept=".html" className="hidden" onChange={handleDiff} />
             </label>
 
-            <Button variant="outline" onClick={loadBookmarks} className="rounded-xl">
+            <Button variant="outline" onClick={loadBookmarks}>
               <RefreshCw className="h-4 w-4 mr-2" />{t.refresh}
             </Button>
 
             {isEditing && (
-              <Button onClick={() => setShowAddModal(true)} className="rounded-xl">
+              <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="h-4 w-4 mr-2" />{t.manualAdd}
               </Button>
             )}
@@ -1128,7 +1118,6 @@ export default function BookmarksPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                className="rounded-xl"
                 onClick={() => handleDelete(Array.from(selectedIds))}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
@@ -1193,7 +1182,7 @@ export default function BookmarksPage() {
                   size="sm"
                   disabled={generatingBatch}
                   onClick={batchGenerateDescriptions}
-                  className="h-10 rounded-xl"
+                  className="h-10"
                 >
                   {generatingBatch ? (
                     <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -1216,8 +1205,7 @@ export default function BookmarksPage() {
               />
             }
           />
-        </CardContent>
-      </Card>
+      </SectionPanel>
 
       {/* Bookmarks Display */}
       {filteredBookmarks.length === 0 && bookmarks.length === 0 ? (
@@ -1225,6 +1213,7 @@ export default function BookmarksPage() {
           icon={BookmarkIcon}
           title={t.emptyNoBookmarksTitle}
           description={t.emptyNoBookmarksDescription}
+          textured
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="outline" onClick={openExtensionGuide}>
@@ -1246,10 +1235,9 @@ export default function BookmarksPage() {
           description={t.emptyNoMatchesDescription}
         />
       ) : viewMode === "card" ? (
-        /* Card View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ItemGrid>
           {filteredBookmarks.map((b) => (
-            <ItemSurface key={b.id} selected={selectedIds.has(b.id)}>
+            <ItemSurface key={b.id} inset selected={selectedIds.has(b.id)}>
               <div className="p-4">
                 <div className="flex items-start gap-2">
                   <Checkbox
@@ -1279,7 +1267,7 @@ export default function BookmarksPage() {
                   </p>
                 )}
                 {b.folder_path && b.folder_path !== "/" && (
-                  <Badge variant="outline" className="mt-2 rounded-lg text-[10px]">
+                  <Badge variant="outline" className="mt-2 text-[10px]">
                     {b.folder_path}
                   </Badge>
                 )}
@@ -1287,21 +1275,21 @@ export default function BookmarksPage() {
                 {renderSnapshotPreview(b)}
                 <div className="flex gap-1 mt-3">
                   {!hasBookmarkDescription(b) && (
-                    <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => generateDescription(b)}>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateDescription(b)}>
                       <Sparkles className="h-3 w-3 mr-1" />AI
                     </Button>
                   )}
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-7 rounded-lg text-xs"
+                    className="h-7 text-xs"
                     aria-label={language === "zh" ? "编辑描述" : "Edit description"}
                     onClick={() => openBookmarkEditor(b)}
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
                   {isEditing && (
-                    <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={() => handleDelete([b.id])}>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDelete([b.id])}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   )}
@@ -1309,13 +1297,13 @@ export default function BookmarksPage() {
               </div>
             </ItemSurface>
           ))}
-        </div>
+        </ItemGrid>
       ) : viewMode === "compact" ? (
-        /* Compact multi-column */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <ItemGrid columns="grid-cols-1 md:grid-cols-2">
           {filteredBookmarks.map((b) => (
             <ItemSurface
               key={b.id}
+              inset
               selected={selectedIds.has(b.id)}
               className="px-3 py-2.5"
             >
@@ -1345,7 +1333,7 @@ export default function BookmarksPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 w-7 rounded-lg p-0"
+                className="h-7 w-7 p-0"
                 aria-label={language === "zh" ? "编辑描述" : "Edit description"}
                 onClick={() => openBookmarkEditor(b)}
               >
@@ -1357,12 +1345,11 @@ export default function BookmarksPage() {
               </div>
             </ItemSurface>
           ))}
-        </div>
+        </ItemGrid>
       ) : (
-        /* List View */
-        <div className="space-y-2">
+        <FeedList>
           {filteredBookmarks.map((b) => (
-            <ItemSurface key={b.id} selected={selectedIds.has(b.id)}>
+            <FeedListItem key={b.id} selected={selectedIds.has(b.id)}>
               <div className="px-4 py-3">
                 <div className="flex items-start gap-3">
                   <Checkbox
@@ -1391,7 +1378,7 @@ export default function BookmarksPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-xl text-xs"
+                            className="h-8 text-xs"
                             onClick={() => generateDescription(b)}
                           >
                             <Sparkles className="h-3 w-3 mr-1" />
@@ -1401,7 +1388,7 @@ export default function BookmarksPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 rounded-xl p-0"
+                          className="h-8 w-8 p-0"
                           aria-label={language === "zh" ? "编辑描述" : "Edit description"}
                           onClick={() => openBookmarkEditor(b)}
                         >
@@ -1411,7 +1398,7 @@ export default function BookmarksPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-8 w-8 rounded-xl p-0"
+                            className="h-8 w-8 p-0"
                             onClick={() => handleDelete([b.id])}
                           >
                             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1430,7 +1417,7 @@ export default function BookmarksPage() {
                       </p>
                     )}
                     {b.folder_path && b.folder_path !== "/" && (
-                      <Badge variant="outline" className="mt-2 rounded-lg text-xs">
+                      <Badge variant="outline" className="mt-2 text-xs">
                         {b.folder_path}
                       </Badge>
                     )}
@@ -1439,9 +1426,9 @@ export default function BookmarksPage() {
                   </div>
                 </div>
               </div>
-            </ItemSurface>
+            </FeedListItem>
           ))}
-        </div>
+        </FeedList>
       )}
 
       {/* Add Bookmark Modal */}

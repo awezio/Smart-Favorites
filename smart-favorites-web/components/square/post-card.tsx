@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   Star,
   ThumbsUp,
@@ -12,11 +13,13 @@ import {
   ChevronUp,
   Image as ImageIcon,
   Film,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { DitheredImage } from "@/components/layout/dithered-image";
 import { getDiceBearUrl } from "@/lib/avatars";
 import { SQUARE_TARGET_LABELS } from "@/lib/square";
 import type { SquarePost } from "@/types";
@@ -40,6 +43,71 @@ interface PostCardProps {
   currentUserId?: string;
   onVote: (postId: string, helpful: boolean | null) => void;
   onDelete?: (postId: string) => void;
+  layout?: "feed" | "grid";
+}
+
+function SnapshotCover({
+  post,
+  images,
+}: {
+  post: SquarePost;
+  images: NonNullable<SquarePost["media"]>;
+}) {
+  const coverUrl =
+    post.snapshot_url ||
+    images[0]?.url ||
+    null;
+
+  if (post.snapshot_status === "capturing" || post.snapshot_status === "pending") {
+    return (
+      <div className="flex aspect-[16/10] w-full items-center justify-center bg-muted">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-xs">快照生成中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (post.snapshot_status === "failed" || post.snapshot_status === "unavailable") {
+    return (
+      <div className="flex aspect-[16/10] w-full items-center justify-center bg-muted/80">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <AlertCircle className="h-6 w-6" />
+          <span className="text-xs">快照不可用</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (coverUrl) {
+    return (
+      <DitheredImage className="relative aspect-[16/10] w-full bg-muted">
+        <Image
+          src={coverUrl}
+          alt={post.title}
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          unoptimized
+          className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
+        />
+        <div className="absolute inset-0 z-[2] bg-gradient-to-t from-foreground/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      </DitheredImage>
+    );
+  }
+
+  return (
+    <div className="flex aspect-[16/10] w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/10 to-accent-creative/10 p-6">
+      <svg viewBox="0 0 80 60" className="h-14 w-18 text-primary/35" aria-hidden>
+        <rect x="4" y="4" width="72" height="52" rx="4" fill="currentColor" fillOpacity="0.25" />
+        <rect x="12" y="14" width="24" height="18" rx="2" fill="currentColor" fillOpacity="0.4" />
+        <rect x="42" y="14" width="26" height="4" rx="1" fill="currentColor" fillOpacity="0.3" />
+      </svg>
+      <span className="max-w-full truncate text-center text-xs text-muted-foreground">
+        {post.title}
+      </span>
+    </div>
+  );
 }
 
 export function PostCard({
@@ -47,6 +115,7 @@ export function PostCard({
   currentUserId,
   onVote,
   onDelete,
+  layout = "feed",
 }: PostCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -55,7 +124,6 @@ export function PostCard({
   const votes = post.votes;
   const userVote = votes?.user_vote ?? null;
 
-  // Avatar URL
   const avatarUrl = post.author?.avatar_url
     ? post.author.avatar_url
     : post.author?.avatar_seed
@@ -80,253 +148,231 @@ export function PostCard({
 
   const handleVote = (helpful: boolean) => {
     if (userVote === helpful) {
-      // Toggle off
       onVote(post.id, null);
     } else {
       onVote(post.id, helpful);
     }
   };
 
+  const isGrid = layout === "grid";
+
   return (
     <>
-      <Card className="transition-all duration-200 hover:shadow-md">
-        <CardContent className="p-5">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-3">
-            <Image
-              src={avatarUrl}
-              alt="avatar"
-              width={32}
-              height={32}
-              unoptimized
-              className="h-8 w-8 rounded-full object-cover bg-muted"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">
-                  {displayName}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {timeAgo(post.created_at)}
-                </span>
-              </div>
-              {post.title && (
-                <h3 className="text-base font-semibold mt-0.5 leading-tight">
-                  {post.title}
-                </h3>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            {targetLabel && (
-              <Badge variant="secondary" className="text-xs">
-                {targetLabel}
-              </Badge>
-            )}
-            {mediaCount > 0 && (
-              <Badge variant="outline" className="text-xs gap-1">
-                {images.length > 0 && <ImageIcon className="h-3 w-3" />}
-                {videos.length > 0 && !images.length && <Film className="h-3 w-3" />}
-                {mediaCount} 个媒体
-              </Badge>
-            )}
-            {post.target_url && (
-              <a
-                href={post.target_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Badge
-                  variant="outline"
-                  className="gap-1 text-xs hover:bg-accent cursor-pointer shrink-0"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  链接
-                </Badge>
-              </a>
-            )}
-          </div>
-
-          {/* Rating */}
-          {post.rating != null && post.rating > 0 && (
-            <div className="flex items-center gap-0.5 mb-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={cn(
-                    "h-4 w-4",
-                    i < post.rating!
-                      ? "fill-current text-amber-400"
-                      : "text-muted-foreground"
-                  )}
-                />
-              ))}
-            </div>
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+      >
+        <article
+          className={cn(
+            "group overflow-hidden border border-border bg-card transition-colors hover:bg-muted/30",
+            isGrid && "h-full"
           )}
+        >
+          <SnapshotCover post={post} images={images} />
 
-          {/* Content */}
-          <div className="relative">
-            <p
-              className={cn(
-                "text-sm text-foreground/90 whitespace-pre-wrap break-words",
-                !expanded && "line-clamp-6"
-              )}
-            >
-              {post.content}
-            </p>
-            {post.content.length > 300 && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
-              >
-                {expanded ? (
-                  <>
-                    收起 <ChevronUp className="h-3 w-3" />
-                  </>
-                ) : (
-                  <>
-                    展开 <ChevronDown className="h-3 w-3" />
-                  </>
+          <div className={cn("p-4 sm:p-5", isGrid && "flex flex-1 flex-col")}>
+            <div className="mb-3 flex items-center gap-3">
+              <Image
+                src={avatarUrl}
+                alt="avatar"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-8 w-8 rounded-full object-cover bg-muted"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{displayName}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {timeAgo(post.created_at)}
+                  </span>
+                </div>
+                {post.title && (
+                  <h3 className="mt-0.5 text-base font-semibold leading-tight text-foreground">
+                    {post.title}
+                  </h3>
                 )}
-              </button>
-            )}
-          </div>
+              </div>
+            </div>
 
-          {/* Media gallery */}
-          {(images.length > 0 || videos.length > 0) && (
-            <div className="mt-3">
-              {/* Images */}
-              {images.length > 0 && (
-                <div
-                  className={cn(
-                    "grid gap-2",
-                    images.length === 1
-                      ? "grid-cols-1"
-                      : images.length === 2
-                        ? "grid-cols-2"
-                        : "grid-cols-3"
-                  )}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {targetLabel && (
+                <Badge variant="secondary" className="text-xs">
+                  {targetLabel}
+                </Badge>
+              )}
+              {mediaCount > 0 && (
+                <Badge variant="outline" className="gap-1 text-xs">
+                  {images.length > 0 && <ImageIcon className="h-3 w-3" />}
+                  {videos.length > 0 && !images.length && <Film className="h-3 w-3" />}
+                  {mediaCount} 个媒体
+                </Badge>
+              )}
+              {post.target_url && (
+                <a href={post.target_url} target="_blank" rel="noopener noreferrer">
+                  <Badge
+                    variant="outline"
+                    className="cursor-pointer gap-1 text-xs hover:bg-accent"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    链接
+                  </Badge>
+                </a>
+              )}
+            </div>
+
+            {post.rating != null && post.rating > 0 && (
+              <div className="mb-2 flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={cn(
+                      "h-4 w-4",
+                      i < post.rating!
+                        ? "fill-current text-accent-creative"
+                        : "text-muted-foreground"
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="relative">
+              <p
+                className={cn(
+                  "text-sm text-foreground/90 whitespace-pre-wrap break-words",
+                  !expanded && "line-clamp-4"
+                )}
+              >
+                {post.content}
+              </p>
+              {post.content.length > 200 && (
+                <button
+                  onClick={() => setExpanded(!expanded)}
+                  className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline"
                 >
-                  {images.map((img) => (
-                    <button
-                      key={img.id}
-                      onClick={() => setLightboxUrl(img.url)}
-                      className="relative overflow-hidden rounded-lg border bg-muted aspect-video"
-                    >
+                  {expanded ? (
+                    <>
+                      收起 <ChevronUp className="h-3 w-3" />
+                    </>
+                  ) : (
+                    <>
+                      展开 <ChevronDown className="h-3 w-3" />
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {images.length > 1 && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {images.slice(1, 4).map((img) => (
+                  <button
+                    key={img.id}
+                    onClick={() => setLightboxUrl(img.url)}
+                    className="relative aspect-video overflow-hidden border bg-muted"
+                  >
+                    <DitheredImage className="absolute inset-0">
                       <Image
                         src={img.url}
-                        alt={post.title ? `${post.title} media` : "Square post media"}
+                        alt=""
                         fill
-                        sizes="(max-width: 768px) 33vw, 240px"
+                        sizes="120px"
                         unoptimized
-                        className="h-full w-full object-cover hover:scale-105 transition-transform duration-200"
+                        className="object-cover"
                       />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {/* Videos */}
-              {videos.map((vid) => (
-                <div key={vid.id} className="mt-2">
-                  <video
-                    src={vid.url}
-                    controls
-                    className="w-full rounded-lg border"
-                    preload="metadata"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Footer / Votes */}
-          <div className="flex items-center justify-between mt-4 pt-3 border-t">
-            {isAuthor ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  你的发布
-                </span>
-                {onDelete && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => onDelete(post.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                    删除
-                  </Button>
-                )}
+                    </DitheredImage>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground hidden sm:inline">
-                  这篇评测是否有价值？
-                </span>
-                <div className="flex items-center gap-1.5">
+            )}
+
+            {videos.map((vid) => (
+              <div key={vid.id} className="mt-3">
+                <video
+                  src={vid.url}
+                  controls
+                  className="w-full border"
+                  preload="metadata"
+                />
+              </div>
+            ))}
+
+            <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+              {isAuthor ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">你的发布</span>
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onDelete(post.id)}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      删除
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant={userVote === true ? "default" : "outline"}
                     size="sm"
                     className={cn(
-                      "h-7 text-xs gap-1",
-                      userVote === true &&
-                        "bg-green-600 hover:bg-green-700 text-white"
+                      "h-7 gap-1 text-xs",
+                      userVote === true && "bg-green-600 hover:bg-green-700"
                     )}
                     onClick={() => handleVote(true)}
                   >
                     <ThumbsUp className="h-3.5 w-3.5" />
-                    有用{" "}
-                    {votes?.helpful_count ? `(${votes.helpful_count})` : ""}
+                    有用 {votes?.helpful_count ? `(${votes.helpful_count})` : ""}
                   </Button>
                   <Button
                     variant={userVote === false ? "default" : "outline"}
                     size="sm"
                     className={cn(
-                      "h-7 text-xs gap-1",
-                      userVote === false &&
-                        "bg-red-600 hover:bg-red-700 text-white"
+                      "h-7 gap-1 text-xs",
+                      userVote === false && "bg-red-600 hover:bg-red-700"
                     )}
                     onClick={() => handleVote(false)}
                   >
                     <ThumbsDown className="h-3.5 w-3.5" />
                     无用{" "}
-                    {votes?.not_helpful_count
-                      ? `(${votes.not_helpful_count})`
-                      : ""}
+                    {votes?.not_helpful_count ? `(${votes.not_helpful_count})` : ""}
                   </Button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Show vote stats for author too */}
-            {isAuthor && votes && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <ThumbsUp className="h-3 w-3" /> {votes.helpful_count}
-                </span>
-                <span className="flex items-center gap-1">
-                  <ThumbsDown className="h-3 w-3" /> {votes.not_helpful_count}
-                </span>
-              </div>
-            )}
+              {isAuthor && votes && (
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <ThumbsUp className="h-3 w-3" /> {votes.helpful_count}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ThumbsDown className="h-3 w-3" /> {votes.not_helpful_count}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </article>
+      </motion.div>
 
-      {/* Lightbox */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-foreground/80 p-4"
           onClick={() => setLightboxUrl(null)}
         >
           <Image
             src={lightboxUrl}
-            alt={post.title ? `${post.title} media preview` : "Square post media preview"}
+            alt=""
             width={1200}
             height={800}
             unoptimized
-            className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+            className="max-h-[90vh] max-w-[90vw] border object-contain"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

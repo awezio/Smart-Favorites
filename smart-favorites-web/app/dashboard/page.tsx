@@ -2,16 +2,13 @@
 
 import { useState } from "react";
 import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { FilterToolbar } from "@/components/dashboard/filter-toolbar";
+import { FeedList, FeedListItem } from "@/components/layout/feed-list";
+import { SectionPanel } from "@/components/layout/section-panel";
+import { EmptyState } from "@/components/empty-state";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type { SearchResult } from "@/types";
 
@@ -115,77 +112,71 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
-        <p className="text-muted-foreground mt-2">
-          {t.subtitle}
-        </p>
-      </div>
+    <div className="page-stack">
+      <PageHeader title={t.title} description={t.subtitle} />
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-2">
-            <Input
-              placeholder={t.placeholder}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="text-base"
-            />
-            <Button onClick={handleSearch} disabled={loading}>
+      <SectionPanel noPadding>
+        <FilterToolbar
+          searchPlaceholder={t.placeholder}
+          searchValue={query}
+          onSearchChange={setQuery}
+          onSearchKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          selects={[
+            {
+              id: "type",
+              value: searchType,
+              onChange: (value) =>
+                setSearchType(value as "all" | "bookmarks" | "stars" | "documents"),
+              options: (["all", "bookmarks", "stars", "documents"] as const).map(
+                (type) => ({
+                  value: type,
+                  label: filterLabel(language, type),
+                })
+              ),
+            },
+          ]}
+          actions={
+            <Button onClick={handleSearch} disabled={loading} className="h-10">
               <Search className="h-4 w-4 mr-2" />
               {loading ? t.searching : t.search}
             </Button>
-          </div>
+          }
+        />
+      </SectionPanel>
 
-          <div className="flex gap-2 mt-4">
-            {(["all", "bookmarks", "stars", "documents"] as const).map((type) => (
-              <Button
-                key={type}
-                variant={searchType === type ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSearchType(type)}
-              >
-                {filterLabel(language, type)}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {error && (
+        <SectionPanel className="border-destructive/40 bg-destructive/5">
+          <p className="text-sm text-destructive">{error}</p>
+        </SectionPanel>
+      )}
 
-      <div className="space-y-4">
-        {error && (
-          <Card>
-            <CardContent className="py-6 text-center text-destructive">
-              {error}
-            </CardContent>
-          </Card>
-        )}
+      {results.length > 0 && (
+        <p className="utility-label">
+          {t.resultCount.replace("{count}", String(results.length))}
+        </p>
+      )}
 
-        {results.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            {t.resultCount.replace("{count}", String(results.length))}
-          </p>
-        )}
+      {results.length > 0 && (
+        <FeedList>
+          {results.map((result, index) => (
+            <ResultRow key={index} result={result} language={language} />
+          ))}
+        </FeedList>
+      )}
 
-        {results.map((result, index) => (
-          <ResultCard key={index} result={result} language={language} />
-        ))}
-
-        {results.length === 0 && query && !loading && !error && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              {t.noResults}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {results.length === 0 && query && !loading && !error && (
+        <EmptyState
+          icon={Search}
+          title={t.noResults}
+          description={t.placeholder}
+          textured
+        />
+      )}
     </div>
   );
 }
 
-function ResultCard({
+function ResultRow({
   result,
   language,
 }: {
@@ -226,62 +217,62 @@ function ResultCard({
       : result.star?.url || "";
 
   return (
-    <Card className="transition-shadow hover:shadow-md">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg">{title}</CardTitle>
+    <FeedListItem>
+      <div className="px-4 py-4 sm:px-5 sm:py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-serif text-base font-semibold leading-snug sm:text-lg">
+                {title}
+              </h3>
               <Badge variant={isBookmark ? "default" : "secondary"}>
                 {isBookmark ? t.badgeBookmark : isDocument ? t.badgeDocument : t.badgeStar}
               </Badge>
+              {result.star?.language && (
+                <Badge variant="outline">{result.star.language}</Badge>
+              )}
             </div>
-            {result.star?.language && (
-              <Badge variant="outline" className="mt-2">
-                {result.star.language}
-              </Badge>
+            <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+              {description || t.noDescription}
+            </p>
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate text-sm text-primary hover:underline"
+              >
+                {url}
+              </a>
+            ) : null}
+            {result.star && (
+              <div className="flex gap-4 text-xs text-muted-foreground tabular-nums">
+                <span>Stars: {result.star.stars}</span>
+                <span>Forks: {result.star.forks}</span>
+              </div>
+            )}
+            {result.document && (
+              <div className="text-xs text-muted-foreground">
+                {result.document.file_name && <span>{result.document.file_name}</span>}
+                {result.document.page_number && (
+                  <span>
+                    {" · "}
+                    {pickLanguage(language, t.pageLabel, "Page ")}
+                    {result.document.page_number}
+                    {pickLanguage(language, t.pageSuffix, "")}
+                  </span>
+                )}
+                {result.document.section_title && (
+                  <span> · {result.document.section_title}</span>
+                )}
+              </div>
             )}
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="shrink-0 font-mono text-sm text-muted-foreground">
             {(result.similarity * 100).toFixed(1)}%
           </div>
         </div>
-        <CardDescription className="mt-2">
-          {description || t.noDescription}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {url ? (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
-          >
-            {url}
-          </a>
-        ) : null}
-        {result.star && (
-          <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-            <span>Stars: {result.star.stars}</span>
-            <span>Forks: {result.star.forks}</span>
-          </div>
-        )}
-        {result.document && (
-          <div className="mt-2 text-sm text-muted-foreground">
-            {result.document.file_name && <span>{result.document.file_name}</span>}
-            {result.document.page_number && (
-              <span>
-                {" · "}
-                {pickLanguage(language, t.pageLabel, "Page ")}
-                {result.document.page_number}
-                {pickLanguage(language, t.pageSuffix, "")}
-              </span>
-            )}
-            {result.document.section_title && <span> · {result.document.section_title}</span>}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </FeedListItem>
   );
 }

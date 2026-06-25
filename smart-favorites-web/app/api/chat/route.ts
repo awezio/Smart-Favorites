@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ragChat } from "@/lib/rag/rag-engine";
+import { ragChat, ragChatStream, createRagChatSseStream } from "@/lib/rag/rag-engine";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupportedProvider } from "@/lib/ai/provider-config";
+import { supportsProviderStreaming } from "@/lib/ai/chat-stream-shared";
+
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { query, sessionId, chatHistory = [], provider, model, knowledgeMode } = body;
+    const { query, sessionId, chatHistory = [], provider, model, knowledgeMode, stream } = body;
 
     if (!query || typeof query !== "string") {
       return NextResponse.json(
@@ -32,6 +35,36 @@ export async function POST(request: NextRequest) {
       knowledgeMode === "always" || knowledgeMode === "never" ? knowledgeMode : "auto";
 
     const supabase = await createServerSupabaseClient();
+
+    const wantsStream = stream === true;
+    const streamProvider =
+      providerOverride && supportsProviderStreaming(providerOverride)
+        ? providerOverride
+        : undefined;
+    const shouldStream = wantsStream && Boolean(streamProvider);
+
+    if (shouldStream && streamProvider) {
+      const generator = ragChatStream(
+        query,
+        chatHistory,
+        12,
+        userId,
+        providerOverride,
+        modelOverride,
+        supabase,
+        knowledgeModeOverride
+      );
+
+      return new Response(createRagChatSseStream(generator), {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
     const result = await ragChat(
       query,
       chatHistory,
@@ -46,6 +79,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       answer: result.answer,
       sources: result.sources,
+      citations: result.citations,
       routing: result.routing,
       error: result.error,
       sessionId,

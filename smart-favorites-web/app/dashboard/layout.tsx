@@ -27,8 +27,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getDiceBearUrl } from "@/lib/avatars";
+import { Logo } from "@/components/brand/logo";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
+import { PowerIndicator } from "@/components/layout/power-indicator";
 import type { Profile } from "@/types";
+import { getDashboardPageTitle } from "@/lib/dashboard-page-title";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 
 const primaryNavItems = [
@@ -58,6 +61,10 @@ export default function DashboardLayout({
   const [language, setLanguage] = useDashboardLanguage();
   const supabase = useMemo(() => createClient(), []);
   const isChatPage = pathname.startsWith("/dashboard/chat");
+  const pageTitle = useMemo(
+    () => getDashboardPageTitle(pathname, language),
+    [pathname, language]
+  );
 
   useEffect(() => {
     const getUser = async () => {
@@ -66,7 +73,6 @@ export default function DashboardLayout({
       } = await supabase.auth.getUser();
       setUser(user);
       if (user) {
-        // Fetch profile data
         try {
           const res = await fetch("/api/profile");
           if (res.ok) {
@@ -98,43 +104,35 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="flex h-dvh min-h-0 bg-sky-50/50">
-      {/* Mobile overlay */}
+    <div className="flex h-dvh min-h-0 bg-background">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-foreground/10 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 border-r border-sky-100 bg-white transition-transform duration-200 lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-border bg-background transition-transform duration-300 lg:static lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-sky-100 px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-white font-bold text-sm">
-              SF
-            </div>
-            <span className="text-lg font-bold">Smart Favorites</span>
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+          <Link href="/" onClick={() => setSidebarOpen(false)}>
+            <Logo size="sm" />
           </Link>
           <button
-            className="lg:hidden p-1 rounded hover:bg-sky-50"
+            className="rounded-lg p-1.5 hover:bg-accent lg:hidden"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="px-4 pt-4">
-          <LanguageSwitch language={language} setLanguage={setLanguage} />
-        </div>
-
-        <nav className="space-y-5 p-4">
-          <div className="space-y-1">
+        <nav className="flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="space-y-0.5">
             {primaryNavItems.map((item) => (
               <SidebarLink
                 key={item.href}
@@ -146,8 +144,8 @@ export default function DashboardLayout({
             ))}
           </div>
 
-          <div className="space-y-1 border-t border-sky-100 pt-4">
-            <p className="px-3 text-xs font-medium text-slate-500">
+          <div className="space-y-0.5 border-t border-border pt-4">
+            <p className="px-3 pb-1 utility-label">
               {pickLanguage(language, "账户", "Account")}
             </p>
             {accountNavItems.map((item) => (
@@ -162,20 +160,20 @@ export default function DashboardLayout({
           </div>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-sky-100 bg-white p-4 space-y-1">
+        <div className="shrink-0 space-y-0.5 border-t border-border p-3">
           {user && (
             <Link
               href="/dashboard/profile"
               onClick={() => setSidebarOpen(false)}
               title={pickLanguage(language, "个人资料", "Profile")}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 mb-2 rounded-lg transition-colors",
+                "mb-2 flex items-center gap-3 px-3 py-2 transition-colors",
                 pathname.startsWith("/dashboard/profile")
-                  ? "bg-sky-50 text-sky-700"
-                  : "hover:bg-sky-50"
+                  ? "border border-primary/30 bg-primary/5 text-primary"
+                  : "hover:bg-muted/50"
               )}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-50 text-sky-700 overflow-hidden">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                 {profile?.avatar_url ? (
                   <Image
                     src={profile.avatar_url}
@@ -212,17 +210,17 @@ export default function DashboardLayout({
                     className="h-8 w-8 rounded-full object-cover"
                   />
                 ) : (
-                  <User className="h-4 w-4" />
+                  <User className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
                   {profile?.display_name ||
                     user.user_metadata?.full_name ||
                     user.user_metadata?.name ||
                     user.email?.split("@")[0]}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="truncate text-xs text-muted-foreground">
                   {user.email}
                 </p>
               </div>
@@ -230,14 +228,14 @@ export default function DashboardLayout({
           )}
           <Link
             href="/"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-sky-50 hover:text-sky-700 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
             <Home className="h-5 w-5" />
             <span>{pickLanguage(language, "返回首页", "Home")}</span>
           </Link>
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="flex w-full items-center gap-3 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="h-5 w-5" />
             <span>{pickLanguage(language, "退出登录", "Log out")}</span>
@@ -245,23 +243,30 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header: mobile menu + title + theme (GitHub-style compact) */}
-        <header className="flex h-16 shrink-0 items-center gap-4 border-b border-sky-100 bg-white px-6">
+        <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-background px-4 sm:px-6">
           <button
-            className="p-1 rounded hover:bg-sky-50 lg:hidden"
+            className="p-1.5 hover:bg-muted/50 lg:hidden"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
           >
             <Menu className="h-6 w-6" />
           </button>
-          <span className="flex-1 font-semibold">Smart Favorites</span>
+          <span className="min-w-0 flex-1 truncate font-serif text-base font-semibold text-foreground sm:text-lg lg:hidden">
+            {pageTitle}
+          </span>
+          <div className="hidden flex-1 lg:block" aria-hidden />
+          <PowerIndicator compact className="hidden md:inline-flex" />
           <LanguageSwitch language={language} setLanguage={setLanguage} compact />
           <ThemeToggleCompact className="h-9 w-9 p-1.5" />
         </header>
 
         <main className={cn("min-h-0 flex-1", isChatPage ? "overflow-hidden" : "overflow-y-auto")}>
-          <div className={cn(isChatPage ? "h-full min-h-0" : "container mx-auto max-w-6xl p-6")}>
+          <div
+            className={cn(
+              isChatPage ? "flex h-full min-h-0 w-full flex-col" : "page-shell"
+            )}
+          >
             {children}
           </div>
         </main>
@@ -296,13 +301,13 @@ function SidebarLink({
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+        "flex items-center gap-3 px-3 py-2 text-sm transition-colors",
         isActive
-          ? "bg-sky-50 text-sky-700 font-medium"
-          : "text-slate-500 hover:bg-sky-50 hover:text-sky-700"
+          ? "border border-primary/30 bg-primary/5 font-medium text-primary"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
       )}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="h-5 w-5 shrink-0" />
       <span className="min-w-0 truncate">{item.label[language]}</span>
     </Link>
   );
@@ -326,9 +331,7 @@ function LanguageSwitch({
   const activeOption = options.find((option) => option.value === language) || options[0];
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
@@ -337,9 +340,7 @@ function LanguageSwitch({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
+      if (event.key === "Escape") setOpen(false);
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -351,13 +352,7 @@ function LanguageSwitch({
   }, [open]);
 
   return (
-    <div
-      ref={menuRef}
-      className={cn(
-        "relative inline-flex",
-        compact ? "h-9" : "w-full"
-      )}
-    >
+    <div ref={menuRef} className={cn("relative inline-flex", compact ? "h-9" : "w-full")}>
       <button
         type="button"
         aria-label="Language"
@@ -365,17 +360,17 @@ function LanguageSwitch({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-sky-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-sky-50 hover:text-sky-700",
+          "inline-flex h-9 items-center justify-center gap-2 border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground",
           compact ? "w-9 px-0 sm:w-auto sm:px-3" : "w-full justify-between"
         )}
       >
         <span className="inline-flex items-center gap-2">
-          <Languages className="h-4 w-4 text-sky-600" />
+          <Languages className="h-4 w-4 text-primary" />
           <span className={cn(compact ? "hidden sm:inline" : "inline")}>{activeOption.label}</span>
         </span>
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-slate-400 transition",
+            "h-4 w-4 text-muted-foreground transition",
             compact ? "hidden sm:block" : "",
             open ? "rotate-180" : ""
           )}
@@ -387,7 +382,7 @@ function LanguageSwitch({
           role="menu"
           aria-label="Language"
           className={cn(
-            "absolute z-50 mt-2 min-w-36 overflow-hidden rounded-lg border border-sky-100 bg-white py-1 shadow-lg shadow-slate-200/70",
+            "absolute z-50 mt-2 min-w-36 overflow-hidden border border-border bg-popover py-1",
             compact ? "right-0 top-full" : "left-0 top-full w-full"
           )}
         >
@@ -406,12 +401,12 @@ function LanguageSwitch({
                 className={cn(
                   "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition",
                   active
-                    ? "bg-sky-50 text-sky-700"
-                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
                 <span className="inline-flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-100 text-xs font-semibold text-sky-700">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
                     {option.shortLabel}
                   </span>
                   {option.label}

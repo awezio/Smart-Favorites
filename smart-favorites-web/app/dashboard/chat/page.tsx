@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
-  Clock,
   Copy,
   Database,
   ExternalLink,
@@ -23,7 +22,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Settings,
   Sparkles,
   Trash2,
   X,
@@ -31,8 +29,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { SourcesMobileSheet, SourcesPanel } from "@/components/chat/sources-panel";
+import { aggregateSessionSources } from "@/lib/chat/session-sources";
+import { isPlaceholderSessionTitle } from "@/lib/chat/session-title-utils";
 import { cn } from "@/lib/utils";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type {
@@ -45,7 +47,6 @@ import type {
 import { CHAT_PROVIDER_OPTIONS, type ChatModelOption } from "@/lib/chat-models";
 
 type KnowledgeMode = "auto" | "always" | "never";
-type WorkspaceTab = "new" | "settings" | "scheduled";
 
 const PINNED_STORAGE_KEY = "smart-favorites:chat:pinned";
 const ARCHIVED_STORAGE_KEY = "smart-favorites:chat:archived";
@@ -79,8 +80,6 @@ const chatCopy = {
     emptyTitle: "新会话",
     emptyDescription: "开始一次新的知识库会话。Smart Favorites 会搜索、整理并连接你保存的资源。",
     newSession: "新会话",
-    scheduled: "计划任务",
-    allProjects: "全部项目",
     searchSessions: "搜索会话...",
     archived: "已归档",
     today: "今天",
@@ -89,7 +88,6 @@ const chatCopy = {
     active: "当前",
     archive: "归档",
     noSessions: "暂无会话",
-    settings: "设置",
     untitled: "未命名会话",
     sessionActions: "会话操作",
     rename: "重命名",
@@ -134,8 +132,6 @@ const chatCopy = {
     emptyDescription:
       "Start a fresh knowledge session. Smart Favorites is ready to search, organize, debug, and connect your saved resources.",
     newSession: "New session",
-    scheduled: "Scheduled",
-    allProjects: "All projects",
     searchSessions: "Search sessions...",
     archived: "Archived",
     today: "Today",
@@ -144,7 +140,6 @@ const chatCopy = {
     active: "Active",
     archive: "Archive",
     noSessions: "No sessions",
-    settings: "Settings",
     untitled: "Untitled session",
     sessionActions: "Session actions",
     rename: "Rename",
@@ -194,7 +189,9 @@ export default function ChatPage() {
   const [modelLoadStates, setModelLoadStates] = useState<Record<string, boolean>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("new");
+  const [sourcesPanelCollapsed, setSourcesPanelCollapsed] = useState(false);
+  const [highlightedSourceIndex, setHighlightedSourceIndex] = useState<number | null>(null);
+  const [sourcesMobileOpen, setSourcesMobileOpen] = useState(false);
   const [knowledgeMode, setKnowledgeMode] = useState<KnowledgeMode>("auto");
   const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(new Set());
   const [archivedSessionIds, setArchivedSessionIds] = useState<Set<string>>(new Set());
@@ -343,6 +340,46 @@ export default function ChatPage() {
     }
   }, [loadProviderModels]);
 
+  const maybeGenerateSessionTitle = useCallback(
+    async (sessionId: string, sessionMessages: ChatMessage[]) => {
+      const userCount = sessionMessages.filter((message) => message.role === "user").length;
+      const assistantCount = sessionMessages.filter((message) => message.role === "assistant").length;
+      if (userCount < 1 || assistantCount < 1) {
+        return;
+      }
+
+      const session =
+        sessions.find((item) => item.id === sessionId) ??
+        (currentSession?.id === sessionId ? currentSession : null);
+      if (session && !isPlaceholderSessionTitle(session.title)) {
+        return;
+      }
+
+      try {
+        await fetch(`/api/chat/sessions/${sessionId}/generate-title`, { method: "POST" });
+        await loadSessions();
+        const response = await fetch(`/api/chat/sessions/${sessionId}`);
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        const updated = data.session as ChatSession;
+        setCurrentSession((current) =>
+          current?.id === sessionId
+            ? {
+                ...current,
+                title: updated.title,
+                title_status: updated.title_status,
+              }
+            : current
+        );
+      } catch {
+        // Title generation is best-effort.
+      }
+    },
+    [currentSession, loadSessions, sessions]
+  );
+
   useEffect(() => {
     setPinnedSessionIds(readStoredSessionSet(PINNED_STORAGE_KEY));
     setArchivedSessionIds(readStoredSessionSet(ARCHIVED_STORAGE_KEY));
@@ -396,6 +433,8 @@ export default function ChatPage() {
     selectedModelId
   );
   const supportsAttachments = isMultimodalModel(selectedProvider, selectedModelId);
+
+  const sessionSources = useMemo(() => aggregateSessionSources(messages), [messages]);
 
   const visibleSessions = useMemo(() => {
     const normalizedSearch = sessionSearch.trim().toLowerCase();
@@ -553,6 +592,7 @@ export default function ChatPage() {
         body: JSON.stringify({ messages: savedMessages }),
       });
       await loadSessions();
+      void maybeGenerateSessionTitle(targetSession.id, savedMessages);
     } catch (error: any) {
       toast.error(error.message || t.networkError);
     } finally {
@@ -599,14 +639,14 @@ export default function ChatPage() {
 
   if (initializing) {
     return (
-      <div className="flex h-full min-h-0 items-center justify-center bg-sky-100/60">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+      <div className="flex h-full min-h-0 items-center justify-center bg-muted/40">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-sky-100/60 text-slate-950">
+    <div className="flex h-full min-h-0 overflow-hidden bg-muted/40 text-foreground">
       <ChatSidebar
         language={language}
         collapsed={sidebarCollapsed}
@@ -629,71 +669,111 @@ export default function ChatPage() {
         onToggleShowArchived={() => setShowArchived((value) => !value)}
       />
 
-      <section className="flex min-w-0 flex-1 flex-col">
-        <WorkspaceTabs language={language} activeTab={activeTab} onChange={setActiveTab} />
-
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-4 pb-40 pt-6 sm:px-6 lg:px-8">
-            {messages.length === 0 ? (
-              <NewSessionEmptyState language={language} />
-            ) : (
-              <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-                {messages.map((message, index) => (
-                  <MessageBubble
-                    key={`${message.timestamp}-${index}`}
-                    language={language}
-                    message={message}
-                    onCopy={() => copyText(message.content, t.copied)}
-                    onRegenerate={() => regenerateFrom(index)}
-                    onBranch={() => branchFrom(index)}
-                  />
-                ))}
-                {loading && (
-                  <div className="flex items-center gap-3 rounded-2xl border border-sky-100 bg-white/90 px-5 py-4 text-sm text-slate-500 shadow-sm shadow-sky-100/60">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t.generating}
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <section className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-end border-b border-border bg-muted/50 px-4 py-2 lg:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSourcesMobileOpen(true)}
+            >
+              {t.sources}
+              {sessionSources.length > 0 ? ` (${sessionSources.length})` : ""}
+            </Button>
           </div>
 
-          <Composer
-            language={language}
-            input={input}
-            loading={loading}
-            attachments={attachments}
-            knowledgeMode={knowledgeMode}
-            currentModelLabel={currentModelLabel}
-            providerOptions={providerOptions}
-            selectedProvider={selectedProvider}
-            selectedModelId={selectedModelId}
-            showModelMenu={showModelMenu}
-            supportsAttachments={supportsAttachments}
-            fileInputRef={fileInputRef}
-            onInputChange={setInput}
-            onSend={handleSend}
-            onKnowledgeModeChange={setKnowledgeMode}
-            onToggleModelMenu={() => setShowModelMenu((value) => !value)}
-            onSelectModel={(provider, modelId) => {
-              setSelectedProvider(provider);
-              setSelectedModelId(modelId);
-              setShowModelMenu(false);
-            }}
-            onSelectDefaultModel={() => {
-              setSelectedProvider("");
-              setSelectedModelId("");
-              setShowModelMenu(false);
-            }}
-            onAttachClick={() => fileInputRef.current?.click()}
-            onFilesSelected={attachFiles}
-            onRemoveAttachment={(index) =>
-              setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))
-            }
-          />
-        </div>
-      </section>
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="flex-1 overflow-y-auto px-4 pb-40 pt-6 sm:px-6 lg:px-8">
+              {messages.length === 0 ? (
+                <NewSessionEmptyState language={language} />
+              ) : (
+                <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+                  {messages.map((message, index) => (
+                    <MessageBubble
+                      key={`${message.timestamp}-${index}`}
+                      language={language}
+                      message={message}
+                      onCopy={() => copyText(message.content, t.copied)}
+                      onRegenerate={() => regenerateFrom(index)}
+                      onBranch={() => branchFrom(index)}
+                      onCitationClick={(citationIndex) => {
+                        setHighlightedSourceIndex(citationIndex);
+                        setSourcesPanelCollapsed(false);
+                        setSourcesMobileOpen(true);
+                      }}
+                    />
+                  ))}
+                  {loading && (
+                    <div className="flex items-center gap-3 border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-none">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t.generating}
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
+
+            <Composer
+              language={language}
+              input={input}
+              loading={loading}
+              attachments={attachments}
+              knowledgeMode={knowledgeMode}
+              currentModelLabel={currentModelLabel}
+              providerOptions={providerOptions}
+              selectedProvider={selectedProvider}
+              selectedModelId={selectedModelId}
+              showModelMenu={showModelMenu}
+              supportsAttachments={supportsAttachments}
+              fileInputRef={fileInputRef}
+              onInputChange={setInput}
+              onSend={handleSend}
+              onKnowledgeModeChange={setKnowledgeMode}
+              onToggleModelMenu={() => setShowModelMenu((value) => !value)}
+              onSelectModel={(provider, modelId) => {
+                setSelectedProvider(provider);
+                setSelectedModelId(modelId);
+                setShowModelMenu(false);
+              }}
+              onSelectDefaultModel={() => {
+                setSelectedProvider("");
+                setSelectedModelId("");
+                setShowModelMenu(false);
+              }}
+              onAttachClick={() => fileInputRef.current?.click()}
+              onFilesSelected={attachFiles}
+              onRemoveAttachment={(index) =>
+                setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+              }
+            />
+          </div>
+        </section>
+
+        <SourcesPanel
+          language={language}
+          sessionId={currentSession?.id ?? null}
+          sources={sessionSources}
+          collapsed={sourcesPanelCollapsed}
+          highlightedIndex={highlightedSourceIndex}
+          onToggleCollapse={() => setSourcesPanelCollapsed((value) => !value)}
+          onHighlight={setHighlightedSourceIndex}
+          onAnalyze={(prompt) => void sendQuery(prompt)}
+        />
+      </div>
+
+      <SourcesMobileSheet
+        open={sourcesMobileOpen}
+        language={language}
+        sessionId={currentSession?.id ?? null}
+        sources={sessionSources}
+        onClose={() => setSourcesMobileOpen(false)}
+        onAnalyze={(prompt) => {
+          setSourcesMobileOpen(false);
+          void sendQuery(prompt);
+        }}
+      />
     </div>
   );
 }
@@ -739,16 +819,16 @@ function ChatSidebar({
 
   if (collapsed) {
     return (
-        <aside className="flex w-14 shrink-0 flex-col items-center border-r border-sky-200 bg-sky-100/70 py-4">
+        <aside className="flex w-14 shrink-0 flex-col items-center border-r border-border bg-muted/50 py-4">
         <button
-          className="rounded-lg p-2 text-slate-600 hover:bg-white"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-card"
           onClick={onToggleCollapse}
           aria-label={t.expandSidebar}
         >
           <PanelLeftOpen className="h-5 w-5" />
         </button>
         <button
-          className="mt-4 rounded-lg p-2 text-slate-600 hover:bg-white"
+          className="mt-4 rounded-lg p-2 text-muted-foreground hover:bg-card"
           onClick={onCreateSession}
           aria-label={t.newSession}
         >
@@ -759,19 +839,19 @@ function ChatSidebar({
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-r border-sky-200 bg-sky-100/70">
+    <aside className="flex w-[300px] shrink-0 flex-col border-r border-border bg-muted/50">
       <div className="flex items-center justify-between px-5 pb-4 pt-5">
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl border border-sky-100 bg-white text-sky-600 shadow-sm shadow-sky-100/60">
+          <div className="grid h-9 w-9 place-items-center border border-border bg-card text-primary shadow-none">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
             <div className="text-sm font-semibold">Smart Favorites</div>
-            <div className="text-xs text-sky-600">{t.knowledgeBase}</div>
+            <div className="text-xs text-primary">{t.knowledgeBase}</div>
           </div>
         </div>
         <button
-          className="rounded-lg p-2 text-slate-500 hover:bg-white"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-card"
           onClick={onToggleCollapse}
           aria-label={t.collapseSidebar}
         >
@@ -782,53 +862,45 @@ function ChatSidebar({
       <div className="space-y-3 px-5">
         <button
           onClick={onCreateSession}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-white"
+          className="flex w-full items-center gap-3 border border-transparent px-3 py-2 text-left text-sm text-muted-foreground hover:border-border hover:bg-card"
         >
           <Plus className="h-4 w-4" />
           {t.newSession}
         </button>
-        <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-white">
-          <Clock className="h-4 w-4" />
-          {t.scheduled}
-        </button>
 
-        <div className="pt-3">
-          <button className="flex items-center gap-2 text-sm text-slate-600">
-            {t.allProjects}
-            <ChevronDown className="h-4 w-4" />
-          </button>
-          <div className="mt-3 flex items-center rounded-lg border border-sky-100 bg-white px-3 py-2 focus-within:ring-1 focus-within:ring-sky-500">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input
-              value={sessionSearch}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder={t.searchSessions}
-              className="ml-2 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-          </div>
+        <div className="flex items-center border border-border bg-card px-3 py-2 focus-within:ring-1 focus-within:ring-ring">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            value={sessionSearch}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={t.searchSessions}
+            className="ml-2 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
         </div>
       </div>
 
       <div className="mt-5 flex-1 overflow-y-auto px-4 pb-4">
         <div className="mb-3 flex items-center justify-between px-1">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <span className="utility-label px-1">
             {showArchived ? t.archived : t.today}
           </span>
           <button
             onClick={onToggleShowArchived}
-            className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-white"
+            className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-card"
           >
             {showArchived ? t.active : t.archive}
           </button>
         </div>
 
         {sessions.length === 0 ? (
-          <div className="rounded-xl px-3 py-4 text-sm text-slate-500">{t.noSessions}</div>
+          <div className="border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+            {t.noSessions}
+          </div>
         ) : (
           sessions.map((group) => (
             <div key={group.key} className="mb-5">
               {group.key !== "today" && (
-                <div className="mb-2 px-2 text-xs font-semibold text-slate-500">
+                <div className="mb-2 px-2 text-xs font-semibold text-muted-foreground">
                   {group.label}
                 </div>
               )}
@@ -852,13 +924,6 @@ function ChatSidebar({
             </div>
           ))
         )}
-      </div>
-
-      <div className="border-t border-sky-100 px-5 py-4">
-        <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-sm text-slate-700 hover:bg-white">
-          <Settings className="h-5 w-5" />
-          {t.settings}
-        </button>
       </div>
     </aside>
   );
@@ -893,16 +958,18 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-colors",
-        active ? "bg-white text-slate-950 shadow-sm shadow-sky-100/70" : "text-slate-600 hover:bg-white"
+        "group relative flex cursor-pointer items-center gap-2 border border-transparent px-3 py-2.5 text-sm transition-colors",
+        active
+          ? "border-border bg-card text-foreground"
+          : "text-muted-foreground hover:border-border hover:bg-card"
       )}
       onClick={onOpen}
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full", pinned ? "bg-sky-500" : "bg-slate-300")} />
+      <span className={cn("h-1.5 w-1.5 rounded-full", pinned ? "bg-primary/50" : "bg-muted-foreground/30")} />
       <span className="min-w-0 flex-1 truncate">{session.title || t.untitled}</span>
-      {archived && <Archive className="h-3.5 w-3.5 text-slate-400" />}
+      {archived && <Archive className="h-3.5 w-3.5 text-muted-foreground" />}
       <button
-        className="rounded-md p-1 text-slate-400 opacity-0 hover:bg-sky-50 hover:text-slate-700 group-hover:opacity-100"
+        className="rounded-md p-1 text-muted-foreground opacity-0 hover:bg-primary/5 hover:text-muted-foreground group-hover:opacity-100"
         onClick={(event) => {
           event.stopPropagation();
           setMenuOpen((value) => !value);
@@ -913,7 +980,7 @@ function SessionRow({
       </button>
       {menuOpen && (
         <div
-          className="absolute right-2 top-9 z-20 w-36 rounded-xl border border-sky-100 bg-white p-1 text-sm shadow-xl shadow-sky-100/60"
+          className="absolute right-2 top-9 z-20 w-36 border border-border bg-card p-1 text-sm"
           onClick={(event) => event.stopPropagation()}
         >
           <MenuButton icon={Pencil} label={t.rename} onClick={onRename} />
@@ -940,7 +1007,7 @@ function MenuButton({
   return (
     <button
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-sky-50",
+        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-primary/5",
         danger && "text-red-600"
       )}
       onClick={onClick}
@@ -951,67 +1018,17 @@ function MenuButton({
   );
 }
 
-function WorkspaceTabs({
-  language,
-  activeTab,
-  onChange,
-}: {
-  language: DashboardLanguage;
-  activeTab: WorkspaceTab;
-  onChange: (tab: WorkspaceTab) => void;
-}) {
-  const t = chatCopy[language];
-
-  return (
-  <header className="flex h-14 shrink-0 items-center border-b border-sky-200 bg-sky-100/70">
-      <TabButton active={activeTab === "new"} onClick={() => onChange("new")}>
-        {t.newSession}
-      </TabButton>
-      <TabButton active={activeTab === "settings"} onClick={() => onChange("settings")}>
-        <Settings className="h-5 w-5" />
-        {t.settings}
-      </TabButton>
-      <TabButton active={activeTab === "scheduled"} onClick={() => onChange("scheduled")}>
-        <Clock className="h-5 w-5" />
-        {t.scheduled}
-      </TabButton>
-    </header>
-  );
-}
-
-function TabButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex h-full min-w-44 items-center gap-3 border-r border-sky-100 px-5 text-left text-sm font-medium text-slate-600",
-        active && "bg-white text-slate-950"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 function NewSessionEmptyState({ language }: { language: DashboardLanguage }) {
   const t = chatCopy[language];
 
   return (
     <div className="flex min-h-full items-center justify-center pb-20">
       <div className="text-center">
-        <div className="mx-auto grid h-24 w-24 place-items-center rounded-3xl border border-sky-100 bg-white text-sky-600 shadow-[0_18px_50px_rgba(14,116,144,0.14)]">
+        <div className="mx-auto grid h-24 w-24 place-items-center border border-border bg-card text-primary">
           <Sparkles className="h-12 w-12" />
         </div>
-        <h1 className="mt-10 text-5xl font-bold tracking-normal text-slate-950">{t.emptyTitle}</h1>
-        <p className="mx-auto mt-5 max-w-lg text-xl leading-8 text-slate-600">
+        <h1 className="mt-10 text-5xl font-bold tracking-normal text-foreground">{t.emptyTitle}</h1>
+        <p className="mx-auto mt-5 max-w-lg text-xl leading-8 text-muted-foreground">
           {t.emptyDescription}
         </p>
       </div>
@@ -1075,7 +1092,7 @@ function Composer({
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-4 sm:px-6 lg:px-8">
       <div className="pointer-events-auto mx-auto max-w-5xl">
-        <div className="rounded-2xl border border-sky-200 bg-white shadow-[0_20px_60px_rgba(14,116,144,0.18)]">
+        <div className="border border-border bg-card">
           <Textarea
             value={input}
             onChange={(event) => onInputChange(event.target.value)}
@@ -1091,11 +1108,11 @@ function Composer({
           />
 
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 border-t border-sky-50 px-5 py-3">
+            <div className="flex flex-wrap gap-2 border-t border-border/60 px-5 py-3">
               {attachments.map((file, index) => (
                 <span
                   key={`${file.name}-${index}`}
-                  className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs text-slate-600"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-xs text-muted-foreground"
                 >
                   <FileText className="h-3.5 w-3.5" />
                   {file.name}
@@ -1107,7 +1124,7 @@ function Composer({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-sky-50 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 px-5 py-3">
             <input
               ref={fileInputRef}
               type="file"
@@ -1123,13 +1140,13 @@ function Composer({
               onClick={onAttachClick}
               disabled={!supportsAttachments}
               title={supportsAttachments ? t.uploadAttachment : t.modelNotMultimodal}
-              className="rounded-xl p-2 text-slate-600 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-xl p-2 text-muted-foreground hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Paperclip className="h-5 w-5" />
             </button>
             <button
               onClick={cycleKnowledgeMode}
-              className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
+              className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
             >
               <Zap className="h-4 w-4" />
               {knowledgeModeLabels[language][knowledgeMode]}
@@ -1140,48 +1157,48 @@ function Composer({
               <div className="relative">
                 <button
                   onClick={onToggleModelMenu}
-                  className="inline-flex max-w-xs items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
+                  className="inline-flex max-w-xs items-center gap-2 rounded-full bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
                 >
-                  <Sparkles className="h-4 w-4 text-sky-600" />
+                  <Sparkles className="h-4 w-4 text-primary" />
                   <span className="truncate">{currentModelLabel}</span>
                   <ChevronDown className="h-4 w-4" />
                 </button>
 
                 {showModelMenu && (
-                  <div className="absolute bottom-full right-0 z-50 mb-2 max-h-80 w-72 overflow-y-auto rounded-2xl border border-sky-100 bg-white p-2 shadow-2xl shadow-sky-100/70">
+                  <div className="absolute bottom-full right-0 z-50 mb-2 max-h-80 w-72 overflow-y-auto border border-border bg-card p-2">
                     <button
                       className={cn(
-                        "w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-sky-50",
-                        !selectedProvider && "bg-sky-50 font-semibold"
+                        "w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-primary/5",
+                        !selectedProvider && "bg-primary/5 font-semibold"
                       )}
                       onClick={onSelectDefaultModel}
                     >
                       {t.defaultModel}
                     </button>
                     {providerOptions.length === 0 && (
-                      <div className="px-3 py-3 text-xs text-slate-500">
+                      <div className="px-3 py-3 text-xs text-muted-foreground">
                         {t.noModels}
                       </div>
                     )}
                     {providerOptions.map((provider) => (
                       <div key={provider.id} className="mt-2">
-                        <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {provider.name}
                         </div>
                         {provider.models.map((model) => (
                           <button
                             key={model.id}
                             className={cn(
-                              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-sky-50",
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-primary/5",
                               selectedProvider === provider.id &&
                                 selectedModelId === model.id &&
-                                "bg-sky-50 font-semibold"
+                                "bg-primary/5 font-semibold"
                             )}
                             onClick={() => onSelectModel(provider.id, model.id)}
                           >
                             <span className="truncate">{model.label}</span>
                             {selectedProvider === provider.id && selectedModelId === model.id && (
-                              <Check className="h-4 w-4 text-sky-600" />
+                              <Check className="h-4 w-4 text-primary" />
                             )}
                           </button>
                         ))}
@@ -1193,7 +1210,7 @@ function Composer({
               <button
                 onClick={onSend}
                 disabled={loading || !input.trim()}
-                className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
                 {t.run}
@@ -1212,12 +1229,14 @@ function MessageBubble({
   onCopy,
   onRegenerate,
   onBranch,
+  onCitationClick,
 }: {
   language: DashboardLanguage;
   message: ChatMessage;
   onCopy: () => void;
   onRegenerate: () => void;
   onBranch: () => void;
+  onCitationClick?: (index: number) => void;
 }) {
   const isUser = message.role === "user";
   const sources = message.sources || [];
@@ -1235,15 +1254,15 @@ function MessageBubble({
   }
 
   return (
-    <div className="group rounded-3xl border border-sky-100 bg-white/95 p-5 shadow-sm shadow-sky-100/60">
+    <div className="group border border-border bg-card/95 p-5 shadow-none">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-blue-50 text-blue-600">
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
             <Sparkles className="h-4 w-4" />
           </span>
           {t.smartFavorites}
           {routing && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-xs font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-primary/5 px-2 py-0.5 text-xs font-medium">
               <Database className="h-3.5 w-3.5" />
               {routing.useKnowledge ? t.knowledgeSearched : t.knowledgeSkipped}
             </span>
@@ -1256,13 +1275,16 @@ function MessageBubble({
         </div>
       </div>
 
-      <div className="prose prose-slate max-w-none rounded-2xl bg-sky-50/60 px-5 py-4 text-base leading-7">
-        <MarkdownRenderer content={normalizeAssistantAnswer(message.content, sources, language)} />
+      <div className="prose prose-slate max-w-none rounded-2xl bg-muted/40 px-5 py-4 text-base leading-7">
+        <MarkdownRenderer
+          content={normalizeAssistantAnswer(message.content, sources, language)}
+          onCitationClick={onCitationClick}
+        />
       </div>
 
       {sources.length > 0 && (
-        <details className="group/source mt-4 rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3" open>
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-500">
+        <details className="group/source mt-4 rounded-2xl border border-border bg-muted/50 px-4 py-3" open>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-muted-foreground">
             <span className="inline-flex items-center gap-2">
               <FileText className="h-4 w-4" />
               {t.sources} - {sources.length}
@@ -1291,7 +1313,7 @@ function IconAction({
 }) {
   return (
     <button
-      className="rounded-lg p-2 text-slate-400 hover:bg-sky-50 hover:text-slate-700"
+      className="rounded-lg p-2 text-muted-foreground hover:bg-primary/5 hover:text-muted-foreground"
       onClick={onClick}
       title={label}
       aria-label={label}
@@ -1322,7 +1344,7 @@ function SourceChip({
       {href ? <ExternalLink className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />}
       <span className="flex min-w-0 max-w-[280px] flex-col">
         <span className="truncate">{title}</span>
-        {description && <span className="truncate text-[11px] text-slate-500">{description}</span>}
+        {description && <span className="truncate text-[11px] text-muted-foreground">{description}</span>}
       </span>
       <Badge variant="secondary" className="rounded-md px-1.5 py-0 text-[10px]">
         {Math.round((source.similarity || 0) * 100)}%
@@ -1331,7 +1353,7 @@ function SourceChip({
   );
 
   const className =
-    "inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-sm shadow-sky-100/60 transition hover:bg-sky-50";
+    "inline-flex max-w-full items-center gap-1.5 rounded-lg bg-card px-2.5 py-1.5 text-xs text-muted-foreground shadow-none transition hover:bg-primary/5";
 
   return href ? (
     <a href={href} target="_blank" rel="noopener noreferrer" className={className}>

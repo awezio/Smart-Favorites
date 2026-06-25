@@ -6,6 +6,10 @@ import {
   BOOKMARK_DESCRIPTION_SCHEMA_VERSION,
   BOOKMARK_DESCRIPTION_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts/bookmark-description.skill";
+import {
+  STAR_DESCRIPTION_SYSTEM_PROMPT,
+  buildStarDescriptionUserPrompt,
+} from "@/lib/prompts/star-description";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptSecret } from "@/lib/server/secrets";
 
@@ -150,10 +154,21 @@ export async function generateStarDescription(
       messages: [
         {
           role: "system",
-          content:
-            "You write detailed bilingual knowledge-base descriptions. Return strict JSON only.",
+          content: STAR_DESCRIPTION_SYSTEM_PROMPT,
         },
-        { role: "user", content: buildStarPrompt({ title, item, page }) },
+        {
+          role: "user",
+          content: buildStarDescriptionUserPrompt({
+            title,
+            url: item.url || page.url,
+            language: item.language || "",
+            stars: item.stars ?? "",
+            forks: item.forks ?? "",
+            existingDescription: item.description || "",
+            reachable: page.reachable,
+            pageText: page.text || "",
+          }),
+        },
       ],
     });
 
@@ -328,42 +343,20 @@ function buildBookmarkWebsiteInfo({
   url: string;
   page: PageContext;
 }) {
-  return `网站信息：
+  return `<website>
 Title: ${title}
 URL: ${url}
 Reachable: ${page.reachable}
 Fetch error: ${page.error || ""}
 Page title: ${page.title || ""}
 Meta description: ${page.description || ""}
-Extracted content:
-${page.text || ""}`;
-}
+</website>
 
-function buildStarPrompt({
-  title,
-  item,
-  page,
-}: {
-  title: string;
-  item: any;
-  page: PageContext;
-}) {
-  return `Generate a detailed bilingual knowledge-base description for this GitHub Star.
-Cover purpose, content, and target audience. Return JSON only:
-{
-  "description_zh": "中文描述",
-  "description_en": "English description"
-}
+<extracted_content>
+${page.text || ""}
+</extracted_content>
 
-Repository: ${title}
-URL: ${item.url || page.url}
-Language: ${item.language || ""}
-Stars: ${item.stars ?? ""}
-Forks: ${item.forks ?? ""}
-Existing description: ${item.description || ""}
-Reachable: ${page.reachable}
-Extracted content:
-${page.text || ""}`;
+Generate the structured JSON description now.`;
 }
 
 function parseStructuredDescriptionJson(content: string): StructuredWebsiteDescription {

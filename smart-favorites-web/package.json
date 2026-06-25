@@ -17,6 +17,7 @@
     "test:okf-knowledge-format": "node scripts/okf-knowledge-format-contract.test.mjs",
     "test:knowledge-graph": "node scripts/knowledge-graph-contract.test.mjs",
     "test:ai-settings-chat": "node scripts/ai-settings-chat-contract.test.mjs",
+    "test:chat-enhancements": "node scripts/chat-enhancements-contract.test.mjs",
     "test:provider-admin": "node scripts/provider-admin-contract.test.mjs",
     "test:favicon": "node scripts/favicon-contract.test.mjs",
     "test:auth-settings": "node scripts/auth-settings-security.test.mjs",
@@ -27,6 +28,8 @@
     "db:types": "npx supabase gen types typescript --project-id <project-ref> > types/supabase.ts"
   },
   "dependencies": {
+    "@fontsource/noto-sans-sc": "^5.2.9",
+    "@fontsource/noto-serif-sc": "^5.2.9",
     "@radix-ui/react-label": "^2.1.1",
     "@radix-ui/react-slot": "^1.1.1",
     "@sparticuz/chromium": "^149.0.0",
@@ -58,6 +61,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@tailwindcss/container-queries": "^0.1.1",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",

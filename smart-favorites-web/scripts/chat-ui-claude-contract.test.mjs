@@ -16,11 +16,6 @@ assert.match(
 );
 assert.match(
   chatPage,
-  /function WorkspaceTabs/,
-  "Chat page should render top workspace tabs."
-);
-assert.match(
-  chatPage,
   /function Composer/,
   "Chat page should render a large bottom composer instead of a plain input row."
 );

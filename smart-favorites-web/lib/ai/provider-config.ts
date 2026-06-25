@@ -216,12 +216,14 @@ export async function callProviderChat({
   messages,
   model,
   maxTokens = 800,
+  timeoutMs = 30000,
 }: {
   provider: string;
   apiKey: string;
   messages: LLMMessage[];
   model?: string;
   maxTokens?: number;
+  timeoutMs?: number;
 }): Promise<LLMResponse> {
   const definition = getProviderDefinition(provider);
   if (!definition) throw new Error("Invalid provider");
@@ -244,7 +246,7 @@ export async function callProviderChat({
         messages: toProviderMessages(messages),
         stream: false,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
@@ -273,7 +275,7 @@ export async function callProviderChat({
         system,
         messages: anthropicMessages,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
@@ -299,7 +301,7 @@ export async function callProviderChat({
             : undefined,
           generationConfig: { maxOutputTokens: maxTokens },
         }),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(timeoutMs),
       }
     );
     if (!response.ok) await throwProviderApiError(response);
@@ -322,7 +324,7 @@ export async function callProviderChat({
         messages: toProviderMessages(messages),
         max_tokens: maxTokens,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) await throwProviderApiError(response);
     const data = await response.json();
@@ -345,7 +347,7 @@ export async function callProviderChat({
         messages: toProviderMessages(messages),
         max_tokens: maxTokens,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeoutMs),
     }
   );
 

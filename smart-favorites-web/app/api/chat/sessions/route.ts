@@ -34,22 +34,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { title } = body;
-
-    if (!title) {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 }
-      );
-    }
+    const sessionTitle =
+      typeof title === "string" && title.trim()
+        ? title.trim()
+        : "新会话";
 
     const supabase = await createServerSupabaseClient();
 
     const { data: session, error } = await supabase
       .from("chat_sessions")
       .insert({
-        title,
+        title: sessionTitle,
         messages: [],
         user_id: userId,
+        title_status: "pending",
       })
       .select()
       .single();

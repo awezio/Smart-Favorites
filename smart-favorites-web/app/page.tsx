@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   Bookmark,
@@ -12,14 +13,29 @@ import {
   Globe,
   Import,
   MessageSquare,
+  Moon,
   Puzzle,
   Search,
   Sparkles,
   Star,
+  Sun,
   Zap,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/brand/logo";
+import { Footer } from "@/components/footer";
+import { ShowcaseSection } from "@/components/home/showcase-section";
+import {
+  ContentList,
+  ContentListItem,
+  EditorialSection,
+} from "@/components/layout/editorial-section";
+import { PowerIndicator } from "@/components/layout/power-indicator";
+import { DitheredImage } from "@/components/layout/dithered-image";
+import { Reveal, RevealHero, RevealItem, RevealStagger } from "@/components/motion/reveal";
 import { translations, type Locale } from "@/lib/i18n";
+import { HERO_IMAGE } from "@/lib/editorial-images";
 
 const GITHUB_URL = "https://github.com/awezio/Smart-Favorites";
 const EXTENSION_URL =
@@ -27,6 +43,7 @@ const EXTENSION_URL =
 
 export default function LandingPage() {
   const [locale, setLocale] = useState<Locale>("zh");
+  const { theme, setTheme } = useTheme();
   const t = translations[locale];
 
   const featureCards = [
@@ -38,215 +55,246 @@ export default function LandingPage() {
     { icon: Sparkles, ...t.features.aiDesc },
   ];
 
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              SF
-            </span>
-            <span className="hidden text-lg font-bold sm:inline">
-              Smart Favorites
-            </span>
+      <header className="site-header">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
+          <Link href="/" className="shrink-0">
+            <Logo size="sm" />
           </Link>
 
-          <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <a href="#features" className="transition-colors hover:text-foreground">
+          <nav className="hidden items-center gap-6 md:flex">
+            <a href="#showcase" className="nav-link">
+              {t.nav.showcase}
+            </a>
+            <a href="#features" className="nav-link">
               {t.nav.features}
             </a>
-            <a href="#extension" className="transition-colors hover:text-foreground">
+            <a href="#extension" className="nav-link">
               {t.nav.extension}
             </a>
-            <a href="#how-it-works" className="transition-colors hover:text-foreground">
+            <a href="#how-it-works" className="nav-link">
               {t.nav.howItWorks}
             </a>
             <a
               href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-foreground"
+              className="nav-link"
             >
               {t.nav.github}
             </a>
-          </div>
+          </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <PowerIndicator compact className="hidden sm:inline-flex" />
             <button
               onClick={() => setLocale(locale === "zh" ? "en" : "zh")}
-              className="flex items-center gap-1 rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="nav-link flex items-center gap-1 px-2 py-1"
             >
               <Globe className="h-4 w-4" />
-              {locale === "zh" ? "EN" : "中文"}
+              <span className="hidden xs:inline">
+                {locale === "zh" ? "EN" : "中文"}
+              </span>
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="nav-link p-2"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </button>
             <Link href="/dashboard">
-              <Button size="sm">{t.nav.dashboard}</Button>
+              <Button size="sm" variant="creative" className="hidden xs:inline-flex">
+                {t.nav.dashboard}
+              </Button>
             </Link>
           </div>
         </div>
-      </nav>
+      </header>
 
-      <section className="border-b">
-        <div className="mx-auto max-w-7xl px-6 py-20 text-center">
-          <div className="mb-6 inline-flex rounded-full border bg-card px-4 py-1.5 text-sm text-muted-foreground">
-            {locale === "zh"
-              ? "使用 Next.js + Supabase + pgvector 构建"
-              : "Built with Next.js + Supabase + pgvector"}
-          </div>
-          <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-            {t.hero.title}
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            {t.hero.subtitle}
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link href="/dashboard">
-              <Button size="lg" className="gap-2">
-                {t.hero.cta}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="lg" className="gap-2">
-                <Github className="h-5 w-5" />
-                {t.hero.ctaSecondary}
-              </Button>
-            </a>
-          </div>
+      <section className="border-b border-border">
+        <div className="mx-auto grid max-w-5xl gap-8 px-4 pb-12 pt-16 sm:px-6 sm:pb-16 sm:pt-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-12">
+          <RevealHero className="space-y-5">
+            <p className="utility-label inline-flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              {t.hero.badge}
+            </p>
+            <h1 className="type-display max-w-xl text-4xl md:text-5xl lg:text-6xl">
+              {t.hero.title}
+            </h1>
+            <p className="max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">
+              {t.hero.subtitle}
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Link href="/dashboard">
+                <Button size="lg" variant="creative" className="gap-2">
+                  {t.hero.cta}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="lg" className="gap-2">
+                  <Github className="h-5 w-5" />
+                  {t.hero.ctaSecondary}
+                </Button>
+              </a>
+            </div>
+          </RevealHero>
+
+          <Reveal delay={0.08} className="relative border border-border noise-overlay">
+            <DitheredImage>
+              <Image
+                src={HERO_IMAGE}
+                alt={
+                  locale === "zh"
+                    ? "纸张纹理与知识归档"
+                    : "Paper grain texture and knowledge archives"
+                }
+                width={1200}
+                height={900}
+                priority
+                className="aspect-[4/3] w-full object-cover"
+              />
+            </DitheredImage>
+            <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 px-4 py-3">
+              <PowerIndicator label={locale === "zh" ? "系统就绪" : "Ready"} />
+            </div>
+          </Reveal>
         </div>
       </section>
 
-      <section id="features" className="border-b py-20">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              {t.features.title}
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-              {t.features.subtitle}
-            </p>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <ShowcaseSection title={t.showcase.title} subtitle={t.showcase.subtitle} />
+
+      <EditorialSection id="features" title={t.features.title} subtitle={t.features.subtitle}>
+        <RevealStagger>
+          <ContentList>
             {featureCards.map((feature) => {
               const Icon = feature.icon;
               return (
-                <div key={feature.title} className="rounded-lg border bg-card p-6">
-                  <Icon className="mb-4 h-6 w-6 text-primary" />
-                  <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {feature.desc}
-                  </p>
-                </div>
+                <li key={feature.title}>
+                  <RevealItem>
+                    <div className="flex gap-4 px-4 py-5 sm:px-6 sm:py-6">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-muted/50 text-primary">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <h3 className="font-serif text-lg font-semibold sm:text-xl">
+                          {feature.title}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {feature.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </RevealItem>
+                </li>
               );
             })}
-          </div>
-        </div>
-      </section>
+          </ContentList>
+        </RevealStagger>
+      </EditorialSection>
 
-      <section id="extension" className="border-b bg-muted/30 py-20">
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 md:grid-cols-2 md:items-center">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              {t.extensionSection.title}
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              {t.extensionSection.subtitle}
-            </p>
-            <div className="mt-8 space-y-3">
-              {t.extensionSection.features.map((feature) => (
-                <div key={feature} className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Check className="h-4 w-4" />
-                  </span>
-                  <span>{feature}</span>
-                </div>
-              ))}
-            </div>
+      <EditorialSection
+        id="extension"
+        title={t.extensionSection.title}
+        subtitle={t.extensionSection.subtitle}
+        className="bg-muted/20"
+      >
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-4">
+            {t.extensionSection.features.map((feature) => (
+              <div key={feature} className="flex items-start gap-3 text-sm">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border border-primary text-primary">
+                  <Check className="h-3 w-3" />
+                </span>
+                <span>{feature}</span>
+              </div>
+            ))}
             <a
               href={EXTENSION_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-8 inline-block"
+              className="inline-block pt-4"
             >
-              <Button size="lg" className="gap-2">
+              <Button size="lg" variant="creative" className="gap-2">
                 <Download className="h-5 w-5" />
                 {t.extensionSection.download}
               </Button>
             </a>
           </div>
 
-          <div className="rounded-lg border bg-card p-6 shadow-lg">
-            <div className="mb-4 flex items-center gap-3 border-b pb-4">
-              <span className="flex h-8 w-8 items-center justify-center rounded bg-primary text-xs font-bold text-primary-foreground">
-                SF
-              </span>
-              <span className="font-semibold">Smart Favorites</span>
-              <span className="ml-auto text-xs text-muted-foreground">Side Panel</span>
+          <div className="panel">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+              <Logo size="sm" showText={false} />
+              <span className="font-medium">Smart Favorites</span>
+              <span className="ml-auto utility-label">Side Panel</span>
             </div>
-            <div className="mb-4 flex items-center gap-2 rounded-lg border bg-muted/50 p-3">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                {locale === "zh" ? "搜索你的收藏..." : "Search your favorites..."}
-              </span>
-            </div>
-            {["Next.js Documentation", "Supabase", "Tailwind CSS"].map((title, index) => (
-              <div
-                key={title}
-                className="mb-2 flex items-center justify-between rounded-lg border p-3"
-              >
-                <span className="text-sm font-medium">{title}</span>
-                <span className="text-xs font-medium text-primary">
-                  {[92, 87, 84][index]}%
+            <div className="space-y-2 p-4">
+              <div className="flex items-center gap-2 border border-border bg-muted/30 p-3">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {locale === "zh" ? "搜索你的收藏..." : "Search your favorites..."}
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="how-it-works" className="border-b py-20">
-        <div className="mx-auto max-w-7xl px-6">
-          <h2 className="mb-12 text-center text-3xl font-bold tracking-tight sm:text-4xl">
-            {t.howItWorks.title}
-          </h2>
-          <div className="grid gap-8 md:grid-cols-3">
-            {t.howItWorks.steps.map((step, index) => {
-              const icons = [Import, Brain, Zap];
-              const Icon = icons[index];
-              return (
-                <div key={step.title} className="text-center">
-                  <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Icon className="h-8 w-8" />
+              {[
+                { title: "Next.js Documentation", tag: locale === "zh" ? "文档" : "Docs" },
+                { title: "Supabase", tag: locale === "zh" ? "数据库" : "Database" },
+                { title: "Tailwind CSS", tag: locale === "zh" ? "样式" : "CSS" },
+              ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="flex items-center justify-between border border-border p-3 text-sm"
+                  >
+                    <span className="font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">{item.tag}</span>
                   </div>
-                  <h3 className="mb-2 text-xl font-semibold">{step.title}</h3>
-                  <p className="text-muted-foreground">{step.desc}</p>
-                </div>
-              );
-            })}
+                )
+              )}
+            </div>
           </div>
         </div>
-      </section>
+      </EditorialSection>
 
-      <section className="bg-muted/30 py-20 text-center">
-        <div className="mx-auto max-w-4xl px-6">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {locale === "zh"
-              ? "开始智能管理你的收藏"
-              : "Start Managing Your Favorites Smartly"}
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            {locale === "zh"
-              ? "免费、开源、自托管。你的数据完全由你掌控。"
-              : "Free, open-source, self-hosted. Your data, your control."}
-          </p>
+      <EditorialSection id="how-it-works" title={t.howItWorks.title} narrow>
+        <ContentList>
+          {t.howItWorks.steps.map((step, index) => {
+            const icons = [Import, Brain, Zap];
+            const Icon = icons[index];
+            return (
+              <ContentListItem
+                key={step.title}
+                title={step.title}
+                description={step.desc}
+                trailing={<Icon className="h-5 w-5 text-primary" />}
+              />
+            );
+          })}
+        </ContentList>
+      </EditorialSection>
+
+      <Reveal as="section" className="border-b border-border py-14 sm:py-16">
+        <div className="editorial-column px-4 text-center sm:px-6">
+          <h2 className="type-h2">{t.cta.title}</h2>
+          <p className="mt-4 max-w-md mx-auto text-muted-foreground">{t.cta.subtitle}</p>
           <Link href="/dashboard" className="mt-8 inline-block">
-            <Button size="lg" className="gap-2">
+            <Button size="lg" variant="creative" className="gap-2">
               {t.hero.cta}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
-      </section>
+      </Reveal>
+
+      <Footer locale={locale} />
     </div>
   );
 }

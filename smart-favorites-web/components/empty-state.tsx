@@ -2,36 +2,43 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { Reveal } from "@/components/motion/reveal";
 
 interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
   description: string;
   action?: ReactNode;
+  textured?: boolean;
 }
 
-export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  textured = false,
+}: EmptyStateProps) {
   return (
-    <motion.div
-      className="flex flex-col items-center justify-center py-16 px-4"
-      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-    >
-      <motion.div
-        className="bg-muted/60 rounded-full p-5 mb-5"
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.35, ease: "easeOut" }}
+    <Reveal>
+      <div
+        className={cn(
+          "relative flex flex-col items-center justify-center border border-dashed border-border px-6 py-16 text-center",
+          textured && "texture-accent noise-overlay"
+        )}
       >
-        <Icon className="h-12 w-12 text-muted-foreground/70" strokeWidth={1.5} />
-      </motion.div>
-      <h3 className="text-lg font-medium mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground text-center max-w-sm mb-4">
+      <div className="mb-4 border border-border p-4">
+        <Icon className="h-10 w-10 text-muted-foreground" strokeWidth={1.25} />
+      </div>
+      <h3 className="font-serif text-lg font-semibold text-foreground">
+        {title}
+      </h3>
+      <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
-      {action && <div className="mt-1">{action}</div>}
-    </motion.div>
+      {action && <div className="mt-6">{action}</div>}
+      </div>
+    </Reveal>
   );
 }

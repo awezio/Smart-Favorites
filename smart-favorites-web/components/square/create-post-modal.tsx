@@ -244,8 +244,8 @@ export function CreatePostModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>发布到广场</CardTitle>
