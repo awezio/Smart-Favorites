@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchAll, searchBookmarks, searchDocuments, searchStars } from "@/lib/rag/search";
-import { getAuthUser } from "@/lib/auth/get-user";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
@@ -21,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     let results;
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     switch (type) {
       case "bookmarks":

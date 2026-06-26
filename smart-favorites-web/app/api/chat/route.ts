@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 import { ragChat, ragChatStream, createRagChatSseStream } from "@/lib/rag/rag-engine";
-import { getAuthUser } from "@/lib/auth/get-user";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupportedProvider } from "@/lib/ai/provider-config";
 import { supportsProviderStreaming } from "@/lib/ai/chat-stream-shared";
 
@@ -9,7 +8,7 @@ export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
     const knowledgeModeOverride =
       knowledgeMode === "always" || knowledgeMode === "never" ? knowledgeMode : "auto";
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     const wantsStream = stream === true;
     const streamProvider =

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 import { syncSessionSourcesFromMessages } from "@/lib/chat/session-sources-db";
 import type { ChatMessage } from "@/types";
 
@@ -9,13 +8,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const { id } = await params;
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     const { data: session, error } = await supabase
       .from("chat_sessions")
@@ -37,7 +36,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
@@ -46,7 +45,7 @@ export async function PATCH(
     const body = await request.json();
     const { title, messages, is_pinned, is_archived, title_status } = body;
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     const updates: Record<string, unknown> = {};
     if (title !== undefined) updates.title = title;
@@ -89,13 +88,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const { id } = await params;
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     const { error } = await supabase
       .from("chat_sessions")

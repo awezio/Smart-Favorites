@@ -33,6 +33,7 @@ import { PowerIndicator } from "@/components/layout/power-indicator";
 import type { Profile } from "@/types";
 import { getDashboardPageTitle } from "@/lib/dashboard-page-title";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
+import { useExtensionSessionBridge } from "@/lib/extension/use-extension-session-bridge";
 
 const primaryNavItems = [
   { href: "/dashboard", icon: Search, label: { zh: "搜索", en: "Search" } },
@@ -65,6 +66,7 @@ export default function DashboardLayout({
     () => getDashboardPageTitle(pathname, language),
     [pathname, language]
   );
+  useExtensionSessionBridge();
 
   useEffect(() => {
     const getUser = async () => {

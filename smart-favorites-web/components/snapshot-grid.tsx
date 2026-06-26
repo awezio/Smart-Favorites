@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { DitheredImage } from "@/components/layout/dithered-image";
 import { cn } from "@/lib/utils";
 import { fadeInUp, staggerContainer, staggerItem } from "@/lib/motion";
@@ -103,36 +104,137 @@ function SnapshotPlaceholder({ title }: { title: string }) {
 }
 
 export function SnapshotMarquee({ items }: { items: SnapshotCardData[] }) {
-  const doubled = [...items, ...items];
+  return <SnapshotCarousel items={items} />;
+}
+
+const CAROUSEL_INTERVAL_MS = 5000;
+
+export function SnapshotCarousel({ items }: { items: SnapshotCardData[] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const count = items.length;
+
+  const goTo = useCallback(
+    (next: number) => {
+      if (count === 0) return;
+      setIndex((next + count) % count);
+    },
+    [count]
+  );
+
+  useEffect(() => {
+    if (count <= 1 || paused) return;
+    const timer = window.setInterval(() => {
+      setIndex((current) => (current + 1) % count);
+    }, CAROUSEL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [count, paused]);
+
+  if (count === 0) {
+    return null;
+  }
+
+  const item = items[index];
 
   return (
-    <div className="relative overflow-hidden py-4">
-      <div className="flex animate-marquee gap-4 hover:[animation-play-state:paused]">
-        {doubled.map((item, i) => (
-          <Link
-            key={`${item.id}-${i}`}
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative h-40 w-64 shrink-0 overflow-hidden border border-border bg-card"
+    <div
+      className="relative overflow-hidden border border-border bg-card"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="relative aspect-[16/7] w-full bg-muted sm:aspect-[21/8]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="absolute inset-0"
           >
-            {item.snapshotUrl ? (
-              <DitheredImage className="relative h-full w-full bg-muted">
-                <Image
-                  src={item.snapshotUrl}
-                  alt={item.title}
-                  fill
-                  sizes="256px"
-                  unoptimized
-                  className="object-cover object-top"
-                />
-              </DitheredImage>
-            ) : (
-              <SnapshotPlaceholder title={item.title} />
-            )}
-          </Link>
-        ))}
+            <Link
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group block h-full w-full"
+            >
+              {item.snapshotUrl ? (
+                <DitheredImage className="relative h-full w-full">
+                  <Image
+                    src={item.snapshotUrl}
+                    alt={item.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 1200px"
+                    unoptimized
+                    className="object-cover object-center"
+                  />
+                </DitheredImage>
+              ) : (
+                <SnapshotPlaceholder title={item.title} />
+              )}
+              <div className="absolute inset-x-0 bottom-0 border-t border-border/80 bg-background/90 px-4 py-3 backdrop-blur-sm sm:px-6 sm:py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-serif text-lg font-semibold sm:text-xl">
+                      {item.title}
+                    </h3>
+                    {item.category && (
+                      <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+                        {item.category}
+                      </p>
+                    )}
+                  </div>
+                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+        </AnimatePresence>
+
+        {count > 1 && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous slide"
+              onClick={(event) => {
+                event.preventDefault();
+                goTo(index - 1);
+              }}
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 border border-border bg-background/90 p-2 text-foreground transition-colors hover:bg-muted"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next slide"
+              onClick={(event) => {
+                event.preventDefault();
+                goTo(index + 1);
+              }}
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 border border-border bg-background/90 p-2 text-foreground transition-colors hover:bg-muted"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
+
+      {count > 1 && (
+        <div className="flex items-center justify-center gap-2 border-t border-border px-4 py-3">
+          {items.map((slide, slideIndex) => (
+            <button
+              key={slide.id}
+              type="button"
+              aria-label={`Go to slide ${slideIndex + 1}`}
+              onClick={() => goTo(slideIndex)}
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                slideIndex === index ? "bg-primary" : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+              )}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

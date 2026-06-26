@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 import {
   aggregateSessionSources,
   exportSourcesAsJson,
@@ -13,7 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
@@ -21,7 +20,7 @@ export async function GET(
     const { id } = await params;
     const format = request.nextUrl.searchParams.get("format") || "json";
     const locale = request.nextUrl.searchParams.get("locale") === "en" ? "en" : "zh";
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     const { data: session, error } = await supabase
       .from("chat_sessions")

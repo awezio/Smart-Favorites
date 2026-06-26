@@ -23,7 +23,8 @@ type ExtensionAuthSessionResponse = {
   error?: string;
 };
 
-const EXTENSION_MESSAGE_TIMEOUT_MS = 2500;
+const EXTENSION_MESSAGE_TIMEOUT_MS = 1500;
+const CONTENT_BRIDGE_TIMEOUT_MS = 800;
 const CONTENT_BRIDGE_REQUEST_TYPE = "smart-favorites-extension-bridge-request";
 const CONTENT_BRIDGE_RESPONSE_TYPE = "smart-favorites-extension-bridge-response";
 const CONTENT_BRIDGE_SOURCE = "smart-favorites-extension";
@@ -146,7 +147,7 @@ function sendContentScriptBridgeMessage<T>(
     };
 
     window.addEventListener("message", handleMessage);
-    timeoutId = window.setTimeout(() => finish(null), EXTENSION_MESSAGE_TIMEOUT_MS);
+    timeoutId = window.setTimeout(() => finish(null), CONTENT_BRIDGE_TIMEOUT_MS);
     window.postMessage(
       {
         source: WEB_BRIDGE_SOURCE,
@@ -174,12 +175,9 @@ async function pingInstalledExtensionViaContentScript(): Promise<ExtensionPingRe
 }
 
 export async function pingInstalledExtension(): Promise<ExtensionPingResult | null> {
-  const contentScriptResult = await pingInstalledExtensionViaContentScript();
-  if (contentScriptResult) {
-    return contentScriptResult;
-  }
+  const configuredIds = getConfiguredExtensionIds();
 
-  for (const extensionId of getConfiguredExtensionIds()) {
+  for (const extensionId of configuredIds) {
     const response = await sendExtensionMessage<{
       installed?: boolean;
       version?: string;
@@ -190,7 +188,22 @@ export async function pingInstalledExtension(): Promise<ExtensionPingResult | nu
     }
   }
 
+  const contentScriptResult = await pingInstalledExtensionViaContentScript();
+  if (contentScriptResult) {
+    return contentScriptResult;
+  }
+
   return null;
+}
+
+export async function ensureInstalledExtension(): Promise<ExtensionPingResult | null> {
+  const detected = await pingInstalledExtension();
+  if (detected?.extensionId) {
+    return detected;
+  }
+
+  await new Promise((resolve) => window.setTimeout(resolve, 400));
+  return pingInstalledExtension();
 }
 
 export async function openExtensionSidePanel(

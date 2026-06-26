@@ -53,6 +53,7 @@ import { SectionPanel } from "@/components/layout/section-panel";
 import type { Bookmark } from "@/types";
 import {
   connectInstalledExtensionSession,
+  ensureInstalledExtension,
   getExtensionInstallUrl,
   openExtensionSidePanel,
   pingInstalledExtension,
@@ -458,13 +459,14 @@ export default function BookmarksPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let retryInterval: number | undefined;
 
-    async function detectExtension() {
+    async function detectExtension(): Promise<string | null> {
       setCheckingExtension(true);
       try {
         const detected = await pingInstalledExtension();
         if (cancelled) {
-          return;
+          return null;
         }
 
         setExtensionId(detected?.extensionId ?? null);
@@ -473,10 +475,11 @@ export default function BookmarksPage() {
           connectInstalledExtensionSession(detected.extensionId).catch((error) => {
             console.warn("Failed to connect installed extension session:", error);
           });
+          return detected.extensionId;
         }
       } catch {
         if (cancelled) {
-          return;
+          return null;
         }
 
         setExtensionId(null);
@@ -486,11 +489,62 @@ export default function BookmarksPage() {
           setCheckingExtension(false);
         }
       }
+
+      return null;
     }
 
-    detectExtension();
+    const handleBridgeReady = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin) {
+        return;
+      }
+
+      const data = event.data;
+      if (data?.source !== "smart-favorites-extension" ||
+          data?.type !== "smart-favorites-extension-bridge-ready") {
+        return;
+      }
+
+      if (typeof data.extensionId === "string") {
+        setExtensionId(data.extensionId);
+        setExtensionVersion(typeof data.version === "string" ? data.version : null);
+        connectInstalledExtensionSession(data.extensionId).catch((error) => {
+          console.warn("Failed to connect installed extension session:", error);
+        });
+        return;
+      }
+
+      void detectExtension();
+    };
+
+    const handleWindowFocus = () => {
+      void detectExtension();
+    };
+
+    void detectExtension().then((extensionId) => {
+      if (cancelled || extensionId || retryInterval) {
+        return;
+      }
+
+      retryInterval = window.setInterval(() => {
+        void detectExtension().then((detectedId) => {
+          if (detectedId && retryInterval) {
+            window.clearInterval(retryInterval);
+            retryInterval = undefined;
+          }
+        });
+      }, 3000);
+    });
+
+    window.addEventListener("message", handleBridgeReady);
+    window.addEventListener("focus", handleWindowFocus);
+
     return () => {
       cancelled = true;
+      if (retryInterval) {
+        window.clearInterval(retryInterval);
+      }
+      window.removeEventListener("message", handleBridgeReady);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, []);
 
@@ -512,16 +566,46 @@ export default function BookmarksPage() {
     window.open(getExtensionInstallUrl(), "_blank", "noopener,noreferrer");
   };
 
-  const handleOpenExtension = async () => {
-    if (!extensionId) {
+  const resolveExtensionConnection = async (): Promise<string | null> => {
+    if (extensionId) {
+      return extensionId;
+    }
+
+    setCheckingExtension(true);
+    try {
+      const detected = await ensureInstalledExtension();
+      if (!detected?.extensionId) {
+        setExtensionId(null);
+        setExtensionVersion(null);
+        return null;
+      }
+
+      setExtensionId(detected.extensionId);
+      setExtensionVersion(detected.version ?? null);
+      await connectInstalledExtensionSession(detected.extensionId).catch((error) => {
+        console.warn("Failed to connect installed extension session:", error);
+      });
+      return detected.extensionId;
+    } finally {
+      setCheckingExtension(false);
+    }
+  };
+
+  const handleInstallOrOpenExtension = async () => {
+    const resolvedExtensionId = await resolveExtensionConnection();
+    if (!resolvedExtensionId) {
       openExtensionGuide();
       return;
     }
 
-    const opened = await openExtensionSidePanel(extensionId);
+    const opened = await openExtensionSidePanel(resolvedExtensionId);
     if (!opened) {
       toast.error(t.openSidebarFailed);
     }
+  };
+
+  const handleOpenExtension = async () => {
+    await handleInstallOrOpenExtension();
   };
 
   const handleOneClickSync = async () => {
@@ -529,7 +613,8 @@ export default function BookmarksPage() {
     toast.loading(t.syncingBookmarks, { id: "bookmark-sync" });
 
     try {
-      if (!extensionId) {
+      const resolvedExtensionId = await resolveExtensionConnection();
+      if (!resolvedExtensionId) {
         toast.error(t.extensionNotDetected, {
           id: "bookmark-sync",
         });
@@ -537,11 +622,11 @@ export default function BookmarksPage() {
         return;
       }
 
-      const result = await triggerExtensionBookmarkSync(extensionId);
+      const result = await triggerExtensionBookmarkSync(resolvedExtensionId);
 
       if (!result.success) {
         toast.error(t.syncFailedWith(result.error || t.syncFailedUnknown), { id: "bookmark-sync" });
-        await openExtensionSidePanel(extensionId);
+        await openExtensionSidePanel(resolvedExtensionId);
         return;
       }
 
@@ -1087,7 +1172,8 @@ export default function BookmarksPage() {
 
           <Button
             variant={extensionId ? "secondary" : "default"}
-            onClick={extensionId ? handleOpenExtension : openExtensionGuide}
+            disabled={checkingExtension}
+            onClick={handleInstallOrOpenExtension}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             {checkingExtension
@@ -1166,7 +1252,8 @@ export default function BookmarksPage() {
 
             <Button
               variant="outline"
-              onClick={extensionId ? handleOpenExtension : openExtensionGuide}
+              disabled={checkingExtension}
+              onClick={handleInstallOrOpenExtension}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               {t.syncCardTitle}
@@ -1314,7 +1401,7 @@ export default function BookmarksPage() {
           textured
           action={
             <div className="flex flex-wrap justify-center gap-2">
-              <Button variant="outline" onClick={openExtensionGuide}>
+              <Button variant="outline" disabled={checkingExtension} onClick={handleInstallOrOpenExtension}>
                 <ExternalLink className="h-4 w-4 mr-2" />{t.syncCardTitle}
               </Button>
               <label>

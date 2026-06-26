@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 import {
   fallbackSessionTitle,
   generateSessionTitle,
 } from "@/lib/chat/title-generator";
+import { normalizeSessionMessages } from "@/lib/chat/normalize-session-messages";
 import { isPlaceholderSessionTitle } from "@/lib/chat/session-title-utils";
-import type { ChatMessage } from "@/types";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
@@ -22,10 +21,10 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const locale = body.locale === "en" ? "en" : "zh";
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
     const { data: session, error: fetchError } = await supabase
       .from("chat_sessions")
-      .select("id, title, title_status, messages")
+      .select("id, title, title_status, messages, metadata")
       .eq("id", id)
       .eq("user_id", userId)
       .single();
@@ -34,7 +33,7 @@ export async function POST(
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    const messages = normalizeMessages(body.messages ?? session.messages);
+    const messages = normalizeSessionMessages(body.messages ?? session.messages);
     if (messages.length < 2) {
       return NextResponse.json({ error: "At least one exchange is required" }, { status: 400 });
     }
@@ -64,6 +63,11 @@ export async function POST(
       title = fallbackSessionTitle(messages, locale);
     }
 
+    const existingMetadata =
+      session.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata)
+        ? (session.metadata as Record<string, unknown>)
+        : {};
+
     const { data: updated, error: updateError } = await supabase
       .from("chat_sessions")
       .update({
@@ -71,6 +75,7 @@ export async function POST(
         title_status: "ready",
         title_generated_at: new Date().toISOString(),
         metadata: {
+          ...existingMetadata,
           title_source: "ai",
         },
       })
@@ -89,21 +94,4 @@ export async function POST(
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
-
-function normalizeMessages(messages: unknown): Pick<ChatMessage, "role" | "content">[] {
-  if (!Array.isArray(messages)) {
-    return [];
-  }
-
-  return messages
-    .filter((message) => message && typeof message === "object")
-    .map((message) => {
-      const item = message as Partial<ChatMessage>;
-      return {
-        role: item.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: typeof item.content === "string" ? item.content : "",
-      };
-    })
-    .filter((message) => message.content.trim().length > 0);
 }

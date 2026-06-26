@@ -23,18 +23,21 @@ CREATE INDEX IF NOT EXISTS chat_session_sources_user_idx
 
 ALTER TABLE public.chat_session_sources ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own chat session sources" ON public.chat_session_sources;
 CREATE POLICY "Users can view own chat session sources"
   ON public.chat_session_sources
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own chat session sources" ON public.chat_session_sources;
 CREATE POLICY "Users can insert own chat session sources"
   ON public.chat_session_sources
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own chat session sources" ON public.chat_session_sources;
 CREATE POLICY "Users can delete own chat session sources"
   ON public.chat_session_sources
   FOR DELETE

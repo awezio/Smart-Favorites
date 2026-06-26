@@ -51,6 +51,7 @@ assert.match(
 
 assert.match(titleGenerator, /generateSessionTitle/, "Title generator should expose generateSessionTitle.");
 assert.match(generateTitleRoute, /generateSessionTitle/, "Generate-title API should call title generator.");
+assert.match(generateTitleRoute, /normalizeSessionMessages/, "Generate-title API should normalize stored messages.");
 assert.match(sessionSources, /aggregateSessionSources/, "Session sources helper should aggregate citations.");
 assert.match(sourcesRoute, /aggregateSessionSources/, "Sources API should aggregate session sources.");
 assert.match(exportRoute, /exportSourcesAsMarkdown/, "Export API should support markdown export.");
@@ -64,6 +65,11 @@ assert.match(read("lib", "admin", "chat-quality-metrics.ts"), /loadChatQualityMe
 assert.match(chatPage, /SourcesPanel/, "Chat page should render a dedicated sources panel.");
 assert.match(chatPage, /generate-title/, "Chat page should trigger async session title generation.");
 assert.match(chatPage, /maybeGenerateSessionTitle/, "Chat page should include title generation helper.");
+assert.match(
+  chatPage,
+  /locale:\s*language/,
+  "Chat page should pass locale when generating session titles."
+);
 assert.match(sourcesPanel, /exportMd/, "Sources panel should expose markdown export.");
 assert.match(read("lib", "ai", "chat-stream-shared.ts"), /supportsProviderStreaming/, "Streaming capability check should be client-safe.");
 assert.match(read("app", "dashboard", "chat", "page.tsx"), /chat-stream-shared/, "Chat page should not import server-only provider stream module.");

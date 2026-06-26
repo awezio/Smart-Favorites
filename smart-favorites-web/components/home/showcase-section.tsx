@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SnapshotGrid, SnapshotMarquee, type SnapshotCardData } from "@/components/snapshot-grid";
+import { SnapshotCarousel, SnapshotGrid, type SnapshotCardData } from "@/components/snapshot-grid";
 import { EditorialSection } from "@/components/layout/editorial-section";
 import { Reveal } from "@/components/motion/reveal";
 
@@ -50,8 +50,8 @@ export function ShowcaseSection({ title, subtitle }: ShowcaseSectionProps) {
   return (
     <EditorialSection id="showcase" title={title} subtitle={subtitle}>
       <Reveal>
-        <div className="mb-8 hidden border border-border md:block">
-          <SnapshotMarquee items={items} />
+        <div className="mb-8 hidden md:block">
+          <SnapshotCarousel items={items} />
         </div>
         <SnapshotGrid items={items} columns={3} />
       </Reveal>

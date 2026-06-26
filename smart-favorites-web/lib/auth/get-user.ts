@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { hashExtensionToken, isExtensionToken } from "@/lib/auth/extension-token";
 
 type ExtensionTokenUser = { id: string; auth_type: "extension_token" };
@@ -105,4 +106,12 @@ export async function getAuthUser(
 
 export function isExtensionAuthUser(user: AuthUser | null): user is ExtensionTokenUser {
   return Boolean(user && "auth_type" in user && user.auth_type === "extension_token");
+}
+
+export async function createAuthenticatedSupabaseClient(user: AuthUser | null) {
+  if (isExtensionAuthUser(user)) {
+    return createAdminClient();
+  }
+
+  return createServerSupabaseClient();
 }

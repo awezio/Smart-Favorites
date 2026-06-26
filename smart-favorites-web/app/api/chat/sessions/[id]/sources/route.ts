@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
 import { loadSessionSourcesFromDb } from "@/lib/chat/session-sources-db";
 import type { ChatMessage } from "@/types";
@@ -10,14 +9,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthUser(request);
+    const { userId, user } = await getAuthUser(request);
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const { id } = await params;
     const typeFilter = request.nextUrl.searchParams.get("type");
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAuthenticatedSupabaseClient(user);
 
     const { data: session, error } = await supabase
       .from("chat_sessions")

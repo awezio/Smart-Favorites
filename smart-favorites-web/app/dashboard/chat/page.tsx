@@ -213,6 +213,77 @@ export default function ChatPage() {
     return list;
   }, []);
 
+  const maybeGenerateSessionTitle = useCallback(
+    async (sessionId: string, sessionMessages: ChatMessage[]) => {
+      const userCount = sessionMessages.filter((message) => message.role === "user").length;
+      const assistantCount = sessionMessages.filter(
+        (message) => message.role === "assistant"
+      ).length;
+      if (userCount < 1 || assistantCount < 1) {
+        return;
+      }
+
+      const session =
+        sessions.find((item) => item.id === sessionId) ??
+        (currentSession?.id === sessionId ? currentSession : null);
+      if (session && !isPlaceholderSessionTitle(session.title)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/chat/sessions/${sessionId}/generate-title`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: sessionMessages.map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
+            locale: language,
+          }),
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        if (data.skipped) {
+          return;
+        }
+
+        const nextTitle = typeof data.title === "string" ? data.title : "";
+        if (!nextTitle) {
+          return;
+        }
+
+        setSessions((current) =>
+          current.map((item) =>
+            item.id === sessionId
+              ? {
+                  ...item,
+                  title: nextTitle,
+                  title_status: data.title_status || item.title_status,
+                }
+              : item
+          )
+        );
+        setCurrentSession((current) =>
+          current?.id === sessionId
+            ? {
+                ...current,
+                title: nextTitle,
+                title_status: data.title_status || current.title_status,
+              }
+            : current
+        );
+      } catch {
+        // Title generation is best-effort.
+      }
+    },
+    [currentSession, language, sessions]
+  );
+
   const openSession = useCallback(async (session: ChatSession) => {
     const fallbackMessages = normalizeChatMessages(session.messages);
     setCurrentSession({ ...session, messages: fallbackMessages });
@@ -236,10 +307,14 @@ export default function ChatPage() {
       setSessions((current) =>
         current.map((item) => (item.id === hydratedSession.id ? hydratedSession : item))
       );
+
+      if (isPlaceholderSessionTitle(hydratedSession.title)) {
+        void maybeGenerateSessionTitle(hydratedSession.id, hydratedSession.messages);
+      }
     } catch {
       toast.error(t.openFailed);
     }
-  }, [t.openFailed]);
+  }, [maybeGenerateSessionTitle, t.openFailed]);
 
   const createNewSession = useCallback(
     async (initialMessages: ChatMessage[] = [], title?: string): Promise<ChatSession | null> => {
@@ -247,9 +322,7 @@ export default function ChatPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title:
-            title ||
-            `${t.sessionTitle} ${new Date().toLocaleString(language === "zh" ? "zh-CN" : "en-US")}`,
+          title: title || t.emptyTitle,
         }),
       });
 
@@ -275,7 +348,7 @@ export default function ChatPage() {
       await loadSessions();
       return hydratedSession;
     },
-    [language, loadSessions, t.createFailed, t.sessionTitle]
+    [loadSessions, t.createFailed, t.emptyTitle]
   );
 
   const loadProviderModels = useCallback(async (provider: LLMProvider) => {
@@ -339,46 +412,6 @@ export default function ChatPage() {
       console.error("Failed to load AI settings:", error);
     }
   }, [loadProviderModels]);
-
-  const maybeGenerateSessionTitle = useCallback(
-    async (sessionId: string, sessionMessages: ChatMessage[]) => {
-      const userCount = sessionMessages.filter((message) => message.role === "user").length;
-      const assistantCount = sessionMessages.filter((message) => message.role === "assistant").length;
-      if (userCount < 1 || assistantCount < 1) {
-        return;
-      }
-
-      const session =
-        sessions.find((item) => item.id === sessionId) ??
-        (currentSession?.id === sessionId ? currentSession : null);
-      if (session && !isPlaceholderSessionTitle(session.title)) {
-        return;
-      }
-
-      try {
-        await fetch(`/api/chat/sessions/${sessionId}/generate-title`, { method: "POST" });
-        await loadSessions();
-        const response = await fetch(`/api/chat/sessions/${sessionId}`);
-        if (!response.ok) {
-          return;
-        }
-        const data = await response.json();
-        const updated = data.session as ChatSession;
-        setCurrentSession((current) =>
-          current?.id === sessionId
-            ? {
-                ...current,
-                title: updated.title,
-                title_status: updated.title_status,
-              }
-            : current
-        );
-      } catch {
-        // Title generation is best-effort.
-      }
-    },
-    [currentSession, loadSessions, sessions]
-  );
 
   useEffect(() => {
     setPinnedSessionIds(readStoredSessionSet(PINNED_STORAGE_KEY));

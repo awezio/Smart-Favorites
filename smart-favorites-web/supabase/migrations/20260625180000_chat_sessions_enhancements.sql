@@ -15,18 +15,21 @@ ALTER TABLE public.user_settings
 -- Replace permissive dev policy with owner-scoped access.
 DROP POLICY IF EXISTS "Allow all operations on chat_sessions" ON public.chat_sessions;
 
+DROP POLICY IF EXISTS "Users can view own chat sessions" ON public.chat_sessions;
 CREATE POLICY "Users can view own chat sessions"
   ON public.chat_sessions
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own chat sessions" ON public.chat_sessions;
 CREATE POLICY "Users can insert own chat sessions"
   ON public.chat_sessions
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own chat sessions" ON public.chat_sessions;
 CREATE POLICY "Users can update own chat sessions"
   ON public.chat_sessions
   FOR UPDATE
@@ -34,6 +37,7 @@ CREATE POLICY "Users can update own chat sessions"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own chat sessions" ON public.chat_sessions;
 CREATE POLICY "Users can delete own chat sessions"
   ON public.chat_sessions
   FOR DELETE
