@@ -1,11 +1,12 @@
 import type { SnapshotCardData } from "@/components/snapshot-grid";
 import { bookmarkToShowcaseItem, buildPublicSnapshotUrl, toPublicShowcaseSnapshotUrl } from "@/lib/showcase";
+import type { ShowcaseBookmarkRow } from "@/lib/showcase-bookmarks";
 import type { HomepageShowcaseItem } from "@/lib/showcase-homepage";
 import { bookmarkMatchesPattern } from "@/lib/showcase-match";
 
 export const BOOKMARK_SNAPSHOT_IMAGE_SENTINEL = "__bookmark_snapshot__";
 
-type BookmarkRow = Parameters<typeof bookmarkToShowcaseItem>[0];
+type BookmarkRow = ShowcaseBookmarkRow;
 
 export function mergeShowcaseBookmarks(
   bookmarks: BookmarkRow[],
@@ -24,7 +25,7 @@ export function mergeShowcaseBookmarks(
     }
 
     const bookmark = bookmarks[index];
-    const snapshotUrl = resolveOverrideSnapshotUrl(override, bookmark);
+    const snapshotUrl = resolveOverrideSnapshotUrl(override, bookmark, bookmarks);
     items[index] = {
       id: bookmark.id,
       title: override.title,
@@ -43,27 +44,35 @@ function findOverrideTargetIndex(
   override: HomepageShowcaseItem
 ): number {
   if (override.bookmark_id) {
-    return items.findIndex((item) => item.id === override.bookmark_id);
+    const byId = items.findIndex((item) => item.id === override.bookmark_id);
+    if (byId >= 0) {
+      return byId;
+    }
   }
 
   const pattern = override.bookmark_url_match?.trim();
-  if (!pattern) {
-    return -1;
+  if (pattern) {
+    const byPattern = bookmarks.findIndex((bookmark) =>
+      bookmarkMatchesPattern(bookmark, pattern)
+    );
+    if (byPattern >= 0) {
+      return byPattern;
+    }
   }
 
-  return bookmarks.findIndex((bookmark) => bookmarkMatchesPattern(bookmark, pattern));
+  return -1;
 }
 
 function resolveOverrideSnapshotUrl(
   override: HomepageShowcaseItem,
-  bookmark: BookmarkRow
+  bookmark: BookmarkRow,
+  bookmarks: BookmarkRow[]
 ): string | null | undefined {
   const imageUrl = override.image_url?.trim();
   if (!imageUrl || imageUrl === BOOKMARK_SNAPSHOT_IMAGE_SENTINEL) {
     const bookmarkId = override.bookmark_id || bookmark.id;
-    const snapshotTakenAt =
-      bookmarkId === bookmark.id ? bookmark.snapshot_taken_at : bookmark.snapshot_taken_at;
-    return buildPublicSnapshotUrl(bookmarkId, snapshotTakenAt);
+    const source = bookmarks.find((row) => row.id === bookmarkId) || bookmark;
+    return buildPublicSnapshotUrl(bookmarkId, source.snapshot_taken_at);
   }
   return toPublicShowcaseSnapshotUrl(imageUrl);
 }
