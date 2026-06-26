@@ -1,0 +1,9 @@
+.codex
+.claude
+.agents
+image
+dist
+node_modules
+smart-favorites-web/node_modules
+smart-favorites-web/.next
+backend

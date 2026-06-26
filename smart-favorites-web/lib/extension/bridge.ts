@@ -18,6 +18,11 @@ export type ExtensionSyncResult = {
   error?: string;
 };
 
+type ExtensionAuthSessionResponse = {
+  token?: string;
+  error?: string;
+};
+
 const EXTENSION_MESSAGE_TIMEOUT_MS = 2500;
 const DEFAULT_EXTENSION_IDS = [
   "iikmkjmpaadaobahmlepeloendndfphd",
@@ -112,6 +117,36 @@ export async function openExtensionSidePanel(
     extensionId,
     { action: "openSidePanel" }
   );
+  return Boolean(response?.success);
+}
+
+export async function connectInstalledExtensionSession(
+  extensionId: string
+): Promise<boolean> {
+  const tokenResponse = await fetch("/api/auth/extension/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ extensionId }),
+  });
+
+  if (!tokenResponse.ok) {
+    return false;
+  }
+
+  const { token } = (await tokenResponse.json()) as ExtensionAuthSessionResponse;
+  if (!token) {
+    return false;
+  }
+
+  const response = await sendExtensionMessage<{ success?: boolean }>(
+    extensionId,
+    {
+      action: "smartFavoritesExtensionAuth",
+      token,
+      backendUrl: window.location.origin,
+    }
+  );
+
   return Boolean(response?.success);
 }
 

@@ -110,6 +110,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 // ==================== Message Handling ====================
 
+async function openExtensionPopupWindow() {
+  await chrome.windows.create({
+    url: chrome.runtime.getURL('sidepanel/sidepanel.html'),
+    type: 'popup',
+    width: 440,
+    height: 720,
+  });
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case 'checkConnection':
@@ -171,14 +180,27 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   if (action === 'openSidePanel') {
     const windowId = sender.tab?.windowId;
     if (windowId === undefined) {
-      sendResponse({ success: false, error: 'Missing browser window context' });
-      return false;
+      openExtensionPopupWindow()
+        .then(() => sendResponse({ success: true, opened: 'popup' }))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
     }
 
     chrome.sidePanel
       .open({ windowId })
-      .then(() => sendResponse({ success: true }))
-      .catch((error) => sendResponse({ success: false, error: error.message }));
+      .then(() => sendResponse({ success: true, opened: 'sidePanel' }))
+      .catch((error) => {
+        openExtensionPopupWindow()
+          .then(() => sendResponse({
+            success: true,
+            opened: 'popup',
+            warning: error.message,
+          }))
+          .catch((fallbackError) => sendResponse({
+            success: false,
+            error: `${error.message}; fallback failed: ${fallbackError.message}`,
+          }));
+      });
     return true;
   }
 

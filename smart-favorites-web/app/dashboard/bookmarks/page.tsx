@@ -52,6 +52,7 @@ import { FeedList, FeedListItem } from "@/components/layout/feed-list";
 import { SectionPanel } from "@/components/layout/section-panel";
 import type { Bookmark } from "@/types";
 import {
+  connectInstalledExtensionSession,
   getExtensionInstallUrl,
   openExtensionSidePanel,
   pingInstalledExtension,
@@ -468,6 +469,11 @@ export default function BookmarksPage() {
 
         setExtensionId(detected?.extensionId ?? null);
         setExtensionVersion(detected?.version ?? null);
+        if (detected?.extensionId) {
+          connectInstalledExtensionSession(detected.extensionId).catch((error) => {
+            console.warn("Failed to connect installed extension session:", error);
+          });
+        }
       } catch {
         if (cancelled) {
           return;

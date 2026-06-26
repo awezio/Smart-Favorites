@@ -182,6 +182,28 @@ async function persistExtensionAuthToken(token, backendUrl) {
   return true;
 }
 
+async function trySilentExtensionLogin(base) {
+  if (!chrome.identity?.getRedirectURL || !chrome.identity?.launchWebAuthFlow) {
+    return false;
+  }
+
+  const authUrl = new URL('/auth/extension', base.replace(/\/$/, ''));
+  authUrl.searchParams.set('ext_id', chrome.runtime.id);
+  authUrl.searchParams.set('redirect_uri', chrome.identity.getRedirectURL('auth-callback'));
+
+  try {
+    const responseUrl = await chrome.identity.launchWebAuthFlow({
+      url: authUrl.toString(),
+      interactive: false
+    });
+    const { token, backendUrl } = parseExtensionAuthRedirect(responseUrl);
+    return await persistExtensionAuthToken(token, backendUrl || base);
+  } catch (error) {
+    console.info('No existing Smart Favorites web session available for silent extension login:', error);
+    return false;
+  }
+}
+
 async function maybeAutoConnectFromActiveWebSession() {
   const { authToken, autoConnectAttemptedAt } = await chrome.storage.local.get([
     'authToken',
@@ -201,6 +223,10 @@ async function maybeAutoConnectFromActiveWebSession() {
     autoConnectAttemptedAt: now,
     backendUrl: activeOrigin
   });
+
+  if (await trySilentExtensionLogin(activeOrigin)) {
+    await handleExtensionAuthChanged({ syncAfterAuth: true });
+  }
 }
 
 async function handleExtensionAuthChanged({ syncAfterAuth = true } = {}) {

@@ -88,6 +88,16 @@ assert.match(
 );
 assert.match(
   extensionBridge,
+  /connectInstalledExtensionSession/,
+  "Web app should proactively bridge the current logged-in session into an installed extension."
+);
+assert.match(
+  bookmarksPage,
+  /connectInstalledExtensionSession\(detected\.extensionId\)/,
+  "Bookmarks page should connect the installed extension to the current web login after detection."
+);
+assert.match(
+  extensionBridge,
   /EXTENSION_MESSAGE_TIMEOUT_MS/,
   "Web-to-extension messages should have a timeout so extension detection never stays loading forever."
 );
@@ -115,6 +125,16 @@ assert.match(
   extensionBackground,
   /action === 'triggerSync'/,
   "Extension background should allow the web page to trigger bookmark sync directly."
+);
+assert.match(
+  extensionBackground,
+  /chrome\.windows\.create[\s\S]*sidepanel\/sidepanel\.html/,
+  "Extension open requests should fall back to an extension popup window when sidePanel.open is rejected."
+);
+assert.match(
+  extensionBackground,
+  /sidePanel[\s\S]*\.open[\s\S]*catch[\s\S]*openExtensionPopupWindow/,
+  "Extension open requests should not fail permanently when the browser rejects sidePanel.open from a web-page message."
 );
 assert.match(
   extensionSources,
@@ -250,6 +270,21 @@ assert.match(
   extensionSidepanel,
   /maybeAutoConnectFromActiveWebSession/,
   "Extension should try the auth bridge when opened on an already logged-in Smart Favorites web page."
+);
+assert.match(
+  extensionSidepanel,
+  /trySilentExtensionLogin/,
+  "Extension should have a silent login probe for an already-open logged-in Smart Favorites web session."
+);
+assert.match(
+  extensionSidepanel,
+  /launchWebAuthFlow\(\{[\s\S]*interactive:\s*false/,
+  "Extension silent login probe should use chrome.identity without prompting when a web session already exists."
+);
+assert.match(
+  extensionSidepanel,
+  /maybeAutoConnectFromActiveWebSession[\s\S]*trySilentExtensionLogin/,
+  "Extension should invoke the silent login probe during active web-session auto-connect."
 );
 assert.doesNotMatch(
   extensionSidepanel,
