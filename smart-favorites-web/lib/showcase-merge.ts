@@ -1,5 +1,5 @@
 import type { SnapshotCardData } from "@/components/snapshot-grid";
-import { bookmarkToShowcaseItem, buildPublicSnapshotUrl } from "@/lib/showcase";
+import { bookmarkToShowcaseItem, buildPublicSnapshotUrl, toPublicShowcaseSnapshotUrl } from "@/lib/showcase";
 import type { HomepageShowcaseItem } from "@/lib/showcase-homepage";
 import { bookmarkMatchesPattern } from "@/lib/showcase-match";
 
@@ -60,9 +60,12 @@ function resolveOverrideSnapshotUrl(
 ): string | null | undefined {
   const imageUrl = override.image_url?.trim();
   if (!imageUrl || imageUrl === BOOKMARK_SNAPSHOT_IMAGE_SENTINEL) {
-    return buildPublicSnapshotUrl(bookmark.id, bookmark.snapshot_taken_at);
+    const bookmarkId = override.bookmark_id || bookmark.id;
+    const snapshotTakenAt =
+      bookmarkId === bookmark.id ? bookmark.snapshot_taken_at : bookmark.snapshot_taken_at;
+    return buildPublicSnapshotUrl(bookmarkId, snapshotTakenAt);
   }
-  return imageUrl;
+  return toPublicShowcaseSnapshotUrl(imageUrl);
 }
 
 export function normalizeBookmarkUrlMatch(value: string): string {

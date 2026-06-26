@@ -11,6 +11,38 @@ export function buildPublicSnapshotUrl(
   return `${base}&v=${encodeURIComponent(snapshotTakenAt)}`;
 }
 
+/** Map admin/dashboard snapshot URLs to the public homepage showcase proxy. */
+export function toPublicShowcaseSnapshotUrl(imageUrl: string): string {
+  const trimmed = imageUrl.trim();
+  if (!trimmed) return trimmed;
+
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    try {
+      parsed = new URL(trimmed, "https://www.smart-favorites.cc.cd");
+    } catch {
+      return trimmed;
+    }
+  }
+
+  const isSnapshotProxy =
+    parsed.pathname === "/api/bookmarks/snapshot-page" ||
+    parsed.pathname === "/api/showcase/snapshot";
+
+  if (!isSnapshotProxy) {
+    return trimmed;
+  }
+
+  const id = parsed.searchParams.get("id");
+  if (!id) {
+    return trimmed;
+  }
+
+  return buildPublicSnapshotUrl(id, parsed.searchParams.get("v"));
+}
+
 export function bookmarkToShowcaseItem(bookmark: {
   id: string;
   title: string;
