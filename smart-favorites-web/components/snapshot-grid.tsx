@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
+import { DitheredImage } from "@/components/layout/dithered-image";
 import { cn } from "@/lib/utils";
 import { fadeInUp, staggerContainer, staggerItem } from "@/lib/motion";
 
@@ -54,8 +55,8 @@ function SnapshotCard({ item }: { item: SnapshotCardData }) {
         rel="noopener noreferrer"
         className="block overflow-hidden border border-border bg-card transition-colors hover:bg-muted/30"
       >
-        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-          {item.snapshotUrl ? (
+        {item.snapshotUrl ? (
+          <DitheredImage className="relative aspect-[4/3] w-full bg-muted">
             <Image
               src={item.snapshotUrl}
               alt={item.title}
@@ -64,15 +65,12 @@ function SnapshotCard({ item }: { item: SnapshotCardData }) {
               unoptimized
               className="object-cover object-top"
             />
-          ) : (
+          </DitheredImage>
+        ) : (
+          <div className="relative aspect-[4/3] overflow-hidden bg-muted">
             <SnapshotPlaceholder title={item.title} />
-          )}
-          <div className="absolute inset-0 hidden" />
-          <div className="absolute bottom-0 left-0 right-0 hidden p-4">
-            <p className="truncate font-medium text-white">{item.title}</p>
-            <p className="truncate text-xs text-white/80">{item.url}</p>
           </div>
-        </div>
+        )}
         <div className="flex items-center justify-between gap-2 p-4 @xs:p-5">
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-serif text-base font-semibold text-foreground">{item.title}</h3>
@@ -119,14 +117,16 @@ export function SnapshotMarquee({ items }: { items: SnapshotCardData[] }) {
             className="group relative h-40 w-64 shrink-0 overflow-hidden border border-border bg-card"
           >
             {item.snapshotUrl ? (
-              <Image
-                src={item.snapshotUrl}
-                alt={item.title}
-                fill
-                sizes="256px"
-                unoptimized
-                className="object-cover object-top"
-              />
+              <DitheredImage className="relative h-full w-full bg-muted">
+                <Image
+                  src={item.snapshotUrl}
+                  alt={item.title}
+                  fill
+                  sizes="256px"
+                  unoptimized
+                  className="object-cover object-top"
+                />
+              </DitheredImage>
             ) : (
               <SnapshotPlaceholder title={item.title} />
             )}
