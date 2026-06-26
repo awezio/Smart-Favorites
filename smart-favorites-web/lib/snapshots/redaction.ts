@@ -1,6 +1,6 @@
 import "server-only";
 
-type SnapshotPage = {
+export type SnapshotPage = {
   addStyleTag(options: { content: string }): Promise<unknown>;
   evaluate<T>(pageFunction: () => T | Promise<T>): Promise<T>;
 };

@@ -113,7 +113,8 @@ export async function describeBookmark({
     description_zh: generated.description_zh,
     description_en: generated.description_en,
     description_metadata: generated.description_metadata,
-    structured_description: generated.structured_description,
+    structured_description: (generated.structured_description ||
+      {}) as Record<string, unknown>,
     snapshot_url:
       snapshotResult?.status === "ready"
         ? `/api/bookmarks/snapshot-page?id=${encodeURIComponent(item.id)}`
@@ -126,7 +127,6 @@ export async function describeBookmark({
     snapshot_completed: snapshotResult?.status === "ready",
     asyncSnapshotJob:
       snapshotMode === "async" ? { ...item, userId } : undefined,
-    ...generated,
   };
 }
 

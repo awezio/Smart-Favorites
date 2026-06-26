@@ -1,8 +1,11 @@
 import "server-only";
 
-import { maskSensitiveSnapshotText } from "@/lib/snapshots/redaction";
+import {
+  maskSensitiveSnapshotText,
+  type SnapshotPage,
+} from "@/lib/snapshots/redaction";
 
-type SnapshotPage = {
+type NavigableSnapshotPage = SnapshotPage & {
   goto(
     url: string,
     options?: { waitUntil?: "load" | "domcontentloaded" | "networkidle"; timeout?: number }
@@ -13,7 +16,6 @@ type SnapshotPage = {
   ): Promise<void>;
   waitForTimeout(ms: number): Promise<void>;
   url(): string;
-  evaluate<T>(pageFunction: () => T | Promise<T>): Promise<T>;
 };
 
 const BOT_CHALLENGE_PATTERN =
@@ -25,7 +27,7 @@ export type PagePrepareResult = {
 };
 
 export async function preparePageForSnapshot(
-  page: SnapshotPage,
+  page: NavigableSnapshotPage,
   url: string
 ): Promise<PagePrepareResult> {
   await page.goto(url, {
