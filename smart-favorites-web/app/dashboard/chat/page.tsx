@@ -200,6 +200,17 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const requestedModelsRef = useRef<Set<string>>(new Set());
+  const sessionsRef = useRef(sessions);
+  const currentSessionRef = useRef(currentSession);
+  const hasInitializedRef = useRef(false);
+
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
 
   const loadSessions = useCallback(async (): Promise<ChatSession[]> => {
     const response = await fetch("/api/chat/sessions");
@@ -224,8 +235,8 @@ export default function ChatPage() {
       }
 
       const session =
-        sessions.find((item) => item.id === sessionId) ??
-        (currentSession?.id === sessionId ? currentSession : null);
+        sessionsRef.current.find((item) => item.id === sessionId) ??
+        (currentSessionRef.current?.id === sessionId ? currentSessionRef.current : null);
       if (session && !isPlaceholderSessionTitle(session.title)) {
         return;
       }
@@ -281,7 +292,7 @@ export default function ChatPage() {
         // Title generation is best-effort.
       }
     },
-    [currentSession, language, sessions]
+    [language]
   );
 
   const openSession = useCallback(async (session: ChatSession) => {
@@ -419,15 +430,20 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
+    if (hasInitializedRef.current) {
+      return;
+    }
+    hasInitializedRef.current = true;
+
     async function init() {
       setInitializing(true);
       try {
         await loadAiSettings();
         const list = await loadSessions();
         if (list.length > 0) {
-          void openSession(list[0]);
+          await openSession(list[0]);
         } else {
-          void createNewSession();
+          await createNewSession();
         }
       } catch (error) {
         console.error("Failed to initialize chat page:", error);
@@ -436,8 +452,10 @@ export default function ChatPage() {
       }
     }
 
-    init();
-  }, [createNewSession, loadAiSettings, loadSessions, openSession]);
+    void init();
+    // Intentionally run once on mount; callbacks are stable enough for initial load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
