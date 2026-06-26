@@ -39,6 +39,11 @@ export async function PATCH(
     } else if (typeof body.bookmark_id === "string") {
       updates.bookmark_id = body.bookmark_id.trim() || null;
     }
+    if (body.bookmark_url_match === null) {
+      updates.bookmark_url_match = null;
+    } else if (typeof body.bookmark_url_match === "string") {
+      updates.bookmark_url_match = body.bookmark_url_match.trim() || null;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No updates provided" }, { status: 400 });

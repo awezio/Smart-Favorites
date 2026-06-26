@@ -9,6 +9,7 @@ export interface HomepageShowcaseItem {
   sort_order: number;
   enabled: boolean;
   bookmark_id?: string | null;
+  bookmark_url_match?: string | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -1,25 +1,13 @@
 import { NextResponse } from "next/server";
 import { listEnabledHomepageShowcaseItems } from "@/lib/admin/homepage-showcase";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  bookmarkToShowcaseItem,
-  SHOWCASE_SNAPSHOT_LIMIT,
-} from "@/lib/showcase";
-import { homepageItemToSnapshotCard } from "@/lib/showcase-homepage";
+import { mergeShowcaseBookmarks } from "@/lib/showcase-merge";
+import { SHOWCASE_SNAPSHOT_LIMIT } from "@/lib/showcase";
 import type { SnapshotCardData } from "@/components/snapshot-grid";
+import type { HomepageShowcaseItem } from "@/lib/showcase-homepage";
 
 export async function GET() {
   try {
-    try {
-      const curated = await listEnabledHomepageShowcaseItems();
-      if (curated.length > 0) {
-        const items: SnapshotCardData[] = curated.map(homepageItemToSnapshotCard);
-        return NextResponse.json({ items, source: "curated" });
-      }
-    } catch (curatedError) {
-      console.warn("[GET /api/showcase] curated items unavailable, falling back to bookmarks", curatedError);
-    }
-
     const admin = createAdminClient();
     const { data: bookmarks, error } = await admin
       .from("bookmarks")
@@ -35,8 +23,18 @@ export async function GET() {
       throw error;
     }
 
-    const items: SnapshotCardData[] = (bookmarks || []).map(bookmarkToShowcaseItem);
-    return NextResponse.json({ items, source: "bookmarks" });
+    let overrides: HomepageShowcaseItem[] = [];
+    try {
+      overrides = await listEnabledHomepageShowcaseItems();
+    } catch (curatedError) {
+      console.warn("[GET /api/showcase] overrides unavailable", curatedError);
+    }
+
+    const items: SnapshotCardData[] = mergeShowcaseBookmarks(bookmarks || [], overrides);
+    return NextResponse.json({
+      items,
+      source: overrides.length > 0 ? "bookmarks+overrides" : "bookmarks",
+    });
   } catch (error) {
     console.error("[GET /api/showcase]", error);
     return NextResponse.json({ items: [], source: "error" });

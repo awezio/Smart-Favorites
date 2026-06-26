@@ -16,9 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionPanel } from "@/components/layout/section-panel";
 import type { HomepageShowcaseItem } from "@/lib/showcase-homepage";
+import { BOOKMARK_SNAPSHOT_IMAGE_SENTINEL } from "@/lib/showcase-merge";
 import { EDITORIAL_IMAGES } from "@/lib/editorial-images";
 
 const IMAGE_PRESETS = [
+  { label: "Use bookmark snapshot", value: BOOKMARK_SNAPSHOT_IMAGE_SENTINEL },
   { label: "Hero paper", value: EDITORIAL_IMAGES.heroPaper },
   { label: "Study notes", value: EDITORIAL_IMAGES.studyNotes },
   { label: "Archive pages", value: EDITORIAL_IMAGES.archivePages },
@@ -31,14 +33,16 @@ type DraftItem = {
   image_url: string;
   category: string;
   enabled: boolean;
+  bookmark_url_match: string;
 };
 
 const emptyDraft = (): DraftItem => ({
   title: "",
   url: "",
-  image_url: EDITORIAL_IMAGES.heroPaper,
+  image_url: BOOKMARK_SNAPSHOT_IMAGE_SENTINEL,
   category: "",
   enabled: true,
+  bookmark_url_match: "",
 });
 
 export function ShowcaseManager() {
@@ -46,6 +50,7 @@ export function ShowcaseManager() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [applyingOverrides, setApplyingOverrides] = useState(false);
   const [draft, setDraft] = useState<DraftItem>(emptyDraft);
 
   const loadItems = useCallback(async () => {
@@ -167,11 +172,39 @@ export function ShowcaseManager() {
     }
   };
 
+  const applyOverrides = async () => {
+    setApplyingOverrides(true);
+    try {
+      const response = await fetch("/api/admin/showcase/apply-overrides", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to apply showcase overrides");
+      }
+      toast.success(data.message || "Overrides applied");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to apply overrides");
+    } finally {
+      setApplyingOverrides(false);
+    }
+  };
+
   return (
     <div className="page-stack">
       <SectionPanel
-        title="Homepage Carousel"
-        description="Control the landing-page showcase carousel order, images, and visibility. When at least one enabled item exists here, bookmark snapshots are not used."
+        title="Homepage Showcase Overrides"
+        description="Patch specific bookmark cards on the landing page without replacing the whole gallery. Use bookmark URL match (for example smart-favorites.cc.cd or chatexcel), then apply overrides to update the bookmark URL and regenerate snapshots. The dither filter stays on the frontend."
+        actions={
+          <Button
+            type="button"
+            variant="outline"
+            disabled={applyingOverrides}
+            onClick={() => void applyOverrides()}
+            className="gap-2"
+          >
+            {applyingOverrides ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Apply overrides & refresh snapshots
+          </Button>
+        }
       >
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -188,9 +221,19 @@ export function ShowcaseManager() {
               <div key={item.id} className="border border-border p-4">
                 <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)_auto]">
                   <div
-                    className="aspect-[4/3] border border-border bg-cover bg-center"
-                    style={{ backgroundImage: `url(${item.image_url})` }}
-                  />
+                    className="aspect-[4/3] border border-border bg-muted bg-cover bg-center"
+                    style={
+                      item.image_url === BOOKMARK_SNAPSHOT_IMAGE_SENTINEL
+                        ? undefined
+                        : { backgroundImage: `url(${item.image_url})` }
+                    }
+                  >
+                    {item.image_url === BOOKMARK_SNAPSHOT_IMAGE_SENTINEL && (
+                      <div className="flex h-full items-center justify-center px-3 text-center text-xs text-muted-foreground">
+                        Uses bookmark snapshot (dithered on homepage)
+                      </div>
+                    )}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1 sm:col-span-2">
                       <Label htmlFor={`title-${item.id}`}>Title</Label>
@@ -227,6 +270,20 @@ export function ShowcaseManager() {
                           const value = event.target.value.trim();
                           if (value && value !== item.image_url) {
                             void updateItem(item, { image_url: value });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label htmlFor={`match-${item.id}`}>Bookmark URL match</Label>
+                      <Input
+                        id={`match-${item.id}`}
+                        defaultValue={item.bookmark_url_match || ""}
+                        placeholder="smart-favorites.cc.cd"
+                        onBlur={(event) => {
+                          const value = event.target.value.trim();
+                          if (value !== (item.bookmark_url_match || "")) {
+                            void updateItem(item, { bookmark_url_match: value });
                           }
                         }}
                       />
@@ -317,6 +374,17 @@ export function ShowcaseManager() {
               onChange={(event) =>
                 setDraft((current) => ({ ...current, category: event.target.value }))
               }
+            />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label htmlFor="draft-match">Bookmark URL match</Label>
+            <Input
+              id="draft-match"
+              value={draft.bookmark_url_match}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, bookmark_url_match: event.target.value }))
+              }
+              placeholder="chatexcel"
             />
           </div>
           <div className="space-y-1 md:col-span-2">

@@ -38,6 +38,10 @@ export async function POST(request: NextRequest) {
       typeof body.bookmark_id === "string" && body.bookmark_id.trim()
         ? body.bookmark_id.trim()
         : null;
+    const bookmarkUrlMatch =
+      typeof body.bookmark_url_match === "string" && body.bookmark_url_match.trim()
+        ? body.bookmark_url_match.trim()
+        : null;
 
     if (!title || !url || !imageUrl) {
       return NextResponse.json(
@@ -61,6 +65,7 @@ export async function POST(request: NextRequest) {
         enabled,
         sort_order: sortOrder,
         bookmark_id: bookmarkId,
+        bookmark_url_match: bookmarkUrlMatch,
       })
       .select("*")
       .single();
