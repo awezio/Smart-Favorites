@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_图层_1" data-name="图层_1" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 489.86 457.22">
+  <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
+  <defs>
+    <style>
+      .st0 {
+        stroke: url(#_未命名的渐变_2);
+      }
+
+      .st0, .st1, .st2, .st3, .st4, .st5, .st6 {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .st0, .st1, .st2, .st3, .st4, .st6 {
+        stroke-width: 22px;
+      }
+
+      .st1 {
+        stroke: url(#_未命名的渐变_3);
+      }
+
+      .st2 {
+        stroke: url(#_未命名的渐变_4);
+      }
+
+      .st3 {
+        stroke: url(#_未命名的渐变_5);
+      }
+
+      .st4 {
+        stroke: url(#_未命名的渐变_6);
+      }
+
+      .st7, .st8, .st9, .st10, .st11 {
+        fill: #fff;
+      }
+
+      .st5 {
+        stroke: url(#_未命名的渐变_8);
+      }
+
+      .st5, .st8 {
+        stroke-width: 20px;
+      }
+
+      .st12 {
+        fill: url(#_未命名的渐变_7);
+      }
+
+      .st8 {
+        stroke: #783ef0;
+      }
+
+      .st9 {
+        stroke: url(#_未命名的渐变_9);
+        stroke-width: 17px;
+      }
+
+      .st10 {
+        stroke: #316fef;
+        stroke-width: 18px;
+      }
+
+      .st11 {
+        stroke: #5148f1;
+        stroke-width: 19px;
+      }
+
+      .st6 {
+        stroke: url(#_未命名的渐变);
+      }
+
+      .st13 {
+        fill: url(#_未命名的渐变_10);
+      }
+    </style>
+    <linearGradient id="_未命名的渐变" data-name="未命名的渐变" x1="-86.86" y1="199.26" x2="334.14" y2="596.26" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08d9e9"/>
+      <stop offset=".45" stop-color="#2499f3"/>
+      <stop offset="1" stop-color="#7d38f3"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_2" data-name="未命名的渐变 2" x1="15.2" y1="134.41" x2="413.11" y2="509.63" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08d9e9"/>
+      <stop offset=".45" stop-color="#2499f3"/>
+      <stop offset="1" stop-color="#7d38f3"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_3" data-name="未命名的渐变 3" x1="100.69" y1="161.56" x2="402.87" y2="426.42" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_4" data-name="未命名的渐变 4" x1="113.16" y1="151.5" x2="389.51" y2="393.72" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_5" data-name="未命名的渐变 5" x1="-23.24" y1="221.9" x2="334.72" y2="535.66" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_6" data-name="未命名的渐变 6" x1="-4.73" y1="227.61" x2="327.27" y2="518.61" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_7" data-name="未命名的渐变 7" x1="13.39" y1="206.94" x2="345.39" y2="497.94" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_8" data-name="未命名的渐变 8" x1="54.5" y1="160.03" x2="386.5" y2="451.03" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_9" data-name="未命名的渐变 9" x1="82.27" y1="152.94" x2="372.64" y2="407.46" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07d7e3"/>
+      <stop offset=".55" stop-color="#2b7ff4"/>
+      <stop offset="1" stop-color="#7a39f2"/>
+    </linearGradient>
+    <linearGradient id="_未命名的渐变_10" data-name="未命名的渐变 10" x1="121.89" y1="502.56" x2="173.4" y2="551.28" gradientTransform="translate(52 651.22) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#02d6e6"/>
+      <stop offset=".52" stop-color="#327ef3"/>
+      <stop offset="1" stop-color="#812ff2"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path id="cloud-outline" class="st6" d="M103.11,298.61c-52,0-83-36-83-86,0-53,42-94,101-93,7-57,56-99,116-99,65,0,116,46,127,110,45-1,86,35,94,84"/>
+    <path id="node-arm-top" class="st0" d="M339.72,226.96c24.28,0,30.82-16.83,48.56-29.92,18.68-14.02,42.96-5.61,58.84-5.61"/>
+    <path id="node-arm-mid" class="st1" d="M339.72,282.61h98.4"/>
+    <path id="node-arm-bottom" class="st2" d="M290.11,335.61c27.25,21,56.91,22,80.95,1,13.63-11,31.26-8,42.48,0"/>
+    <path id="layer-back" class="st3" d="M146.11,176.61h163.15c17.4,0,30.45,12,30.45,28v102"/>
+    <path id="layer-mid" class="st4" d="M143.11,214.61h122c19,0,32,14,32,32v83"/>
+    <rect id="front-card" class="st12" x="123.11" y="253.61" width="185" height="118" rx="15" ry="15"/>
+    <path id="bottom-connector" class="st5" d="M216.11,371.61v47"/>
+    <circle id="bottom-node" class="st9" cx="215.61" cy="426.98" r="18.18"/>
+    <circle id="top-node" class="st8" cx="456.68" cy="207.84" r="19.13"/>
+    <circle id="middle-node" class="st10" cx="438.11" cy="280.11" r="18.5"/>
+    <circle id="lower-node" class="st11" cx="438.41" cy="348.6" r="18.21"/>
+    <path id="top-sparkle" class="st13" d="M237.77,47.87c6.26,26.45,13.92,33.41,41.76,39.67-27.84,6.96-35.5,14.62-41.76,41.07-6.26-26.45-13.92-34.11-41.07-41.07,27.15-6.26,34.8-13.22,41.07-39.67Z"/>
+  </g>
+  <path id="card-sparkle" class="st7" d="M215.61,272.09c6.51,26.77,13.75,34.01,40.52,40.52-26.77,6.51-34.01,13.75-40.52,40.52-6.51-26.77-13.75-34.01-40.52-40.52,26.77-6.51,34.01-13.75,40.52-40.52Z"/>
+</svg>

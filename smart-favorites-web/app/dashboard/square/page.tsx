@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Globe, Plus, Loader2, Users, Image as ImageIcon, ThumbsUp, TrendingUp } from "lucide-react";
+import { Loader2, Users, Image as ImageIcon, ThumbsUp, TrendingUp, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/empty-state";
 import { FeedList, FeedListItem } from "@/components/layout/feed-list";
-import { DitheredSurface } from "@/components/layout/dithered-image";
 import { PostCard } from "@/components/square/post-card";
 import { CreatePostModal } from "@/components/square/create-post-modal";
+import { SquareEmptyPanel, SquareHero, SquareWorkflowStrip } from "@/components/square/square-hero";
 import { createClient } from "@/lib/supabase/client";
 import { SQUARE_TARGET_OPTIONS } from "@/lib/square";
 import { useDashboardLanguage } from "@/lib/dashboard-language";
@@ -47,6 +46,11 @@ const pageCopy = {
     publishFirst: "发布第一条",
     loadingMore: "加载中...",
     loadMore: "加载更多",
+    workflowSteps: [
+      { step: "01", title: "收藏入库", description: "书签、GitHub Stars、文档一键汇聚" },
+      { step: "02", title: "智能整理", description: "自动分类、打标签、建立知识关联" },
+      { step: "03", title: "广场分享", description: "发布评测、投票互动、发现好内容" },
+    ],
   },
   en: {
     filterAll: "All",
@@ -77,6 +81,11 @@ const pageCopy = {
     publishFirst: "Publish the first post",
     loadingMore: "Loading...",
     loadMore: "Load more",
+    workflowSteps: [
+      { step: "01", title: "Collect", description: "Bookmarks, GitHub Stars, and documents in one place" },
+      { step: "02", title: "Organize", description: "Auto-tag, classify, and link your knowledge" },
+      { step: "03", title: "Share", description: "Post reviews, vote, and discover great content" },
+    ],
   },
 };
 
@@ -340,53 +349,17 @@ export default function SquarePage() {
 
   return (
     <div className="page-stack">
-      <DitheredSurface className="p-6 sm:p-8 noise-overlay">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-4">
-            <p className="utility-label w-fit border border-border px-2 py-1">
-              {t.badgeCommunity}
-            </p>
-            <div className="space-y-2">
-              <h1 className="type-h1">
-                {t.heroTitle}
-              </h1>
-              <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                {t.heroDescription}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setShowCreateModal(true)} variant="creative">
-                <Plus className="mr-2 h-4 w-4" />
-                {t.publish}
-              </Button>
-              <div className="flex items-center gap-2 border border-border px-3 py-2 text-sm text-muted-foreground">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                {t.updatesOn}
-              </div>
-            </div>
-          </div>
+      <SquareHero
+        badge={t.badgeCommunity}
+        title={t.heroTitle}
+        description={t.heroDescription}
+        publishLabel={t.publish}
+        updatesOnLabel={t.updatesOn}
+        stats={heroStats}
+        onPublish={() => setShowCreateModal(true)}
+      />
 
-          <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4 lg:max-w-none lg:min-w-[36rem]">
-            {heroStats.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.label}
-                  className="panel panel-pad"
-                >
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span className="utility-label">
-                      {item.label}
-                    </span>
-                    <Icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="mt-3 text-2xl font-semibold">{item.value}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </DitheredSurface>
+      <SquareWorkflowStrip steps={t.workflowSteps} />
 
       <FeedList className="md:grid md:grid-cols-3 md:divide-y-0">
         {SQUARE_TARGET_OPTIONS.map((option) => {
@@ -436,17 +409,12 @@ export default function SquarePage() {
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <EmptyState
-          icon={Globe}
+        <SquareEmptyPanel
           title={t.emptyTitle}
           description={t.emptyDescription}
-          textured
           action={
-            <Button
-              variant="outline"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
+            <Button variant="outline" onClick={() => setShowCreateModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
               {t.publishFirst}
             </Button>
           }
