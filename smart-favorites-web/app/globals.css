@@ -201,24 +201,6 @@
     border: 1px solid hsl(var(--primary) / 0.12);
   }
 
-  .square-art-tint img {
-    filter: grayscale(1) contrast(1.04) brightness(1.06);
-  }
-
-  .square-art-tint::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      135deg,
-      hsl(var(--primary) / 0.42) 0%,
-      hsl(280 65% 72% / 0.5) 55%,
-      hsl(var(--primary) / 0.28) 100%
-    );
-    mix-blend-mode: color;
-    pointer-events: none;
-  }
-
   .dark .square-glass-panel {
     background: hsl(var(--card) / 0.82);
     box-shadow:
