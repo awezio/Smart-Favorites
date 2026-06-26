@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Httpster preview">
+  <rect width="1280" height="720" fill="#f4efe6"/>
+  <rect x="0" y="0" width="1280" height="88" fill="#ffffff"/>
+  <rect x="72" y="30" width="140" height="28" rx="4" fill="#111827"/>
+  <rect x="72" y="132" width="360" height="48" rx="2" fill="#111827"/>
+  <rect x="72" y="196" width="520" height="18" rx="2" fill="#6b7280" opacity="0.7"/>
+  <g>
+    <rect x="72" y="280" width="360" height="220" rx="10" fill="#dbeafe"/>
+    <rect x="456" y="280" width="360" height="220" rx="10" fill="#fde68a"/>
+    <rect x="840" y="280" width="360" height="220" rx="10" fill="#fecdd3"/>
+    <rect x="102" y="310" width="180" height="16" rx="3" fill="#1f2937" opacity="0.35"/>
+    <rect x="102" y="340" width="260" height="12" rx="3" fill="#1f2937" opacity="0.2"/>
+    <rect x="486" y="310" width="180" height="16" rx="3" fill="#1f2937" opacity="0.35"/>
+    <rect x="486" y="340" width="260" height="12" rx="3" fill="#1f2937" opacity="0.2"/>
+    <rect x="870" y="310" width="180" height="16" rx="3" fill="#1f2937" opacity="0.35"/>
+    <rect x="870" y="340" width="260" height="12" rx="3" fill="#1f2937" opacity="0.2"/>
+  </g>
+  <text x="88" y="52" fill="#ffffff" font-family="Georgia, serif" font-size="18" font-weight="700">Httpster</text>
+  <text x="88" y="168" fill="#111827" font-family="Georgia, serif" font-size="38" font-weight="700">Website Design Inspiration</text>
+  <text x="88" y="210" fill="#4b5563" font-family="Arial, sans-serif" font-size="18">Curated web design gallery</text>
+</svg>

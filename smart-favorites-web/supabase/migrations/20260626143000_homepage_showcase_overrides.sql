@@ -22,9 +22,9 @@ INSERT INTO public.homepage_showcase_items (
 SELECT
   'Awwwards',
   'https://www.awwwards.com/',
-  '__bookmark_snapshot__',
+  '/images/showcase/awwwards.svg',
   'AI网站设计模板',
-  'smart-favorites.cc.cd',
+  'smart-favorites.cc.cd,best website,bestwebsite,awwwards',
   0,
   true
 WHERE NOT EXISTS (
@@ -45,9 +45,9 @@ INSERT INTO public.homepage_showcase_items (
 SELECT
   'Website Design Inspiration | Httpster',
   'https://httpster.net/',
-  '__bookmark_snapshot__',
+  '/images/showcase/httpster.svg',
   'AI网页设计',
-  'chatexcel',
+  'chatexcel,httpster,chat excel',
   1,
   true
 WHERE NOT EXISTS (

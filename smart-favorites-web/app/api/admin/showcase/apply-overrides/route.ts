@@ -5,6 +5,7 @@ import { requireAdminUser, adminErrorResponse } from "@/lib/auth/admin";
 import { updateBookmark } from "@/lib/db/bookmarks";
 import { captureBookmarkSnapshot } from "@/lib/snapshots/bookmark-snapshot";
 import { BOOKMARK_SNAPSHOT_IMAGE_SENTINEL } from "@/lib/showcase-merge";
+import { bookmarkMatchesPattern } from "@/lib/showcase-match";
 
 type ApplyResult = {
   overrideId: string;
@@ -26,16 +27,13 @@ function findBookmarkByOverride(
     return bookmarks.find((bookmark) => bookmark.id === override.bookmark_id) || null;
   }
 
-  const pattern = override.bookmark_url_match?.trim().replace(/%/g, "").toLowerCase();
+  const pattern = override.bookmark_url_match?.trim();
   if (!pattern) {
     return null;
   }
 
   return (
-    bookmarks.find((bookmark) => {
-      const haystack = `${bookmark.url} ${bookmark.title}`.toLowerCase();
-      return haystack.includes(pattern);
-    }) || null
+    bookmarks.find((bookmark) => bookmarkMatchesPattern(bookmark, pattern)) || null
   );
 }
 
@@ -81,12 +79,24 @@ export async function POST(request: NextRequest) {
         {
           title: override.title,
           url: override.url,
-          snapshot_status: "capturing",
-          snapshot_error: null,
+          ...(override.image_url === BOOKMARK_SNAPSHOT_IMAGE_SENTINEL
+            ? { snapshot_status: "capturing" as const, snapshot_error: null }
+            : {}),
         },
         bookmark.user_id,
         supabase
       );
+
+      if (override.image_url !== BOOKMARK_SNAPSHOT_IMAGE_SENTINEL) {
+        applied.push({
+          overrideId: override.id,
+          bookmarkId: bookmark.id,
+          title: override.title,
+          url: override.url,
+          snapshot_status: "static-image",
+        });
+        continue;
+      }
 
       const snapshot = await captureBookmarkSnapshot({
         bookmarkId: bookmark.id,

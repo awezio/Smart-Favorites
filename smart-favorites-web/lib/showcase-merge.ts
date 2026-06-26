@@ -1,6 +1,7 @@
 import type { SnapshotCardData } from "@/components/snapshot-grid";
 import { bookmarkToShowcaseItem, buildPublicSnapshotUrl } from "@/lib/showcase";
 import type { HomepageShowcaseItem } from "@/lib/showcase-homepage";
+import { bookmarkMatchesPattern } from "@/lib/showcase-match";
 
 export const BOOKMARK_SNAPSHOT_IMAGE_SENTINEL = "__bookmark_snapshot__";
 
@@ -50,11 +51,7 @@ function findOverrideTargetIndex(
     return -1;
   }
 
-  const normalizedPattern = pattern.replace(/%/g, "").toLowerCase();
-  return bookmarks.findIndex((bookmark) => {
-    const haystack = `${bookmark.url} ${bookmark.title}`.toLowerCase();
-    return haystack.includes(normalizedPattern);
-  });
+  return bookmarks.findIndex((bookmark) => bookmarkMatchesPattern(bookmark, pattern));
 }
 
 function resolveOverrideSnapshotUrl(
