@@ -15,7 +15,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const updates = orderedIds.map((id, index) =>
+    const updates = orderedIds.map((id: string, index: number) =>
       supabase
         .from("homepage_showcase_items")
         .update({ sort_order: index })

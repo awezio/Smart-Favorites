@@ -248,8 +248,8 @@ export function ShowcaseManager() {
                       <Checkbox
                         id={`enabled-${item.id}`}
                         checked={item.enabled}
-                        onCheckedChange={(checked) =>
-                          void updateItem(item, { enabled: checked === true })
+                        onChange={(event) =>
+                          void updateItem(item, { enabled: event.target.checked })
                         }
                       />
                       <Label htmlFor={`enabled-${item.id}`}>Visible on homepage</Label>
