@@ -148,6 +148,7 @@ export default function SquarePage() {
   const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState<FilterType>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingPost, setEditingPost] = useState<SquarePost | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
 
   const supabase = useMemo(() => createClient(), []);
@@ -450,6 +451,7 @@ export default function SquarePage() {
               currentUserId={currentUserId}
               onVote={handleVote}
               onDelete={handleDelete}
+              onEdit={setEditingPost}
               layout="feed"
             />
           ))}
@@ -480,6 +482,12 @@ export default function SquarePage() {
       <CreatePostModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
+        onCreated={handleCreated}
+      />
+      <CreatePostModal
+        open={Boolean(editingPost)}
+        post={editingPost}
+        onClose={() => setEditingPost(null)}
         onCreated={handleCreated}
       />
     </div>

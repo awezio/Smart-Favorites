@@ -1,7 +1,7 @@
 "use client";
 
 import ImagePreview from "next/image";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Star, X, Upload, Film, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { SQUARE_TARGET_OPTIONS } from "@/lib/square";
 import { toast } from "sonner";
+import type { SquarePost } from "@/types";
 
 interface CreatePostModalProps {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  post?: SquarePost | null;
 }
 
 type TargetType = "bookmark" | "star" | "general";
@@ -53,7 +55,9 @@ export function CreatePostModal({
   open,
   onClose,
   onCreated,
+  post = null,
 }: CreatePostModalProps) {
+  const isEditMode = Boolean(post);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [rating, setRating] = useState<number | null>(null);
@@ -80,6 +84,21 @@ export function CreatePostModal({
       onClose();
     }
   };
+
+  useEffect(() => {
+    if (!open) return;
+    if (post) {
+      setTitle(post.title);
+      setContent(post.content);
+      setRating(post.rating);
+      setTargetUrl(post.target_url || "");
+      setTargetType((post.target_type as TargetType) || "general");
+      setMediaFiles([]);
+      setHoverRating(0);
+    } else {
+      resetForm();
+    }
+  }, [open, post, resetForm]);
 
   const handleRatingClick = (star: number) => {
     if (rating === star) {
@@ -190,7 +209,49 @@ export function CreatePostModal({
 
     setSubmitting(true);
     try {
-      // 1. Create the post
+      if (isEditMode && post) {
+        const res = await fetch(`/api/square/${post.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            content: content.trim(),
+            rating,
+            target_type: targetType,
+            target_url: targetUrl.trim() || null,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "保存失败");
+        }
+
+        if (mediaFiles.length > 0) {
+          for (const media of mediaFiles) {
+            const formData = new FormData();
+            formData.append("file", media.file);
+            formData.append("media_type", media.type);
+
+            try {
+              await fetch(`/api/square/${post.id}/media`, {
+                method: "POST",
+                body: formData,
+              });
+            } catch (mediaErr) {
+              console.error("Media upload failed:", mediaErr);
+            }
+          }
+        }
+
+        toast.success("已保存修改");
+        resetForm();
+        onCreated();
+        onClose();
+        return;
+      }
+
+      // Create the post
       const res = await fetch("/api/square", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -248,7 +309,7 @@ export function CreatePostModal({
       <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>发布到广场</CardTitle>
+            <CardTitle>{isEditMode ? "编辑发布" : "发布到广场"}</CardTitle>
             <Button
               variant="ghost"
               size="icon"
@@ -370,7 +431,7 @@ export function CreatePostModal({
           {/* Media Upload */}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <Label>媒体附件 (可选)</Label>
+              <Label>{isEditMode ? "追加媒体 (可选)" : "媒体附件 (可选)"}</Label>
               <span className="text-xs text-muted-foreground">
                 最多 {MAX_MEDIA_FILES} 个，图片 10MB / 视频 50MB
               </span>
@@ -445,8 +506,10 @@ export function CreatePostModal({
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                发布中...
+                {isEditMode ? "保存中..." : "发布中..."}
               </>
+            ) : isEditMode ? (
+              "保存"
             ) : (
               "发布"
             )}

@@ -8,6 +8,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Trash2,
+  Pencil,
   ExternalLink,
   ChevronDown,
   ChevronUp,
@@ -43,6 +44,7 @@ interface PostCardProps {
   currentUserId?: string;
   onVote: (postId: string, helpful: boolean | null) => void;
   onDelete?: (postId: string) => void;
+  onEdit?: (post: SquarePost) => void;
   layout?: "feed" | "grid";
 }
 
@@ -115,6 +117,7 @@ export function PostCard({
   currentUserId,
   onVote,
   onDelete,
+  onEdit,
   layout = "feed",
 }: PostCardProps) {
   const [expanded, setExpanded] = useState(false);
@@ -304,6 +307,17 @@ export function PostCard({
               {isAuthor ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">你的发布</span>
+                  {onEdit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => onEdit(post)}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      编辑
+                    </Button>
+                  )}
                   {onDelete && (
                     <Button
                       variant="ghost"
