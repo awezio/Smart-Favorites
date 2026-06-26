@@ -51,28 +51,30 @@ const TYPE_META: Record<GraphNode["type"], {
   color: string;
   Icon: typeof BookOpen;
 }> = {
-  bookmark: { label: { zh: "??", en: "Bookmark" }, color: "#2563eb", Icon: BookOpen },
-  star: { label: { zh: "??", en: "Star" }, color: "#f59e0b", Icon: Star },
-  document: { label: { zh: "??", en: "Document" }, color: "#059669", Icon: FileText },
+  bookmark: { label: { zh: "书签", en: "Bookmark" }, color: "#2563eb", Icon: BookOpen },
+  star: { label: { zh: "星标", en: "Star" }, color: "#f59e0b", Icon: Star },
+  document: { label: { zh: "文档", en: "Document" }, color: "#059669", Icon: FileText },
 } as const;
 
 const pageCopy = {
   zh: {
-    title: "????",
-    subtitle: "???GitHub ???????? OKF ????",
-    refresh: "??",
-    loadFailed: "????????",
-    nodes: "??",
-    links: "??",
-    bookmarks: "??",
-    starsAndDocs: "?????",
-    linkMap: "????",
-    loadingGraph: "??????...",
-    noKnowledgeItems: "??????",
-    emptyLane: "??????",
+    title: "知识图谱",
+    subtitle: "浏览书签、GitHub 星标与文档之间的 OKF 关联",
+    refresh: "刷新",
+    loadFailed: "知识图谱加载失败",
+    nodes: "节点",
+    links: "链接",
+    bookmarks: "书签",
+    starsAndDocs: "星标与文档",
+    linkMap: "关联图谱",
+    loadingGraph: "正在加载图谱...",
+    noKnowledgeItems: "暂无知识条目",
+    emptyLane: "此栏暂无条目",
     columnTitle: {
-      "Web Knowledge": "????",
-      "Code & Documents": "?????",
+      Connected: "已关联",
+      "Needs AI Description": "待生成描述",
+      "Web Knowledge": "网页知识",
+      "Code & Documents": "代码与文档",
     },
   },
   en: {
@@ -89,6 +91,8 @@ const pageCopy = {
     noKnowledgeItems: "No knowledge items yet.",
     emptyLane: "No items in this lane.",
     columnTitle: {
+      Connected: "Connected",
+      "Needs AI Description": "Needs AI Description",
       "Web Knowledge": "Web Knowledge",
       "Code & Documents": "Code & Documents",
     },
