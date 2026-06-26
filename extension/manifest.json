@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Favorites",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "智能收藏夹管理 - 基于 AI 的收藏夹语义搜索和问答，支持侧边栏模式",
   "author": "Smart Favorites Team",
   "permissions": [
@@ -36,6 +36,19 @@
       "https://*.smart-favorites.cc.cd/*"
     ]
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*",
+        "https://smart-favorites.cc.cd/*",
+        "https://www.smart-favorites.cc.cd/*",
+        "https://*.smart-favorites.cc.cd/*"
+      ],
+      "js": ["content/smart-favorites-bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },

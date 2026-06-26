@@ -25,6 +25,7 @@ const extensionBackground = read("..", "extension", "background", "background.js
 const extensionSidepanel = read("..", "extension", "sidepanel", "sidepanel.js");
 const extensionOptions = read("..", "extension", "options", "options.html");
 const extensionAuthCallback = read("..", "extension", "auth-callback.js");
+const extensionContentScript = read("..", "extension", "content", "smart-favorites-bridge.js");
 const authExtensionPage = read("app", "auth", "extension", "page.tsx");
 const supabaseMiddleware = read("lib", "supabase", "middleware.ts");
 const extensionSources = [
@@ -32,6 +33,7 @@ const extensionSources = [
   extensionSidepanel,
   extensionOptions,
   extensionAuthCallback,
+  extensionContentScript,
 ].join("\n");
 const releaseUrl = "https://github.com/awezio/Smart-Favorites/releases/latest";
 
@@ -87,6 +89,31 @@ assert.match(
   "Extension background should answer web-page ping requests for install detection."
 );
 assert.match(
+  manifest,
+  /"content_scripts"[\s\S]*content\/smart-favorites-bridge\.js/,
+  "Extension should inject a Smart Favorites content bridge so web detection does not depend on a stable unpacked extension ID."
+);
+assert.match(
+  extensionContentScript,
+  /smart-favorites-extension-bridge-request/,
+  "Extension content bridge should listen for web-page bridge requests."
+);
+assert.match(
+  extensionContentScript,
+  /smart-favorites-extension-bridge-response/,
+  "Extension content bridge should respond to the web page without exposing extension internals."
+);
+assert.match(
+  extensionBridge,
+  /sendContentScriptBridgeMessage/,
+  "Web extension bridge should try the content-script channel before falling back to known extension IDs."
+);
+assert.match(
+  extensionBridge,
+  /pingInstalledExtensionViaContentScript/,
+  "Web app should detect installed extensions through the content script even when extension IDs differ per profile."
+);
+assert.match(
   extensionBridge,
   /connectInstalledExtensionSession/,
   "Web app should proactively bridge the current logged-in session into an installed extension."
@@ -125,6 +152,16 @@ assert.match(
   extensionBackground,
   /action === 'triggerSync'/,
   "Extension background should allow the web page to trigger bookmark sync directly."
+);
+assert.match(
+  extensionBackground,
+  /openSidePanelFromContent/,
+  "Extension background should let the injected content bridge open the side panel from the current tab."
+);
+assert.match(
+  extensionBackground,
+  /smartFavoritesExtensionAuth/,
+  "Extension background should accept extension auth tokens from the injected content bridge."
 );
 assert.match(
   extensionBackground,

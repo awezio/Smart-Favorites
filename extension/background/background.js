@@ -119,8 +119,66 @@ async function openExtensionPopupWindow() {
   });
 }
 
+async function openExtensionUiFromWindow(windowId) {
+  if (windowId === undefined) {
+    await openExtensionPopupWindow();
+    return { success: true, opened: 'popup' };
+  }
+
+  try {
+    await chrome.sidePanel.open({ windowId });
+    return { success: true, opened: 'sidePanel' };
+  } catch (error) {
+    await openExtensionPopupWindow();
+    return {
+      success: true,
+      opened: 'popup',
+      warning: error.message,
+    };
+  }
+}
+
+async function persistExtensionAuthFromMessage(request, senderOrigin) {
+  if (!request.token) {
+    return { success: false, error: 'Missing extension auth token' };
+  }
+
+  await chrome.storage.local.set({
+    authToken: request.token,
+    extensionToken: request.token,
+    backendUrl: normalizeApiBaseUrl(request.backendUrl || senderOrigin || API_BASE_URL),
+    autoConnectAttemptedAt: 0
+  });
+  chrome.runtime.sendMessage({ action: 'extensionAuthChanged' }).catch(() => {});
+  return { success: true };
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
+    case 'contentPing':
+      sendResponse({
+        success: true,
+        installed: true,
+        extensionId: chrome.runtime.id,
+        version: chrome.runtime.getManifest().version,
+      });
+      return false;
+
+    case 'openSidePanelFromContent':
+      openExtensionUiFromWindow(sender.tab?.windowId)
+        .then(sendResponse)
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'smartFavoritesExtensionAuth':
+      persistExtensionAuthFromMessage(
+        request,
+        sender.origin || (sender.url ? new URL(sender.url).origin : '')
+      )
+        .then(sendResponse)
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+
     case 'checkConnection':
       checkConnection().then(sendResponse);
       return true;
@@ -178,29 +236,9 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   }
 
   if (action === 'openSidePanel') {
-    const windowId = sender.tab?.windowId;
-    if (windowId === undefined) {
-      openExtensionPopupWindow()
-        .then(() => sendResponse({ success: true, opened: 'popup' }))
-        .catch((error) => sendResponse({ success: false, error: error.message }));
-      return true;
-    }
-
-    chrome.sidePanel
-      .open({ windowId })
-      .then(() => sendResponse({ success: true, opened: 'sidePanel' }))
-      .catch((error) => {
-        openExtensionPopupWindow()
-          .then(() => sendResponse({
-            success: true,
-            opened: 'popup',
-            warning: error.message,
-          }))
-          .catch((fallbackError) => sendResponse({
-            success: false,
-            error: `${error.message}; fallback failed: ${fallbackError.message}`,
-          }));
-      });
+    openExtensionUiFromWindow(sender.tab?.windowId)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
     return true;
   }
 
@@ -216,18 +254,12 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     return false;
   }
 
-  const senderOrigin = sender.origin || (sender.url ? new URL(sender.url).origin : '');
-  chrome.storage.local.set({
-    authToken: request.token,
-    extensionToken: request.token,
-    backendUrl: senderOrigin || API_BASE_URL,
-    autoConnectAttemptedAt: 0
-  }).then(() => {
-    chrome.runtime.sendMessage({ action: 'extensionAuthChanged' }).catch(() => {});
-    sendResponse({ success: true });
-  }).catch((error) => {
-    sendResponse({ success: false, error: error.message });
-  });
+  persistExtensionAuthFromMessage(
+    request,
+    sender.origin || (sender.url ? new URL(sender.url).origin : '')
+  )
+    .then(sendResponse)
+    .catch((error) => sendResponse({ success: false, error: error.message }));
 
   return true;
 });
