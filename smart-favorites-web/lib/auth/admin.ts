@@ -38,7 +38,7 @@ export async function requireAdminUser(request?: NextRequest) {
 export async function requireAdminPage() {
   const allowed = await isAdminRequest();
   if (!allowed) {
-    redirect("/dashboard");
+    redirect("/admin/access-denied");
   }
 }
 

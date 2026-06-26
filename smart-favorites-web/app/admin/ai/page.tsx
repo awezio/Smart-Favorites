@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireAdminUser } from "@/lib/auth/admin";
+import { requireAdminPage } from "@/lib/auth/admin";
 import { PROVIDER_DEFINITIONS } from "@/lib/ai/provider-registry";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadChatQualityMetrics } from "@/lib/admin/chat-quality-metrics";
@@ -44,11 +43,7 @@ async function loadMetrics() {
 }
 
 export default async function AdminAIPage() {
-  try {
-    await requireAdminUser();
-  } catch {
-    redirect("/dashboard");
-  }
+  await requireAdminPage();
   const metrics = await loadMetrics();
   const recentErrors = metrics?.recentErrors || [];
   const chatQuality = metrics?.chatQuality;

@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireAdminUser } from "@/lib/auth/admin";
+import { requireAdminPage } from "@/lib/auth/admin";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ShowcaseManager } from "@/components/admin/showcase-manager";
 import { Button } from "@/components/ui/button";
@@ -8,11 +7,7 @@ import { Button } from "@/components/ui/button";
 export const dynamic = "force-dynamic";
 
 export default async function AdminShowcasePage() {
-  try {
-    await requireAdminUser();
-  } catch {
-    redirect("/dashboard");
-  }
+  await requireAdminPage();
 
   return (
     <main className="page-shell page-stack">
