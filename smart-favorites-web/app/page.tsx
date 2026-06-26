@@ -59,6 +59,14 @@ export default function LandingPage() {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  const navLinks = [
+    { href: "#showcase", label: t.nav.showcase, external: false },
+    { href: "#features", label: t.nav.features, external: false },
+    { href: "#extension", label: t.nav.extension, external: false },
+    { href: "#how-it-works", label: t.nav.howItWorks, external: false },
+    { href: GITHUB_URL, label: t.nav.github, external: true },
+  ] as const;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="site-header">
@@ -67,27 +75,24 @@ export default function LandingPage() {
             <Logo size="sm" />
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex">
-            <a href="#showcase" className="nav-link">
-              {t.nav.showcase}
-            </a>
-            <a href="#features" className="nav-link">
-              {t.nav.features}
-            </a>
-            <a href="#extension" className="nav-link">
-              {t.nav.extension}
-            </a>
-            <a href="#how-it-works" className="nav-link">
-              {t.nav.howItWorks}
-            </a>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="nav-link"
-            >
-              {t.nav.github}
-            </a>
+          <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
+            {navLinks.map((link) =>
+              link.external ? (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="nav-link"
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <a key={link.href} href={link.href} className="nav-link">
+                  {link.label}
+                </a>
+              )
+            )}
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -113,12 +118,39 @@ export default function LandingPage() {
               )}
             </button>
             <Link href="/dashboard">
-              <Button size="sm" variant="creative" className="hidden xs:inline-flex">
+              <Button size="sm" variant="creative" className="inline-flex">
                 {t.nav.dashboard}
               </Button>
             </Link>
           </div>
         </div>
+
+        <nav
+          className="mx-auto flex max-w-5xl gap-4 overflow-x-auto border-t border-border px-4 py-2 md:hidden"
+          aria-label="Primary mobile"
+        >
+          {navLinks.map((link) =>
+            link.external ? (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nav-link shrink-0 whitespace-nowrap"
+              >
+                {link.label}
+              </a>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                className="nav-link shrink-0 whitespace-nowrap"
+              >
+                {link.label}
+              </a>
+            )
+          )}
+        </nav>
       </header>
 
       <section className="border-b border-border">

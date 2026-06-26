@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { SnapshotGrid, SnapshotMarquee, type SnapshotCardData } from "@/components/snapshot-grid";
 import { EditorialSection } from "@/components/layout/editorial-section";
 import { Reveal } from "@/components/motion/reveal";
-import { defaultShowcaseItems } from "@/lib/showcase";
+
 interface ShowcaseSectionProps {
   title: string;
   subtitle: string;
 }
 
 export function ShowcaseSection({ title, subtitle }: ShowcaseSectionProps) {
-  const [items, setItems] = useState<SnapshotCardData[]>(defaultShowcaseItems);
+  const [items, setItems] = useState<SnapshotCardData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,11 +22,16 @@ export function ShowcaseSection({ title, subtitle }: ShowcaseSectionProps) {
         const res = await fetch("/api/showcase");
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && Array.isArray(data.items) && data.items.length > 0) {
-          setItems(data.items);
+        if (!cancelled && Array.isArray(data.items)) {
+          setItems(
+            data.items.filter(
+              (item: SnapshotCardData) =>
+                Boolean(item.snapshotUrl) && Boolean(item.url) && Boolean(item.title)
+            )
+          );
         }
       } catch {
-        // keep defaults
+        // keep empty
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -38,16 +43,18 @@ export function ShowcaseSection({ title, subtitle }: ShowcaseSectionProps) {
     };
   }, []);
 
+  if (loading || items.length === 0) {
+    return null;
+  }
+
   return (
     <EditorialSection id="showcase" title={title} subtitle={subtitle}>
       <Reveal>
         <div className="mb-8 hidden border border-border md:block">
           <SnapshotMarquee items={items} />
         </div>
-
-        <div className={loading ? "opacity-80 transition-opacity" : undefined}>
-          <SnapshotGrid items={items} columns={3} />
-        </div>
+        <SnapshotGrid items={items} columns={3} />
       </Reveal>
-    </EditorialSection>  );
+    </EditorialSection>
+  );
 }

@@ -278,4 +278,30 @@ assert.match(
   "RAG prompt should include structured website description JSON details."
 );
 
+const showcaseRoute = read("app", "api", "showcase", "route.ts");
+const showcaseSnapshotRoute = read("app", "api", "showcase", "snapshot", "route.ts");
+const showcaseLib = read("lib", "showcase.ts");
+const showcaseSection = read("components", "home", "showcase-section.tsx");
+
+assert.match(
+  showcaseRoute,
+  /snapshot_status[\s\S]*ready[\s\S]*snapshot_storage_path[\s\S]*bookmarkToShowcaseItem/,
+  "Showcase API should load ready bookmark snapshots for the landing gallery."
+);
+assert.match(
+  showcaseSnapshotRoute,
+  /snapshot_status[\s\S]*ready[\s\S]*BOOKMARK_SNAPSHOT_BUCKET/,
+  "Public showcase snapshot route should serve stored bookmark screenshots."
+);
+assert.match(
+  showcaseLib,
+  /buildPublicSnapshotUrl[\s\S]*\/api\/showcase\/snapshot/,
+  "Showcase helpers should expose public snapshot image URLs."
+);
+assert.match(
+  showcaseSection,
+  /fetch\("\/api\/showcase"\)[\s\S]*items\.length === 0/,
+  "Landing showcase should render only items with real snapshot URLs."
+);
+
 console.log("AI description contract passed");
