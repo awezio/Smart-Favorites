@@ -55,9 +55,9 @@ export function CreatePostModal({
   open,
   onClose,
   onCreated,
-  post = null,
+  post: editingPost = null,
 }: CreatePostModalProps) {
-  const isEditMode = Boolean(post);
+  const isEditMode = Boolean(editingPost);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [rating, setRating] = useState<number | null>(null);
@@ -87,18 +87,18 @@ export function CreatePostModal({
 
   useEffect(() => {
     if (!open) return;
-    if (post) {
-      setTitle(post.title);
-      setContent(post.content);
-      setRating(post.rating);
-      setTargetUrl(post.target_url || "");
-      setTargetType((post.target_type as TargetType) || "general");
+    if (editingPost) {
+      setTitle(editingPost.title);
+      setContent(editingPost.content);
+      setRating(editingPost.rating);
+      setTargetUrl(editingPost.target_url || "");
+      setTargetType((editingPost.target_type as TargetType) || "general");
       setMediaFiles([]);
       setHoverRating(0);
     } else {
       resetForm();
     }
-  }, [open, post, resetForm]);
+  }, [open, editingPost, resetForm]);
 
   const handleRatingClick = (star: number) => {
     if (rating === star) {
@@ -209,8 +209,8 @@ export function CreatePostModal({
 
     setSubmitting(true);
     try {
-      if (isEditMode && post) {
-        const res = await fetch(`/api/square/${post.id}`, {
+      if (isEditMode && editingPost) {
+        const res = await fetch(`/api/square/${editingPost.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -234,7 +234,7 @@ export function CreatePostModal({
             formData.append("media_type", media.type);
 
             try {
-              await fetch(`/api/square/${post.id}/media`, {
+              await fetch(`/api/square/${editingPost.id}/media`, {
                 method: "POST",
                 body: formData,
               });
