@@ -21,8 +21,8 @@
   },
   "crons": [
     {
-      "path": "/api/cron/process-snapshots?limit=2",
-      "schedule": "*/5 * * * *"
+      "path": "/api/cron/process-snapshots?limit=3",
+      "schedule": "0 3 * * *"
     }
   ]
 }
