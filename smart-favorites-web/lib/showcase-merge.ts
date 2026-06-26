@@ -6,6 +6,13 @@ import { bookmarkMatchesPattern } from "@/lib/showcase-match";
 
 export const BOOKMARK_SNAPSHOT_IMAGE_SENTINEL = "__bookmark_snapshot__";
 
+const SHOWCASE_STATIC_FALLBACKS: Record<string, string> = {
+  "awwwards.com": "/images/showcase/awwwards.svg",
+  "www.awwwards.com": "/images/showcase/awwwards.svg",
+  "httpster.net": "/images/showcase/httpster.svg",
+  "www.httpster.net": "/images/showcase/httpster.svg",
+};
+
 type BookmarkRow = ShowcaseBookmarkRow;
 
 export function mergeShowcaseBookmarks(
@@ -72,9 +79,21 @@ function resolveOverrideSnapshotUrl(
   if (!imageUrl || imageUrl === BOOKMARK_SNAPSHOT_IMAGE_SENTINEL) {
     const bookmarkId = override.bookmark_id || bookmark.id;
     const source = bookmarks.find((row) => row.id === bookmarkId) || bookmark;
-    return buildPublicSnapshotUrl(bookmarkId, source.snapshot_taken_at);
+    if (source.snapshot_status === "ready") {
+      return buildPublicSnapshotUrl(bookmarkId, source.snapshot_taken_at);
+    }
+    return resolveShowcaseStaticFallback(override.url);
   }
   return toPublicShowcaseSnapshotUrl(imageUrl);
+}
+
+function resolveShowcaseStaticFallback(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return SHOWCASE_STATIC_FALLBACKS[hostname] || null;
+  } catch {
+    return null;
+  }
 }
 
 export function normalizeBookmarkUrlMatch(value: string): string {

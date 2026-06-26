@@ -287,7 +287,9 @@ const pageCopy = {
     confirmOverwriteDescriptions: (n: number) =>
       `所选书签中有 ${n} 条已有描述，确定用 AI 重新生成并覆盖吗？`,
     batchGenerating: (n: number) => `正在生成 ${n} 条描述...`,
-    batchDone: (n: number) => `已为 ${n} 个书签生成描述`,
+    batchGeneratingProgress: (current: number, total: number) =>
+      `正在生成描述与快照 (${current}/${total})...`,
+    batchDone: (n: number) => `已为 ${n} 个书签生成描述与快照`,
     batchPartial: (success: number, failed: number) => `完成：${success} 成功，${failed} 失败`,
     confirmDelete: (n: number) => `确定删除 ${n} 个书签？`,
     deleting: "正在删除...",
@@ -393,7 +395,9 @@ const pageCopy = {
     confirmOverwriteDescriptions: (n: number) =>
       `${n} selected bookmark(s) already have descriptions. Regenerate with AI and overwrite them?`,
     batchGenerating: (n: number) => `Generating ${n} description(s)...`,
-    batchDone: (n: number) => `Generated descriptions for ${n} bookmark(s)`,
+    batchGeneratingProgress: (current: number, total: number) =>
+      `Generating description and snapshot (${current}/${total})...`,
+    batchDone: (n: number) => `Generated descriptions and snapshots for ${n} bookmark(s)`,
     batchPartial: (success: number, failed: number) =>
       `Done: ${success} succeeded, ${failed} failed`,
     confirmDelete: (n: number) => `Delete ${n} bookmark(s)?`,
@@ -859,9 +863,37 @@ export default function BookmarksPage() {
     }
   };
 
+  const pollSnapshotStatus = async (
+    bookmarkId: string,
+    options?: { maxAttempts?: number; intervalMs?: number }
+  ): Promise<{ status: string; error?: string }> => {
+    const maxAttempts = options?.maxAttempts ?? 45;
+    const intervalMs = options?.intervalMs ?? 2000;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      const response = await fetch("/api/bookmarks?limit=5000", {
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
+      const data = await response.json().catch(() => ({}));
+      const bookmark = Array.isArray(data.bookmarks)
+        ? data.bookmarks.find((item: Bookmark) => item.id === bookmarkId)
+        : null;
+      if (!bookmark) continue;
+
+      const status = bookmark.snapshot_status || "pending";
+      if (status === "ready" || status === "failed" || status === "unavailable") {
+        return { status, error: bookmark.snapshot_error || undefined };
+      }
+    }
+
+    return { status: "capturing" };
+  };
+
   const captureSnapshot = async (
     bookmark: Bookmark,
-    options?: { quiet?: boolean }
+    options?: { quiet?: boolean; queueOnly?: boolean }
   ): Promise<boolean> => {
     const toastId = `snapshot-${bookmark.id}`;
     if (!options?.quiet) {
@@ -875,6 +907,31 @@ export default function BookmarksPage() {
         body: JSON.stringify({ id: bookmark.id }),
       });
       const data = await response.json().catch(() => ({}));
+
+      if (options?.queueOnly) {
+        return response.ok || response.status === 202 || Boolean(data.queued);
+      }
+
+      if (response.status === 202 || data.queued) {
+        const polled = await pollSnapshotStatus(bookmark.id);
+        if (!options?.quiet) {
+          await loadBookmarks();
+        }
+        if (polled.status === "ready") {
+          if (!options?.quiet) {
+            toast.success(t.snapshotSaved, { id: toastId });
+          }
+          return true;
+        }
+        if (!options?.quiet) {
+          toast.error(
+            polled.error || data.snapshot_error || t.snapshotUnavailable,
+            { id: toastId }
+          );
+        }
+        return false;
+      }
+
       if (!options?.quiet) {
         await loadBookmarks();
       }
@@ -905,6 +962,48 @@ export default function BookmarksPage() {
     }
   };
 
+  const waitForSnapshotBatch = async (bookmarkIds: string[]) => {
+    const pending = new Set(bookmarkIds);
+    const maxAttempts = 60;
+    const intervalMs = 2000;
+
+    for (let attempt = 0; attempt < maxAttempts && pending.size > 0; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      const response = await fetch("/api/bookmarks?limit=5000", {
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
+      const data = await response.json().catch(() => ({}));
+      const bookmarks = Array.isArray(data.bookmarks) ? data.bookmarks : [];
+
+      for (const id of [...pending]) {
+        const bookmark = bookmarks.find((item: Bookmark) => item.id === id);
+        if (!bookmark) continue;
+        const status = bookmark.snapshot_status || "pending";
+        if (status === "ready" || status === "failed" || status === "unavailable") {
+          pending.delete(id);
+        }
+      }
+    }
+
+    const response = await fetch("/api/bookmarks?limit=5000", { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    const bookmarks = Array.isArray(data.bookmarks) ? data.bookmarks : [];
+    let success = 0;
+    let failed = 0;
+
+    for (const id of bookmarkIds) {
+      const bookmark = bookmarks.find((item: Bookmark) => item.id === id);
+      if (bookmark?.snapshot_status === "ready") {
+        success += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    return { success, failed };
+  };
+
   const batchCaptureSnapshots = async () => {
     const selected = filteredBookmarks.filter((bookmark) =>
       selectedIds.has(bookmark.id)
@@ -918,17 +1017,19 @@ export default function BookmarksPage() {
     toast.loading(t.batchSnapshotGenerating(selected.length), {
       id: "batch-snapshot",
     });
-    let success = 0;
-    let failed = 0;
 
+    let queued = 0;
     for (const bookmark of selected) {
-      const ok = await captureSnapshot(bookmark, { quiet: true });
+      const ok = await captureSnapshot(bookmark, { quiet: true, queueOnly: true });
       if (ok) {
-        success += 1;
-      } else {
-        failed += 1;
+        queued += 1;
       }
     }
+
+    const { success, failed } =
+      queued > 0
+        ? await waitForSnapshotBatch(selected.map((bookmark) => bookmark.id))
+        : { success: 0, failed: selected.length };
 
     await loadBookmarks();
     setGeneratingBatchSnapshots(false);
@@ -960,19 +1061,30 @@ export default function BookmarksPage() {
     const targets = selected;
 
     setGeneratingBatch(true);
-    toast.loading(t.batchGenerating(targets.length), { id: "batch-desc" });
     let success = 0;
     let failed = 0;
 
-    for (const bookmark of targets) {
+    for (let index = 0; index < targets.length; index += 1) {
+      const bookmark = targets[index];
+      toast.loading(t.batchGeneratingProgress(index + 1, targets.length), {
+        id: "batch-desc",
+      });
+
       try {
         const response = await fetch("/api/ai/describe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "bookmark", item: bookmark }),
+          body: JSON.stringify({
+            type: "bookmark",
+            item: bookmark,
+            batch: true,
+          }),
         });
-        if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data.success) {
           success += 1;
+          await loadBookmarks();
         } else {
           failed += 1;
         }

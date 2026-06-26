@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import {
-  generateBookmarkDescription,
-  generateStarDescription,
-  structuredDescriptionToRagText,
-} from "@/lib/ai/description-generator";
-import { updateBookmark } from "@/lib/db/bookmarks";
+  describeBookmark,
+  resolveDescribeSnapshotMode,
+} from "@/lib/ai/describe-bookmark";
+import { generateStarDescription } from "@/lib/ai/description-generator";
 import { updateStar } from "@/lib/db/github-stars";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
-import { captureBookmarkSnapshot } from "@/lib/snapshots/bookmark-snapshot";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { runQueuedBookmarkSnapshot } from "@/lib/snapshots/processor";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { type, item, batch = false } = body;
+    const { type, item, batch = false, runSnapshotInline, snapshotMode } = body;
     const supabase = await createServerSupabaseClient();
 
     if (!type || !item) {
@@ -30,45 +30,51 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === "bookmark") {
-      const generated = await generateBookmarkDescription(item.url, item.title, { userId });
-      const snapshot = await captureBookmarkSnapshot({
-        bookmarkId: item.id,
-        userId,
-        url: item.url,
-        title: item.title,
+      const resolvedSnapshotMode = resolveDescribeSnapshotMode({
+        runSnapshotInline,
+        snapshotMode,
+        batch,
       });
 
-      const structuredText = structuredDescriptionToRagText(generated.structured_description);
-      const textToEmbed = `${item.title} ${generated.description_zh} ${generated.description_en} ${structuredText} ${item.url}`;
-      const embedding = await generateEmbedding(textToEmbed, { userId });
-
-      await updateBookmark(
-        item.id,
-        {
-          description: generated.description_zh,
-          description_zh: generated.description_zh,
-          description_en: generated.description_en,
-          description_metadata: generated.description_metadata,
-          snapshot_url: snapshot.snapshot_url,
-          snapshot_storage_path: snapshot.snapshot_storage_path,
-          snapshot_taken_at: snapshot.snapshot_taken_at,
-          snapshot_status: snapshot.snapshot_status,
-          snapshot_error: snapshot.snapshot_error,
-          snapshot_metadata: snapshot.snapshot_metadata,
-          embedding,
-        },
+      const result = await describeBookmark({
         userId,
-        supabase
-      );
+        item,
+        snapshotMode: resolvedSnapshotMode,
+      });
+
+      if (result.asyncSnapshotJob) {
+        const job = result.asyncSnapshotJob;
+        after(async () => {
+          try {
+            await runQueuedBookmarkSnapshot({
+              bookmarkId: job.id,
+              userId: job.userId,
+              url: job.url,
+              title: job.title,
+            });
+          } catch (workerError: unknown) {
+            const message =
+              workerError instanceof Error
+                ? workerError.message
+                : "Snapshot capture failed.";
+            const admin = createAdminClient();
+            await admin
+              .from("bookmarks")
+              .update({
+                snapshot_status: "failed",
+                snapshot_error: message,
+                snapshot_taken_at: new Date().toISOString(),
+              })
+              .eq("id", job.id)
+              .eq("user_id", job.userId);
+          }
+        });
+      }
 
       return NextResponse.json({
         success: true,
-        description: generated.description_zh,
-        structured_description: generated.structured_description,
-        snapshot_url: snapshot.snapshot_url,
-        snapshot_status: snapshot.snapshot_status,
-        snapshot_error: snapshot.snapshot_error,
-        ...generated,
+        snapshot_mode: resolvedSnapshotMode,
+        ...result,
       });
     } else if (type === "star") {
       const generated = await generateStarDescription(item, { userId });
@@ -96,11 +102,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("AI describe error:", error);
-    return NextResponse.json(
-      { error: error.message || "Description generation failed" },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Description generation failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

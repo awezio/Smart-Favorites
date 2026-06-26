@@ -21,6 +21,7 @@
     "test:provider-admin": "node scripts/provider-admin-contract.test.mjs",
     "test:favicon": "node scripts/favicon-contract.test.mjs",
     "test:auth-settings": "node scripts/auth-settings-security.test.mjs",
+    "test:snapshot-worker": "node scripts/snapshot-worker-contract.test.mjs",
     "benchmark:phase5": "node scripts/phase5-benchmark.mjs",
     "start": "next start",
     "lint": "eslint .",

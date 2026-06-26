@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processDocuments } from "@/lib/documents/processor";
 import { enforceCronAuth } from "@/lib/cron/enforce-auth";
+import { processBookmarkSnapshots } from "@/lib/snapshots/processor";
 
-const DEFAULT_BATCH_LIMIT = 5;
+const DEFAULT_BATCH_LIMIT = 3;
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,11 +13,19 @@ export async function GET(request: NextRequest) {
       Number.isFinite(Number(limitParam)) && Number(limitParam) > 0
         ? Number(limitParam)
         : DEFAULT_BATCH_LIMIT;
-    const results = await processDocuments({ limit });
-    return NextResponse.json({ processed: results });
+    const bookmarkId = request.nextUrl.searchParams.get("bookmarkId") || undefined;
+    const userId = request.nextUrl.searchParams.get("userId") || undefined;
+
+    const processed = await processBookmarkSnapshots({
+      limit,
+      bookmarkId,
+      userId,
+    });
+
+    return NextResponse.json({ processed });
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : "Cron processing failed.";
+      error instanceof Error ? error.message : "Snapshot cron processing failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

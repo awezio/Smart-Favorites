@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { preparePageForSnapshot } from "@/lib/snapshots/page-prepare";
 
 export const BOOKMARK_SNAPSHOT_BUCKET = "bookmark_snapshots";
 
@@ -57,11 +58,7 @@ export async function captureBookmarkSnapshot({
         viewport: { width: 1280, height: 720 },
         deviceScaleFactor: 1,
       });
-      await page.goto(normalized.url, {
-        waitUntil: "load",
-        timeout: 30000,
-      });
-      await page.waitForTimeout(600);
+      const prepared = await preparePageForSnapshot(page, normalized.url);
 
       const screenshot = await page.screenshot({
         type: "png",
@@ -82,7 +79,7 @@ export async function captureBookmarkSnapshot({
       if (error) {
         return snapshotFailure("failed", error.message, {
           original_url: url,
-          fetched_url: page.url(),
+          fetched_url: prepared.fetchedUrl,
           runtime: runtime.runtimeLabel,
         });
       }
@@ -96,11 +93,12 @@ export async function captureBookmarkSnapshot({
         snapshot_error: null,
         snapshot_metadata: {
           original_url: url,
-          fetched_url: page.url(),
+          fetched_url: prepared.fetchedUrl,
           title,
           viewport: { width: 1280, height: 720 },
           generated_at: takenAt,
           runtime: runtime.runtimeLabel,
+          redaction: prepared.redaction,
         },
       };
     } catch (error: unknown) {

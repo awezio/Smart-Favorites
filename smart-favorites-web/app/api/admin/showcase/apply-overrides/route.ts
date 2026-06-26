@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { listHomepageShowcaseItems } from "@/lib/admin/homepage-showcase";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminUser, adminErrorResponse } from "@/lib/auth/admin";
 import { updateBookmark } from "@/lib/db/bookmarks";
-import { captureBookmarkSnapshot } from "@/lib/snapshots/bookmark-snapshot";
+import {
+  enqueueBookmarkSnapshot,
+  runQueuedBookmarkSnapshot,
+} from "@/lib/snapshots/processor";
 import { BOOKMARK_SNAPSHOT_IMAGE_SENTINEL } from "@/lib/showcase-merge";
 import { bookmarkMatchesPattern } from "@/lib/showcase-match";
 
@@ -59,6 +62,12 @@ export async function POST(request: NextRequest) {
     }
 
     const applied: ApplyResult[] = [];
+    const snapshotJobs: Array<{
+      bookmarkId: string;
+      userId: string;
+      url: string;
+      title: string;
+    }> = [];
 
     for (const override of overrides) {
       const bookmark = findBookmarkByOverride(bookmarks || [], override);
@@ -98,29 +107,56 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const snapshot = await captureBookmarkSnapshot({
+      await enqueueBookmarkSnapshot(bookmark.id, bookmark.user_id, {
+        source: "showcase-override",
+        override_id: override.id,
+      });
+
+      snapshotJobs.push({
         bookmarkId: bookmark.id,
         userId: bookmark.user_id,
         url: override.url,
         title: override.title,
       });
 
-      await updateBookmark(bookmark.id, snapshot, bookmark.user_id, supabase);
-
       applied.push({
         overrideId: override.id,
         bookmarkId: bookmark.id,
         title: override.title,
         url: override.url,
-        snapshot_status: snapshot.snapshot_status,
-        error: snapshot.snapshot_error || undefined,
+        snapshot_status: "capturing",
+      });
+    }
+
+    if (snapshotJobs.length > 0) {
+      after(async () => {
+        for (const job of snapshotJobs) {
+          try {
+            await runQueuedBookmarkSnapshot(job);
+          } catch (workerError: unknown) {
+            const message =
+              workerError instanceof Error
+                ? workerError.message
+                : "Snapshot capture failed.";
+            await supabase
+              .from("bookmarks")
+              .update({
+                snapshot_status: "failed",
+                snapshot_error: message,
+                snapshot_taken_at: new Date().toISOString(),
+              })
+              .eq("id", job.bookmarkId)
+              .eq("user_id", job.userId);
+          }
+        }
       });
     }
 
     return NextResponse.json({
       applied,
+      queued: snapshotJobs.length,
       message:
-        "Updated matching bookmarks and refreshed snapshots. Homepage cards keep the dither filter automatically.",
+        "Updated matching bookmarks. Live snapshot overrides were queued; static showcase images stay on bundled SVGs.",
     });
   } catch (error) {
     return adminErrorResponse(error);
@@ -131,6 +167,6 @@ export async function GET() {
   return NextResponse.json({
     sentinel: BOOKMARK_SNAPSHOT_IMAGE_SENTINEL,
     description:
-      "POST to update bookmark URLs for configured overrides and regenerate PNG snapshots.",
+      "POST to update bookmark URLs for configured overrides and queue PNG snapshots for live overrides.",
   });
 }

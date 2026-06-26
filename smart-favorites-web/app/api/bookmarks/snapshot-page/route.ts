@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getAuthUser, isExtensionAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { updateBookmark } from "@/lib/db/bookmarks";
 import {
-  BOOKMARK_SNAPSHOT_BUCKET,
-  captureBookmarkSnapshot,
-} from "@/lib/snapshots/bookmark-snapshot";
+  enqueueBookmarkSnapshot,
+  runQueuedBookmarkSnapshot,
+} from "@/lib/snapshots/processor";
+import { BOOKMARK_SNAPSHOT_BUCKET } from "@/lib/snapshots/bookmark-snapshot";
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +38,10 @@ export async function GET(request: NextRequest) {
       .download(bookmark.snapshot_storage_path);
 
     if (downloadError || !data) {
-      return NextResponse.json({ error: downloadError?.message || "Snapshot not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: downloadError?.message || "Snapshot not found" },
+        { status: 404 }
+      );
     }
 
     return new NextResponse(data, {
@@ -47,8 +50,10 @@ export async function GET(request: NextRequest) {
         "Cache-Control": "private, max-age=300",
       },
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Snapshot download failed" }, { status: 500 });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Snapshot download failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -79,34 +84,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
     }
 
-    await updateBookmark(
-      id,
-      {
-        snapshot_status: "capturing",
-        snapshot_error: null,
-      },
-      userId,
-      supabase
-    );
-
-    const snapshot = await captureBookmarkSnapshot({
-      bookmarkId: bookmark.id,
-      userId,
-      url: bookmark.url,
-      title: bookmark.title,
+    const queued = await enqueueBookmarkSnapshot(bookmark.id, userId, {
+      source: "snapshot-page",
     });
 
-    const updated = await updateBookmark(id, snapshot, userId, supabase);
-
-    return NextResponse.json({
-      success: snapshot.snapshot_status === "ready",
-      bookmark: updated,
-      ...snapshot,
+    after(async () => {
+      try {
+        await runQueuedBookmarkSnapshot({
+          bookmarkId: bookmark.id,
+          userId,
+          url: bookmark.url,
+          title: bookmark.title,
+        });
+      } catch (workerError: unknown) {
+        const message =
+          workerError instanceof Error
+            ? workerError.message
+            : "Snapshot capture failed.";
+        const admin = createAdminClient();
+        await admin
+          .from("bookmarks")
+          .update({
+            snapshot_status: "failed",
+            snapshot_error: message,
+            snapshot_taken_at: new Date().toISOString(),
+          })
+          .eq("id", bookmark.id)
+          .eq("user_id", userId);
+      }
     });
-  } catch (error: any) {
+
     return NextResponse.json(
-      { error: error.message || "Snapshot capture failed" },
-      { status: 500 }
+      {
+        queued: true,
+        success: false,
+        bookmark: queued,
+        snapshot_status: queued.snapshot_status,
+        snapshot_error: queued.snapshot_error,
+      },
+      { status: 202 }
     );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Snapshot capture failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
