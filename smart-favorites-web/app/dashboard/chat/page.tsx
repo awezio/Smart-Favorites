@@ -233,11 +233,9 @@ export default function ChatPage() {
   const toggleSessionSidebar = useCallback(() => {
     setSidebarCollapsed((collapsed) => {
       const next = !collapsed;
-      if (next) {
-        sessionPanelRef.current?.collapse();
-      } else {
-        sessionPanelRef.current?.expand();
-      }
+      sessionPanelRef.current?.resize(
+        next ? CHAT_PANEL_DEFAULTS.session.collapsedSize : CHAT_PANEL_DEFAULTS.session.defaultSize
+      );
       return next;
     });
   }, [sessionPanelRef]);
@@ -245,14 +243,18 @@ export default function ChatPage() {
   const toggleSourcesPanel = useCallback(() => {
     setSourcesPanelCollapsed((collapsed) => {
       const next = !collapsed;
-      if (next) {
-        sourcesPanelRef.current?.collapse();
-      } else {
-        sourcesPanelRef.current?.expand();
-      }
+      sourcesPanelRef.current?.resize(
+        next ? CHAT_PANEL_DEFAULTS.sources.collapsedSize : CHAT_PANEL_DEFAULTS.sources.defaultSize
+      );
       return next;
     });
   }, [sourcesPanelRef]);
+
+  const sanitizeChatPanelLayout = useCallback(
+    (layout: Record<string, number>) =>
+      normalizeChatPanelLayout(layout, chatPanelFallbackLayout),
+    [chatPanelFallbackLayout]
+  );
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -521,28 +523,6 @@ export default function ChatPage() {
       sessionSidebarInitializedRef.current = true;
     }
   }, [isLargeScreen]);
-
-  useEffect(() => {
-    if (!isLargeScreen) {
-      return;
-    }
-
-    const frame = requestAnimationFrame(() => {
-      if (sidebarCollapsed) {
-        sessionPanelRef.current?.collapse();
-      } else {
-        sessionPanelRef.current?.expand();
-      }
-
-      if (sourcesPanelCollapsed) {
-        sourcesPanelRef.current?.collapse();
-      } else {
-        sourcesPanelRef.current?.expand();
-      }
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [isLargeScreen, sidebarCollapsed, sourcesPanelCollapsed, sessionPanelRef, sourcesPanelRef]);
 
   useEffect(() => {
     if (hasInitializedRef.current) {
@@ -961,7 +941,7 @@ export default function ChatPage() {
           autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
           panelIds={["chat-session", "chat-main", "chat-sources"]}
           fallbackLayout={chatPanelFallbackLayout}
-          sanitizeLayout={(layout) => normalizeChatPanelLayout(layout, chatPanelFallbackLayout)}
+          sanitizeLayout={sanitizeChatPanelLayout}
           className="min-h-0 min-w-0 flex-1"
         >
           <ResizablePanel
@@ -970,13 +950,7 @@ export default function ChatPage() {
             defaultSize={CHAT_PANEL_DEFAULTS.session.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.session.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.session.maxSize}
-            collapsedSize={CHAT_PANEL_DEFAULTS.session.collapsedSize}
-            collapsible
             className="min-w-0"
-            onResize={() => {
-              const collapsed = sessionPanelRef.current?.isCollapsed() ?? false;
-              setSidebarCollapsed((current) => (current === collapsed ? current : collapsed));
-            }}
           >
             {sessionSidebar}
           </ResizablePanel>
@@ -984,7 +958,6 @@ export default function ChatPage() {
           <ResizablePanel
             id="chat-main"
             defaultSize={CHAT_PANEL_DEFAULTS.chat.defaultSize}
-            minSize={CHAT_PANEL_DEFAULTS.chat.minSize}
             className="min-w-0"
           >
             {chatMain}
@@ -996,13 +969,7 @@ export default function ChatPage() {
             defaultSize={CHAT_PANEL_DEFAULTS.sources.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.sources.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.sources.maxSize}
-            collapsedSize={CHAT_PANEL_DEFAULTS.sources.collapsedSize}
-            collapsible
             className="min-w-0"
-            onResize={() => {
-              const collapsed = sourcesPanelRef.current?.isCollapsed() ?? false;
-              setSourcesPanelCollapsed((current) => (current === collapsed ? current : collapsed));
-            }}
           >
             {sourcesPanel}
           </ResizablePanel>
