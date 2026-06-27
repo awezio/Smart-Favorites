@@ -15,7 +15,7 @@ type StarUpdate = Partial<Omit<GitHubStar, "id" | "user_id" | "created_at">> & {
 };
 
 const SYNC_STAR_COLUMNS =
-  "id, user_id, url, owner, repo, description, description_zh, description_en, description_metadata, language, stars, forks, updated";
+  "id, user_id, url, owner, repo, description, description_zh, description_en, description_metadata, topics, tags, readme_summary, readme_summary_zh, index_status, starred_at, language, stars, forks, updated";
 const DB_BATCH_SIZE = 200;
 const POSTGREST_PAGE_SIZE = 1000;
 
@@ -168,6 +168,35 @@ export async function deleteStar(
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function getStarsByIds(
+  ids: string[],
+  userId: string,
+  client?: SupabaseQueryClient
+): Promise<GitHubStar[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const supabase = client || createAdminClient();
+  const results: GitHubStar[] = [];
+
+  await runInBatches(ids, DB_BATCH_SIZE, async (batch) => {
+    const { data, error } = await supabase
+      .from("github_stars")
+      .select("*")
+      .eq("user_id", userId)
+      .in("id", batch);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    results.push(...((data || []) as GitHubStar[]));
+  });
+
+  return results;
 }
 
 export async function bulkInsertStars(

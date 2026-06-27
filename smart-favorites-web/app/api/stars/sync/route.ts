@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { backfillStarEmbeddings } from "@/lib/jobs/backfill-star-embeddings";
 import {
   diffStars,
   fetchAuthenticatedUserStars,
@@ -78,6 +79,9 @@ export async function POST(request: NextRequest) {
       stars: star.stars || 0,
       forks: star.forks || 0,
       updated: star.updated,
+      topics: star.topics || [],
+      starred_at: star.starred_at || null,
+      index_status: "pending",
       updated_at: new Date().toISOString(),
     }));
 
@@ -97,6 +101,9 @@ export async function POST(request: NextRequest) {
         stars: newStar.stars,
         forks: newStar.forks,
         updated: newStar.updated,
+        topics: newStar.topics || [],
+        starred_at: newStar.starred_at || oldStar.starred_at || null,
+        index_status: oldStar.index_status === "indexed" ? oldStar.index_status : "pending",
         updated_at: new Date().toISOString(),
       }));
       await bulkUpsertStars(modifiedStars as any, supabase);
@@ -108,6 +115,24 @@ export async function POST(request: NextRequest) {
         userId,
         supabase
       );
+    }
+
+    const urlsToBackfill = [
+      ...diff.added.map((star) => star.url),
+      ...diff.modified.map(({ new: star }) => star.url),
+    ];
+
+    if (urlsToBackfill.length > 0 || diff.unchanged_count > 0) {
+      after(async () => {
+        try {
+          if (urlsToBackfill.length > 0) {
+            await backfillStarEmbeddings(userId, urlsToBackfill);
+          }
+          await backfillStarEmbeddings(userId);
+        } catch (error) {
+          console.error("Stars embedding backfill error:", error);
+        }
+      });
     }
 
     return NextResponse.json({

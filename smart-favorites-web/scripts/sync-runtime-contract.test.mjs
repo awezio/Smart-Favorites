@@ -12,7 +12,6 @@ const starsPage = read("app", "dashboard", "stars", "page.tsx");
 
 for (const [name, source] of [
   ["bookmark sync", bookmarksSyncRoute],
-  ["GitHub Stars sync", starsSyncRoute],
 ]) {
   assert.doesNotMatch(
     source,
@@ -25,6 +24,22 @@ for (const [name, source] of [
     `${name} should leave embedding backfill out of the sync response path.`
   );
 }
+
+assert.match(
+  starsSyncRoute,
+  /\bafter\s*\(/,
+  "GitHub Stars sync should queue embedding backfill with after()."
+);
+assert.match(
+  starsSyncRoute,
+  /backfillStarEmbeddings/,
+  "GitHub Stars sync should delegate embedding backfill to a job module."
+);
+assert.doesNotMatch(
+  starsSyncRoute,
+  /generateEmbedding/,
+  "GitHub Stars sync route must not inline embedding generation."
+);
 
 assert.match(
   starsPage,

@@ -12,3 +12,68 @@ export function isPlaceholderSessionTitle(title: string): boolean {
   if (/^(对话|Conversation)\s/.test(trimmed)) return true;
   return false;
 }
+
+function normalizeTitleCompare(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function stripEllipsis(value: string): string {
+  return value.replace(/…$/u, "").trim();
+}
+
+export function isFallbackSessionTitle(
+  title: string,
+  firstUserContent: string | undefined
+): boolean {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle || !firstUserContent) {
+    return false;
+  }
+
+  const userText = firstUserContent.replace(/\n+/g, " ").trim();
+  if (!userText) {
+    return false;
+  }
+
+  const normalizedTitle = normalizeTitleCompare(stripEllipsis(trimmedTitle));
+  const normalizedUser = normalizeTitleCompare(userText);
+
+  if (normalizedTitle === normalizedUser) {
+    return true;
+  }
+
+  if (
+    normalizedUser.startsWith(normalizedTitle) ||
+    normalizedTitle.startsWith(normalizedUser.slice(0, Math.min(normalizedUser.length, 24)))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function shouldRegenerateSessionTitle(
+  title: string,
+  titleStatus: string | null | undefined,
+  metadata: unknown,
+  firstUserContent: string | undefined
+): boolean {
+  if (isPlaceholderSessionTitle(title)) {
+    return true;
+  }
+
+  const meta =
+    metadata && typeof metadata === "object" && !Array.isArray(metadata)
+      ? (metadata as Record<string, unknown>)
+      : null;
+
+  if (meta?.title_source === "fallback" || meta?.needs_retry === true) {
+    return true;
+  }
+
+  if (titleStatus === "failed") {
+    return true;
+  }
+
+  return isFallbackSessionTitle(title, firstUserContent);
+}

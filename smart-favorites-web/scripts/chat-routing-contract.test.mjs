@@ -47,8 +47,8 @@ assert.match(
 );
 assert.match(
   ragEngine,
-  /if\s*\(route\.useKnowledge\)[\s\S]*searchAll/,
-  "RAG engine should only call searchAll when the route requires knowledge search."
+  /if\s*\(route\.useKnowledge\)[\s\S]*searchByScope|searchStars/,
+  "RAG engine should scope knowledge search when the route targets a specific library."
 );
 assert.match(
   ragEngine,

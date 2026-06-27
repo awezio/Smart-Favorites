@@ -302,13 +302,16 @@ async function searchStarsByDirectMatch(
       `description_zh.ilike.%${escapeIlikeTerm(term)}%`,
       `description_en.ilike.%${escapeIlikeTerm(term)}%`,
       `language.ilike.%${escapeIlikeTerm(term)}%`,
+      `readme_summary.ilike.%${escapeIlikeTerm(term)}%`,
+      `readme_summary_zh.ilike.%${escapeIlikeTerm(term)}%`,
+      `tags.cs.{${escapePostgrestArrayTerm(term)}}`,
     ])
     .join(",");
 
   let request = supabase
     .from("github_stars")
     .select(
-      "id,user_id,owner,repo,url,description,description_zh,description_en,description_metadata,language,stars,forks,updated,created_at,updated_at"
+      "id,user_id,owner,repo,url,description,description_zh,description_en,description_metadata,topics,tags,readme_summary,readme_summary_zh,language,stars,forks,updated,created_at,updated_at"
     )
     .or(orFilter)
     .limit(Math.max(topK * 3, 24));
@@ -334,6 +337,10 @@ async function searchStarsByDirectMatch(
           row.description_zh,
           row.description_en,
           row.language,
+          row.readme_summary,
+          row.readme_summary_zh,
+          Array.isArray(row.topics) ? row.topics.join(" ") : "",
+          Array.isArray(row.tags) ? row.tags.join(" ") : "",
         ]),
       })
     )
@@ -370,7 +377,7 @@ function flattenSettledResults(
   );
 }
 
-function extractLexicalSearchTerms(query: string): string[] {
+export function extractLexicalSearchTerms(query: string): string[] {
   const normalized = query.trim().toLowerCase();
   const terms = new Set<string>();
 
@@ -381,17 +388,48 @@ function extractLexicalSearchTerms(query: string): string[] {
     }
   }
 
-  for (const term of CHINESE_DOMAIN_TERMS) {
-    if (normalized.includes(term.toLowerCase())) {
-      terms.add(term);
+  for (const match of normalized.matchAll(/[\u4e00-\u9fff]{2,}/g)) {
+    const segment = match[0];
+    if (!CHINESE_STOP_WORDS.has(segment)) {
+      terms.add(segment);
+    }
+    if (segment.length > 2) {
+      for (let index = 0; index < segment.length - 1; index += 1) {
+        const bigram = segment.slice(index, index + 2);
+        if (!CHINESE_STOP_WORDS.has(bigram)) {
+          terms.add(bigram);
+        }
+      }
     }
   }
 
-  if (normalized.includes("3d") || normalized.includes("3D".toLowerCase())) {
-    terms.add("3d");
+  return expandDomainSynonyms(Array.from(terms)).slice(0, 12);
+}
+
+function expandDomainSynonyms(terms: string[]): string[] {
+  const expanded = new Set<string>();
+
+  for (const term of terms) {
+    expanded.add(term);
+
+    for (const [keyword, aliases] of Object.entries(DOMAIN_SYNONYMS)) {
+      const keywordLower = keyword.toLowerCase();
+      const termLower = term.toLowerCase();
+      const matches =
+        termLower.includes(keywordLower) ||
+        keywordLower.includes(termLower) ||
+        aliases.some((alias) => termLower.includes(alias) || alias.includes(termLower));
+
+      if (matches) {
+        expanded.add(keywordLower);
+        for (const alias of aliases) {
+          expanded.add(alias.toLowerCase());
+        }
+      }
+    }
   }
 
-  return Array.from(terms).slice(0, 8);
+  return Array.from(expanded).filter((term) => term.length >= 2);
 }
 
 function escapeIlikeTerm(term: string): string {
@@ -438,20 +476,41 @@ const ENGLISH_STOP_WORDS = new Set([
   "related",
 ]);
 
-const CHINESE_DOMAIN_TERMS = [
-  "3D",
-  "3d",
-  "建模",
-  "模型",
-  "渲染",
-  "纹理",
-  "材质",
-  "贴图",
-  "动画",
-  "点云",
-  "生成器",
-  "设计",
-];
+const CHINESE_STOP_WORDS = new Set([
+  "帮我",
+  "寻找",
+  "搜索",
+  "查找",
+  "查询",
+  "检索",
+  "一下",
+  "里面",
+  "热门",
+  "项目",
+  "相关",
+  "最好",
+  "能否",
+  "可以",
+  "什么",
+  "哪些",
+  "怎么",
+  "如何",
+  "我的",
+  "从我",
+  "知识库",
+]);
+
+const DOMAIN_SYNONYMS: Record<string, string[]> = {
+  爬虫: ["crawler", "crawl", "scraper", "scrape", "spider", "scraping", "firecrawl", "crawlee"],
+  无头: ["headless", "headless-browser", "headlessbrowser"],
+  无头浏览器: ["headless", "headless-browser", "chromedriver", "playwright", "puppeteer"],
+  浏览器: ["browser", "chromedriver", "playwright", "puppeteer", "selenium"],
+  代理: ["proxy", "proxies", "proxy-list", "proxylist"],
+  反爬: ["anti-bot", "antibot", "stealth", "undetected"],
+  自动化: ["automation", "automate", "bot"],
+  "3d": ["3d", "建模", "模型", "渲染"],
+  建模: ["3d", "modeling", "blender", "maya"],
+};
 
 function reciprocalRankFusion(lists: SearchResult[][], topK: number, k = 60): SearchResult[] {
   const scores = new Map<string, { score: number; result: SearchResult }>();
@@ -528,6 +587,10 @@ function toStarResult(row: any): SearchResult {
       description_zh: row.description_zh,
       description_en: row.description_en,
       description_metadata: row.description_metadata,
+      topics: Array.isArray(row.topics) ? row.topics : [],
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      readme_summary: row.readme_summary,
+      readme_summary_zh: row.readme_summary_zh,
       language: row.language,
       stars: row.stars,
       forks: row.forks,

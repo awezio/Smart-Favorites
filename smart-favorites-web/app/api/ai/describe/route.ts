@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import {
-  describeBookmark,
-  resolveDescribeSnapshotMode,
-} from "@/lib/ai/describe-bookmark";
-import { generateStarDescription } from "@/lib/ai/description-generator";
-import { updateStar } from "@/lib/db/github-stars";
-import { generateEmbedding } from "@/lib/rag/embedding";
+import { describeBookmark, resolveDescribeSnapshotMode } from "@/lib/ai/describe-bookmark";
+import { enrichStarRecord } from "@/lib/stars/enrich-star";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -77,27 +72,19 @@ export async function POST(request: NextRequest) {
         ...result,
       });
     } else if (type === "star") {
-      const generated = await generateStarDescription(item, { userId });
-      const textToEmbed = `${item.owner}/${item.repo} ${generated.description_zh} ${generated.description_en} ${item.language || ""}`;
-      const embedding = await generateEmbedding(textToEmbed, { userId });
-
-      await updateStar(
-        item.id,
-        {
-          description: generated.description_zh,
-          description_zh: generated.description_zh,
-          description_en: generated.description_en,
-          description_metadata: generated.description_metadata,
-          embedding,
-        },
-        userId,
-        supabase
-      );
+      const result = await enrichStarRecord(item, userId, supabase);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error || "Star description generation failed" },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({
         success: true,
-        description: generated.description_zh,
-        ...generated,
+        starId: result.starId,
+        owner: result.owner,
+        repo: result.repo,
       });
     }
 

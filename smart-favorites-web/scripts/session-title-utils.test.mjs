@@ -39,5 +39,15 @@ assert.match(
   /maybeGenerateSessionTitle\(hydratedSession\.id/,
   "Opening a saved session should retry title generation when the title is still a placeholder."
 );
+assert.match(
+  utils,
+  /shouldRegenerateSessionTitle/,
+  "Session title utils should expose retry detection for fallback titles."
+);
+assert.match(
+  generateTitleRoute,
+  /needs_retry/,
+  "Generate-title API should mark fallback titles for retry."
+);
 
 console.log("session-title-utils.test.mjs passed");

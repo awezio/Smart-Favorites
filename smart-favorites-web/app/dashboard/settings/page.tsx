@@ -106,6 +106,18 @@ const pageCopy = {
     aiDescriptionPromptHelp: "留空时使用内置结构化 JSON 模板。",
     aiDescriptionPromptPlaceholder:
       "自定义 AI 生成描述时使用的 system prompt，需要求模型返回 purpose/content/audience JSON。",
+    agentMemoryTitle: "Agent 记忆",
+    agentMemoryDescription:
+      "有界精选记忆会注入 Agent 系统提示词；历史会话搜索不占记忆配额。",
+    userProfileMemoryLabel: "用户偏好 (USER.md)",
+    agentMemoryLabel: "Agent 记忆 (MEMORY.md)",
+    pendingMemoryLabel: "待审批记忆",
+    writeApprovalLabel: "写入前需要审批",
+    saveAgentMemory: "保存 Agent 记忆",
+    agentMemorySaved: "Agent 记忆已保存",
+    approve: "批准",
+    reject: "拒绝",
+    memoryUsage: "已用 {used}/{limit} 字符",
   },
   en: {
     saveFailed: "Save failed",
@@ -178,6 +190,18 @@ const pageCopy = {
     aiDescriptionPromptHelp: "Leave blank to use the built-in structured JSON template.",
     aiDescriptionPromptPlaceholder:
       "Custom system prompt for AI descriptions. It should ask the model to return purpose/content/audience JSON.",
+    agentMemoryTitle: "Agent memory",
+    agentMemoryDescription:
+      "Bounded always-on memory is injected into the Agent system prompt. Session search does not consume memory quota.",
+    userProfileMemoryLabel: "User preferences (USER.md)",
+    agentMemoryLabel: "Agent memory (MEMORY.md)",
+    pendingMemoryLabel: "Pending memory",
+    writeApprovalLabel: "Require approval before writing memory",
+    saveAgentMemory: "Save agent memory",
+    agentMemorySaved: "Agent memory saved",
+    approve: "Approve",
+    reject: "Reject",
+    memoryUsage: "{used}/{limit} chars used",
   },
 } as const;
 
@@ -216,6 +240,13 @@ export default function SettingsPage() {
   const [aiDescriptionPrompt, setAiDescriptionPrompt] = useState("");
   const [embeddingPreference, setEmbeddingPreference] = useState<"local" | "openai">("local");
   const [embeddingModel, setEmbeddingModel] = useState("Xenova/all-MiniLM-L6-v2");
+  const [memoryEntriesText, setMemoryEntriesText] = useState("");
+  const [profileEntriesText, setProfileEntriesText] = useState("");
+  const [pendingEntries, setPendingEntries] = useState<string[]>([]);
+  const [writeApprovalRequired, setWriteApprovalRequired] = useState(false);
+  const [memoryCharLimit, setMemoryCharLimit] = useState(4000);
+  const [profileCharLimit, setProfileCharLimit] = useState(2000);
+  const [memorySaving, setMemorySaving] = useState(false);
 
   const [extensionTokenPreview, setExtensionTokenPreview] = useState<string | null>(null);
   const [extensionTokenGenerated, setExtensionTokenGenerated] = useState<string | null>(null);
@@ -248,6 +279,22 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const loadAgentMemory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agent/memory");
+      if (!res.ok) return;
+      const data = await res.json();
+      setMemoryEntriesText((data.memory_entries || []).join("\n"));
+      setProfileEntriesText((data.user_profile_entries || []).join("\n"));
+      setPendingEntries(Array.isArray(data.pending_entries) ? data.pending_entries : []);
+      setWriteApprovalRequired(Boolean(data.write_approval_required));
+      setMemoryCharLimit(data.memory_char_limit || 4000);
+      setProfileCharLimit(data.profile_char_limit || 2000);
+    } catch (error) {
+      console.error("Failed to load agent memory:", error);
+    }
+  }, []);
+
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
@@ -271,13 +318,14 @@ export default function SettingsPage() {
         setEmbeddingPreference(data.embeddingPreference === "openai" ? "openai" : "local");
         setEmbeddingModel(data.embeddingModel || "Xenova/all-MiniLM-L6-v2");
         await loadExtensionTokenStatus();
+        await loadAgentMemory();
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
     } finally {
       setLoading(false);
     }
-  }, [loadExtensionTokenStatus]);
+  }, [loadExtensionTokenStatus, loadAgentMemory]);
 
   useEffect(() => {
     loadSettings();
@@ -286,6 +334,61 @@ export default function SettingsPage() {
         DEFAULT_OLLAMA_BASE_URL
     );
   }, [loadSettings]);
+
+  const handleSaveAgentMemory = async () => {
+    setMemorySaving(true);
+    try {
+      const res = await fetch("/api/agent/memory", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memory_entries: memoryEntriesText
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean),
+          user_profile_entries: profileEntriesText
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean),
+          write_approval_required: writeApprovalRequired,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || t.saveFailed);
+      }
+      toast.success(t.agentMemorySaved);
+      await loadAgentMemory();
+    } catch (error: any) {
+      toast.error(error.message || t.saveFailed);
+    } finally {
+      setMemorySaving(false);
+    }
+  };
+
+  const handlePendingDecision = async (entry: string, decision: "approve" | "reject") => {
+    setMemorySaving(true);
+    try {
+      const res = await fetch("/api/agent/memory", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          decision === "approve"
+            ? { approve_pending: [entry] }
+            : { reject_pending: [entry] }
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || t.saveFailed);
+      }
+      await loadAgentMemory();
+    } catch (error: any) {
+      toast.error(error.message || t.saveFailed);
+    } finally {
+      setMemorySaving(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -802,6 +905,92 @@ export default function SettingsPage() {
               className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
+        </div>
+      </SectionPanel>
+
+      <SectionPanel title={t.agentMemoryTitle} description={t.agentMemoryDescription}>
+        <div className="space-y-4">
+          <label className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+            <span>{t.writeApprovalLabel}</span>
+            <input
+              type="checkbox"
+              checked={writeApprovalRequired}
+              onChange={(event) => setWriteApprovalRequired(event.target.checked)}
+            />
+          </label>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="profile-memory">{t.userProfileMemoryLabel}</Label>
+              <span className="text-xs text-muted-foreground">
+                {t.memoryUsage
+                  .replace("{used}", String(profileEntriesText.replace(/\n/g, "").length))
+                  .replace("{limit}", String(profileCharLimit))}
+              </span>
+            </div>
+            <textarea
+              id="profile-memory"
+              value={profileEntriesText}
+              onChange={(event) => setProfileEntriesText(event.target.value)}
+              placeholder="firecrawl 是我首选爬虫"
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="agent-memory">{t.agentMemoryLabel}</Label>
+              <span className="text-xs text-muted-foreground">
+                {t.memoryUsage
+                  .replace("{used}", String(memoryEntriesText.replace(/\n/g, "").length))
+                  .replace("{limit}", String(memoryCharLimit))}
+              </span>
+            </div>
+            <textarea
+              id="agent-memory"
+              value={memoryEntriesText}
+              onChange={(event) => setMemoryEntriesText(event.target.value)}
+              placeholder="用户偏好 headless browser 工具"
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+
+          {pendingEntries.length > 0 && (
+            <div className="space-y-2 rounded-md border p-3">
+              <p className="text-sm font-medium">{t.pendingMemoryLabel}</p>
+              {pendingEntries.map((entry) => (
+                <div
+                  key={entry}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border bg-muted/30 px-3 py-2 text-sm"
+                >
+                  <span className="flex-1">{entry}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={memorySaving}
+                      onClick={() => handlePendingDecision(entry, "approve")}
+                    >
+                      {t.approve}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={memorySaving}
+                      onClick={() => handlePendingDecision(entry, "reject")}
+                    >
+                      {t.reject}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Button variant="outline" onClick={handleSaveAgentMemory} disabled={memorySaving}>
+            {memorySaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {t.saveAgentMemory}
+          </Button>
         </div>
       </SectionPanel>
     </div>

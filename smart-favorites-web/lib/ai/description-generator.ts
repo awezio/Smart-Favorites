@@ -31,6 +31,9 @@ export type StructuredWebsiteDescription = {
 export type GeneratedDescription = {
   description_zh: string;
   description_en: string;
+  readme_summary_zh?: string;
+  readme_summary_en?: string;
+  tags?: string[];
   structured_description?: StructuredWebsiteDescription;
   description_metadata: {
     reachable: boolean;
@@ -47,6 +50,7 @@ export type GeneratedDescription = {
     structured_description?: StructuredWebsiteDescription;
     fallback?: boolean;
     error?: string;
+    tags?: string[];
   };
 };
 
@@ -130,6 +134,9 @@ export async function generateStarDescription(
     language?: string;
     stars?: number;
     forks?: number;
+    topics?: string[];
+    readmeSummary?: string;
+    readmeReachable?: boolean;
   },
   options: { userId?: string } = {}
 ): Promise<GeneratedDescription> {
@@ -165,6 +172,9 @@ export async function generateStarDescription(
             stars: item.stars ?? "",
             forks: item.forks ?? "",
             existingDescription: item.description || "",
+            topics: item.topics,
+            readmeSummary: item.readmeSummary,
+            readmeReachable: item.readmeReachable,
             reachable: page.reachable,
             pageText: page.text || "",
           }),
@@ -172,14 +182,19 @@ export async function generateStarDescription(
       ],
     });
 
-    const parsed = parseFlatDescriptionJson(response.content);
+    const parsed = parseStarDescriptionJson(response.content);
     return {
       description_zh: parsed.description_zh,
       description_en: parsed.description_en,
+      readme_summary_zh: parsed.readme_summary_zh,
+      readme_summary_en: parsed.readme_summary_en,
+      tags: parsed.tags,
       description_metadata: {
         ...baseMetadata(page),
         provider: selection.provider,
         model: response.model || selection.model,
+        schema_version: "star_description_v2",
+        tags: parsed.tags,
       },
     };
   } catch (error: any) {
@@ -388,6 +403,23 @@ function parseStructuredDescriptionJson(content: string): StructuredWebsiteDescr
   }
 
   return structured;
+}
+
+function parseStarDescriptionJson(content: string) {
+  const parsed = JSON.parse(extractJsonObject(content));
+  const description_zh = cleanText(parsed.description_zh || parsed.zh);
+  const description_en = cleanText(parsed.description_en || parsed.en);
+  if (!description_zh || !description_en) {
+    throw new Error("Model response did not include both description_zh and description_en.");
+  }
+
+  return {
+    description_zh,
+    description_en,
+    readme_summary_zh: cleanText(parsed.readme_summary_zh),
+    readme_summary_en: cleanText(parsed.readme_summary_en),
+    tags: cleanArray(parsed.tags, 8).map((tag) => tag.toLowerCase()),
+  };
 }
 
 function parseFlatDescriptionJson(content: string) {

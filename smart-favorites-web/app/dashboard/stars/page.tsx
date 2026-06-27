@@ -17,6 +17,7 @@ import {
   Code2,
   Layers,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,15 @@ const pageCopy = {
       `同步完成！新增: ${added}, 修改: ${modified}, 删除: ${removed}`,
     syncFailed: (message: string) => `同步失败: ${message}`,
     unknownError: "未知错误",
+    selectFirst: "请先选择要处理的项目",
+    confirmOverwriteDescriptions: (count: number) =>
+      `选中的 ${count} 个项目已有描述，确定重新生成吗？`,
+    batchGenerating: (n: number) => `正在生成 ${n} 条 AI 描述...`,
+    batchGeneratingProgress: (current: number, total: number) =>
+      `正在生成描述 ${current}/${total}...`,
+    batchDone: (n: number) => `已为 ${n} 个 Stars 生成 AI 描述与索引`,
+    batchPartial: (success: number, failed: number) => `完成：${success} 成功，${failed} 失败`,
+    generateDescriptions: "生成 AI 描述",
   },
   en: {
     title: "GitHub Stars",
@@ -140,6 +150,15 @@ const pageCopy = {
       `Sync complete! Added: ${added}, modified: ${modified}, removed: ${removed}`,
     syncFailed: (message: string) => `Sync failed: ${message}`,
     unknownError: "Unknown error",
+    selectFirst: "Select items first",
+    confirmOverwriteDescriptions: (count: number) =>
+      `${count} selected item(s) already have descriptions. Regenerate anyway?`,
+    batchGenerating: (n: number) => `Generating ${n} AI description(s)...`,
+    batchGeneratingProgress: (current: number, total: number) =>
+      `Generating descriptions ${current}/${total}...`,
+    batchDone: (n: number) => `Generated AI descriptions and indexes for ${n} star(s)`,
+    batchPartial: (success: number, failed: number) => `Done: ${success} succeeded, ${failed} failed`,
+    generateDescriptions: "Generate AI descriptions",
   },
 } as const;
 
@@ -257,6 +276,7 @@ export default function StarsPage() {
   const [filter, setFilter] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generatingBatch, setGeneratingBatch] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
   // View
@@ -316,6 +336,63 @@ export default function StarsPage() {
       toast.error(t.syncFailed(error.message), { id: "sync-stars" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const batchGenerateDescriptions = async () => {
+    const selected = filteredStars.filter((star) => selectedIds.has(star.id));
+    if (selected.length === 0) {
+      toast.error(t.selectFirst);
+      return;
+    }
+
+    const existingDescriptionCount = selected.filter(hasStarDescription).length;
+    if (
+      existingDescriptionCount > 0 &&
+      !confirm(t.confirmOverwriteDescriptions(existingDescriptionCount))
+    ) {
+      return;
+    }
+
+    setGeneratingBatch(true);
+    let success = 0;
+    let failed = 0;
+    const chunkSize = 10;
+
+    for (let index = 0; index < selected.length; index += chunkSize) {
+      const chunk = selected.slice(index, index + chunkSize);
+      toast.loading(
+        t.batchGeneratingProgress(Math.min(index + chunk.length, selected.length), selected.length),
+        { id: "batch-star-desc" }
+      );
+
+      try {
+        const response = await fetch("/api/stars/describe-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: chunk.map((star) => star.id) }),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          success += Number(data?.summary?.success || 0);
+          failed += Number(data?.summary?.failed || 0);
+        } else {
+          failed += chunk.length;
+        }
+      } catch {
+        failed += chunk.length;
+      }
+    }
+
+    await loadStars();
+    setGeneratingBatch(false);
+    setSelectedIds(new Set());
+
+    if (failed === 0) {
+      toast.success(t.batchDone(success), { id: "batch-star-desc" });
+    } else {
+      toast.error(t.batchPartial(success, failed), { id: "batch-star-desc" });
     }
   };
 
@@ -589,15 +666,27 @@ export default function StarsPage() {
         ]}
         actions={
           isEditing && selectedIds.size > 0 ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-10"
-              onClick={() => handleDelete(Array.from(selectedIds))}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              {t.delete(selectedIds.size)}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10"
+                disabled={generatingBatch}
+                onClick={batchGenerateDescriptions}
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                {t.generateDescriptions}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-10"
+                onClick={() => handleDelete(Array.from(selectedIds))}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {t.delete(selectedIds.size)}
+              </Button>
+            </>
           ) : null
         }
         viewToggle={

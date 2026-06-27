@@ -3,6 +3,12 @@
     "app/api/chat/route.ts": {
       "maxDuration": 300
     },
+    "app/api/stars/sync/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/stars/describe-batch/route.ts": {
+      "maxDuration": 300
+    },
     "app/api/bookmarks/snapshot-page/route.ts": {
       "maxDuration": 60,
       "memory": 1024

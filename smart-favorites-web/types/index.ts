@@ -34,6 +34,13 @@ export interface GitHubStar {
   description_zh?: string;
   description_en?: string;
   description_metadata?: Record<string, any> | null;
+  topics?: string[];
+  tags?: string[];
+  readme_summary?: string | null;
+  readme_summary_zh?: string | null;
+  index_status?: "pending" | "indexed" | "failed" | string;
+  last_crawled_at?: string | null;
+  starred_at?: string | null;
   language?: string;
   stars: number;
   forks: number;
@@ -129,6 +136,7 @@ export interface ChatRoutingMetadata {
   mode: "chat" | "knowledge";
   useKnowledge: boolean;
   reason: string;
+  scope?: "all" | "stars" | "bookmarks" | "documents";
 }
 
 export interface ChatMessage {
@@ -208,7 +216,8 @@ export type ToolCategory =
   | "documents"
   | "bookmarks"
   | "analytics"
-  | "annotations";
+  | "annotations"
+  | "memory";
 
 export type ToolPermission =
   | "knowledge:read"

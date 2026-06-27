@@ -86,7 +86,7 @@ export function SourcesPanel({
 
   if (collapsed) {
     return (
-      <aside className="hidden border-l border-border bg-card/80 lg:flex lg:w-12 lg:flex-col lg:items-center lg:py-4">
+      <aside className="flex h-full w-full flex-col items-center border-l border-border bg-card/80 py-4">
         <button
           type="button"
           onClick={onToggleCollapse}
@@ -106,7 +106,7 @@ export function SourcesPanel({
   }
 
   return (
-    <aside className="hidden min-h-0 w-[320px] shrink-0 flex-col border-l border-border bg-card/90 lg:flex xl:w-[360px]">
+    <aside className="flex h-full min-h-0 w-full flex-col border-l border-border bg-card/90">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t.title}</h2>

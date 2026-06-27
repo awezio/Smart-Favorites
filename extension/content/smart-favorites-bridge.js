@@ -63,3 +63,10 @@ window.addEventListener('message', async (event) => {
     response,
   }, window.location.origin);
 });
+
+window.postMessage({
+  source: EXTENSION_SOURCE,
+  type: 'smart-favorites-extension-bridge-ready',
+  extensionId: chrome.runtime.id,
+  version: chrome.runtime.getManifest().version,
+}, window.location.origin);

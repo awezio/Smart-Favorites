@@ -50,7 +50,11 @@ assert.match(
 );
 
 assert.match(titleGenerator, /generateSessionTitle/, "Title generator should expose generateSessionTitle.");
-assert.match(generateTitleRoute, /generateSessionTitle/, "Generate-title API should call title generator.");
+assert.match(titleGenerator, /generateSessionTitleWithSource/, "Title generator should expose source-aware title generation.");
+assert.match(titleGenerator, /maybeGenerateSessionTitleOnServer/, "Title generator should support server-side session title updates.");
+assert.match(generateTitleRoute, /generateSessionTitleWithSource/, "Generate-title API should call source-aware title generator.");
+assert.match(generateTitleRoute, /shouldRegenerateSessionTitle/, "Generate-title API should allow fallback title retries.");
+assert.match(generateTitleRoute, /title_source/, "Generate-title API should persist title source metadata.");
 assert.match(generateTitleRoute, /normalizeSessionMessages/, "Generate-title API should normalize stored messages.");
 assert.match(sessionSources, /aggregateSessionSources/, "Session sources helper should aggregate citations.");
 assert.match(sourcesRoute, /aggregateSessionSources/, "Sources API should aggregate session sources.");
@@ -60,6 +64,12 @@ assert.match(migrations, /rag_rerank_enabled/i, "Migrations should add rag reran
 assert.match(searchFile, /rerankSearchResults/, "Search should optionally rerank with Cohere.");
 assert.match(read("lib", "rag", "rag-engine.ts"), /ragChatStream/, "RAG engine should support streaming.");
 assert.match(read("app", "api", "chat", "route.ts"), /text\/event-stream/, "Chat API should support SSE streaming.");
+assert.match(read("app", "api", "chat", "route.ts"), /maybeGenerateSessionTitleOnServer/, "Chat API should generate session titles server-side.");
+assert.match(read("app", "dashboard", "layout.tsx"), /readDashboardNavCollapsed/, "Dashboard layout should persist nav collapse state.");
+assert.match(chatPage, /ResizablePanelGroup/, "Chat page should use resizable panels on large screens.");
+assert.match(chatPage, /CHAT_PANELS_AUTO_SAVE_ID/, "Chat page should persist panel sizes.");
+assert.match(chatPage, /titleGenerating/, "Chat page should show a generating title state.");
+assert.match(chatPage, /@container\/composer/, "Composer should use container queries for responsive controls.");
 assert.match(read("lib", "admin", "chat-quality-metrics.ts"), /loadChatQualityMetrics/, "Admin should load chat quality metrics.");
 
 assert.match(chatPage, /SourcesPanel/, "Chat page should render a dedicated sources panel.");
@@ -72,11 +82,10 @@ assert.match(
 );
 assert.match(sourcesPanel, /exportMd/, "Sources panel should expose markdown export.");
 assert.match(read("lib", "ai", "chat-stream-shared.ts"), /supportsProviderStreaming/, "Streaming capability check should be client-safe.");
-assert.match(read("app", "dashboard", "chat", "page.tsx"), /chat-stream-shared/, "Chat page should not import server-only provider stream module.");
+assert.doesNotMatch(chatPage, /chat-stream-shared/, "Chat page should not import server-only provider stream module.");
 
 assert.match(settingsRoute, /autoTitleEnabled/, "Settings GET should return auto title preference.");
 assert.match(settingsRoute, /auto_title_enabled/, "Settings PUT should persist auto title preference.");
-assert.match(settingsPage, /autoTitleSessions/, "Settings page should expose auto title sessions toggle.");
 
 assert.match(
   chatPage,

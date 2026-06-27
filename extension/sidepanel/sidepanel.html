@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Favorites</title>
   <link rel="stylesheet" href="sidepanel.css">
-  <!-- Markdown rendering -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Markdown rendering (bundled locally — extension CSP blocks CDN scripts) -->
+  <script src="../vendor/marked.min.js"></script>
   <!-- Code highlighting -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/common.min.js"></script>
+  <link rel="stylesheet" href="../vendor/github.min.css" id="hljs-theme-light">
+  <link rel="stylesheet" href="../vendor/github-dark.min.css" id="hljs-theme-dark" disabled>
+  <script src="../vendor/highlight.min.js"></script>
 </head>
-<body data-theme="dark">
+<body data-theme="light">
   <div class="container">
     <!-- Header with Toolbar -->
     <header class="header">
@@ -21,15 +22,14 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <defs>
               <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#00f0ff"/>
-                <stop offset="50%" stop-color="#6366f1"/>
-                <stop offset="100%" stop-color="#a855f7"/>
+                <stop offset="0%" stop-color="#7c3aed"/>
+                <stop offset="100%" stop-color="#6d28d9"/>
               </linearGradient>
             </defs>
             <!-- Bookmark shape with sparkle -->
             <path d="M5 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17l-7-4-7 4V4z" 
                   fill="url(#logo-grad)" opacity="0.9"/>
-            <circle cx="18" cy="6" r="2" fill="#00f0ff"/>
+            <circle cx="18" cy="6" r="2" fill="#7c3aed"/>
             <circle cx="18" cy="6" r="1" fill="#fff"/>
           </svg>
         </div>

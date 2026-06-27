@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
 import {
   fallbackSessionTitle,
-  generateSessionTitle,
+  generateSessionTitleWithSource,
+  type SessionTitleResult,
 } from "@/lib/chat/title-generator";
 import { normalizeSessionMessages } from "@/lib/chat/normalize-session-messages";
-import { isPlaceholderSessionTitle } from "@/lib/chat/session-title-utils";
+import { shouldRegenerateSessionTitle } from "@/lib/chat/session-title-utils";
 
 export async function POST(
   request: NextRequest,
@@ -38,14 +39,25 @@ export async function POST(
       return NextResponse.json({ error: "At least one exchange is required" }, { status: 400 });
     }
 
+    const firstUserContent = messages.find((message) => message.role === "user")?.content;
     if (
-      session.title_status === "ready" &&
-      !isPlaceholderSessionTitle(session.title) &&
-      !body.force
+      !body.force &&
+      !shouldRegenerateSessionTitle(
+        session.title || "",
+        session.title_status,
+        session.metadata,
+        firstUserContent
+      )
     ) {
       return NextResponse.json({
         title: session.title,
         title_status: session.title_status,
+        title_source:
+          session.metadata &&
+          typeof session.metadata === "object" &&
+          !Array.isArray(session.metadata)
+            ? (session.metadata as Record<string, unknown>).title_source
+            : undefined,
         skipped: true,
       });
     }
@@ -56,11 +68,15 @@ export async function POST(
       .eq("id", id)
       .eq("user_id", userId);
 
-    let title = "";
+    let result: SessionTitleResult;
     try {
-      title = await generateSessionTitle(userId, messages, locale);
-    } catch {
-      title = fallbackSessionTitle(messages, locale);
+      result = await generateSessionTitleWithSource(userId, messages, locale);
+    } catch (error) {
+      console.error("Generate-title route error:", error);
+      result = {
+        title: fallbackSessionTitle(messages, locale),
+        source: "fallback",
+      };
     }
 
     const existingMetadata =
@@ -68,28 +84,33 @@ export async function POST(
         ? (session.metadata as Record<string, unknown>)
         : {};
 
+    const titleStatus = result.source === "ai" ? "ready" : "failed";
+
     const { data: updated, error: updateError } = await supabase
       .from("chat_sessions")
       .update({
-        title,
-        title_status: "ready",
+        title: result.title,
+        title_status: titleStatus,
         title_generated_at: new Date().toISOString(),
         metadata: {
           ...existingMetadata,
-          title_source: "ai",
+          title_source: result.source,
+          needs_retry: result.source === "fallback",
         },
       })
       .eq("id", id)
       .eq("user_id", userId)
-      .select("id, title, title_status, title_generated_at")
+      .select("id, title, title_status, title_generated_at, metadata")
       .single();
 
     if (updateError) throw updateError;
 
     return NextResponse.json({
-      title: updated?.title || title,
-      title_status: updated?.title_status || "ready",
+      title: updated?.title || result.title,
+      title_status: updated?.title_status || titleStatus,
+      title_source: result.source,
       title_generated_at: updated?.title_generated_at,
+      needs_retry: result.source === "fallback",
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

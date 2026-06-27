@@ -3,6 +3,18 @@ import { createBookmark } from "@/lib/db/bookmarks";
 import { getDocumentById, getDocuments, updateDocument } from "@/lib/db/documents";
 import { generateEmbedding } from "@/lib/rag/embedding";
 import { searchAll } from "@/lib/rag/search";
+import { fetchStarReadme, runStarsSearchPipeline } from "@/lib/agent/pipelines/stars-search";
+import {
+  addMemoryEntry,
+  removeMemoryEntry,
+  replaceMemoryEntry,
+} from "@/lib/agent/memory/memory-tool";
+import {
+  getUserAgentMemory,
+  saveUserAgentMemory,
+} from "@/lib/agent/memory/memory-store";
+import { searchUserSessions } from "@/lib/agent/memory/session-search";
+import { webSearch } from "@/lib/search/web-search";
 import type {
   ApiKeyRecord,
   DocumentRecord,
@@ -434,6 +446,220 @@ const registry: ToolRegistration[] = [
       return {
         output: { document: updated },
         metadata: { document_id: documentId, annotation_count: annotations.length },
+      };
+    },
+  },
+  {
+    name: "search_stars",
+    description: "在用户的 GitHub Stars 中执行 Agent 多策略检索",
+    category: "search",
+    permissions: ["knowledge:read"],
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "搜索关键词或自然语言问题" },
+        top_k: { type: "integer", minimum: 1, maximum: 30, default: 12 },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    output_schema: {
+      type: "object",
+      properties: {
+        results: { type: "array" },
+        pipeline: { type: "string" },
+        count: { type: "integer" },
+      },
+    },
+    execute: async (input, context) => {
+      const query = toString((input as Record<string, unknown>)?.query).trim();
+      if (!query) {
+        throw new Error("query is required");
+      }
+
+      const pipeline = await runStarsSearchPipeline(query, context.userId);
+      const topK = Math.min(30, Math.max(1, toNumber((input as Record<string, unknown>)?.top_k, 12)));
+
+      return {
+        output: {
+          results: pipeline.sources.slice(0, topK),
+          web_results: pipeline.webResults,
+          pipeline: pipeline.pipeline,
+          count: Math.min(pipeline.sources.length, topK),
+        },
+        metadata: { query, pipeline: pipeline.pipeline },
+      };
+    },
+  },
+  {
+    name: "fetch_readme",
+    description: "获取 GitHub 仓库 README 原文摘要",
+    category: "search",
+    permissions: ["knowledge:read"],
+    input_schema: {
+      type: "object",
+      properties: {
+        owner: { type: "string" },
+        repo: { type: "string" },
+      },
+      required: ["owner", "repo"],
+      additionalProperties: false,
+    },
+    output_schema: { type: "object" },
+    execute: async (input, context) => {
+      const payload = input as Record<string, unknown>;
+      const owner = toString(payload?.owner).trim();
+      const repo = toString(payload?.repo).trim();
+      if (!owner || !repo) {
+        throw new Error("owner and repo are required");
+      }
+
+      const readme = await fetchStarReadme(owner, repo);
+      return {
+        output: {
+          owner,
+          repo,
+          reachable: readme.reachable,
+          source_url: readme.sourceUrl,
+          text: readme.text.slice(0, 4000),
+          error: readme.error,
+        },
+        metadata: { owner, repo, user_id: context.userId },
+      };
+    },
+  },
+  {
+    name: "web_search",
+    description: "当个人知识库不足时执行公开网页搜索兜底",
+    category: "search",
+    permissions: ["knowledge:read"],
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        max_results: { type: "integer", minimum: 1, maximum: 10, default: 5 },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    output_schema: { type: "object" },
+    execute: async (input, context) => {
+      const payload = input as Record<string, unknown>;
+      const query = toString(payload?.query).trim();
+      if (!query) {
+        throw new Error("query is required");
+      }
+
+      const maxResults = Math.min(10, Math.max(1, toNumber(payload?.max_results, 5)));
+      const response = await webSearch(query, { maxResults });
+
+      return {
+        output: {
+          results: response.results,
+          provider: response.provider,
+          skipped_reason: response.skippedReason,
+        },
+        metadata: { query, user_id: context.userId },
+      };
+    },
+  },
+  {
+    name: "session_search",
+    description: "搜索历史聊天会话全文，不占 Agent 记忆配额",
+    category: "search",
+    permissions: ["knowledge:read"],
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        limit: { type: "integer", minimum: 1, maximum: 20, default: 5 },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    output_schema: { type: "object" },
+    execute: async (input, context) => {
+      const query = toString((input as Record<string, unknown>)?.query).trim();
+      if (!query) {
+        throw new Error("query is required");
+      }
+
+      const limit = Math.min(20, Math.max(1, toNumber((input as Record<string, unknown>)?.limit, 5)));
+      const hits = await searchUserSessions(context.userId, query, limit);
+
+      return {
+        output: { sessions: hits, count: hits.length },
+        metadata: { query, limit },
+      };
+    },
+  },
+  {
+    name: "update_agent_memory",
+    description: "更新 Agent 长期记忆或用户偏好记忆",
+    category: "memory",
+    permissions: ["knowledge:write"],
+    input_schema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["add", "replace", "remove"] },
+        target: { type: "string", enum: ["memory", "profile"], default: "memory" },
+        text: { type: "string" },
+        substring: { type: "string" },
+        replacement: { type: "string" },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+    output_schema: { type: "object" },
+    execute: async (input, context) => {
+      const payload = input as Record<string, unknown>;
+      const action = toString(payload?.action).trim();
+      const target = toString(payload?.target, "memory") === "profile" ? "profile" : "memory";
+      const current = await getUserAgentMemory(context.userId);
+      const entries =
+        target === "profile" ? current.user_profile_entries : current.memory_entries;
+      const charLimit =
+        target === "profile" ? current.profile_char_limit : current.memory_char_limit;
+
+      let result;
+      switch (action) {
+        case "add":
+          result = addMemoryEntry(entries, toString(payload?.text), charLimit);
+          break;
+        case "replace":
+          result = replaceMemoryEntry(
+            entries,
+            toString(payload?.substring),
+            toString(payload?.replacement),
+            charLimit
+          );
+          break;
+        case "remove":
+          result = removeMemoryEntry(entries, toString(payload?.substring));
+          break;
+        default:
+          throw new Error("Unsupported memory action");
+      }
+
+      if (!result.changed) {
+        return {
+          output: { changed: false, reason: result.reason, entries },
+          metadata: { action, target },
+        };
+      }
+
+      const saved = await saveUserAgentMemory(context.userId, {
+        ...(target === "profile"
+          ? { user_profile_entries: result.entries }
+          : { memory_entries: result.entries }),
+      });
+
+      return {
+        output: {
+          changed: true,
+          entries: target === "profile" ? saved.user_profile_entries : saved.memory_entries,
+        },
+        metadata: { action, target },
       };
     },
   },

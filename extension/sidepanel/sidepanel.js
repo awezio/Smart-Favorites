@@ -230,20 +230,34 @@ async function maybeAutoConnectFromActiveWebSession() {
 }
 
 async function handleExtensionAuthChanged({ syncAfterAuth = true } = {}) {
-  await checkExtensionAuthStatus();
-  await checkConnection();
-  await loadExtensionRuntimeSettings();
-
-  if (!syncAfterAuth) return;
-
-  const { lastAuthAutoSyncAt } = await chrome.storage.local.get(['lastAuthAutoSyncAt']);
-  const now = Date.now();
-  if (lastAuthAutoSyncAt && now - lastAuthAutoSyncAt < 15000) {
-    return;
+  if (authChangePromise) {
+    return authChangePromise;
   }
 
-  await chrome.storage.local.set({ lastAuthAutoSyncAt: now });
-  await syncBookmarks(false);
+  authChangePromise = (async () => {
+    await checkExtensionAuthStatus();
+    await checkConnection();
+    await loadExtensionRuntimeSettings();
+
+    if (extensionInitialized) {
+      await loadChatSessions();
+    }
+
+    if (!syncAfterAuth) return;
+
+    const { lastAuthAutoSyncAt } = await chrome.storage.local.get(['lastAuthAutoSyncAt']);
+    const now = Date.now();
+    if (lastAuthAutoSyncAt && now - lastAuthAutoSyncAt < 15000) {
+      return;
+    }
+
+    await chrome.storage.local.set({ lastAuthAutoSyncAt: now });
+    await syncBookmarks(false);
+  })().finally(() => {
+    authChangePromise = null;
+  });
+
+  return authChangePromise;
 }
 
 // State
@@ -252,12 +266,16 @@ let currentModel = '--';
 let currentProvider = 'deepseek';
 let syncMode = 'manual';
 let currentSuggestions = [];
-let currentTheme = 'dark';
+let currentTheme = 'light';
 let currentSessionId = null;
 let chatSessions = [];
+let currentSessionMessages = [];
 let webSearchEnabled = false;
 let attachments = []; // Store uploaded attachments
 let lastUserMessage = ''; // For regenerate feature
+let extensionInitialized = false;
+let chatSessionsLoadPromise = null;
+let authChangePromise = null;
 
 // ==================== DOM Elements ====================
 
@@ -359,7 +377,7 @@ function showToast(message, type = 'info', duration = 3000) {
  */
 async function initTheme() {
   const stored = await chrome.storage.local.get(['themeMode']);
-  const mode = stored.themeMode || 'dark';
+  const mode = stored.themeMode || 'light';
   applyTheme(mode);
   updateThemeUI(mode);
 }
@@ -370,11 +388,21 @@ async function initTheme() {
 function applyTheme(mode) {
   currentTheme = mode;
   
+  let resolvedTheme = mode;
   if (mode === 'auto') {
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    resolvedTheme = isDark ? 'dark' : 'light';
+    document.body.setAttribute('data-theme', resolvedTheme);
   } else {
     document.body.setAttribute('data-theme', mode);
+  }
+
+  const hljsLight = document.getElementById('hljs-theme-light');
+  const hljsDark = document.getElementById('hljs-theme-dark');
+  if (hljsLight && hljsDark) {
+    const useDark = resolvedTheme === 'dark';
+    hljsLight.disabled = useDark;
+    hljsDark.disabled = !useDark;
   }
 }
 
@@ -418,9 +446,9 @@ function hideThemeMenu() {
 }
 
 // Listen for system theme changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (currentTheme === 'auto') {
-    document.body.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+    applyTheme('auto');
   }
 });
 
@@ -432,6 +460,9 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
 async function refreshConnection() {
   refreshBtn.classList.add('refreshing');
   await checkConnection();
+  if (extensionInitialized) {
+    await loadChatSessions();
+  }
   setTimeout(() => {
     refreshBtn.classList.remove('refreshing');
   }, 500);
@@ -636,11 +667,14 @@ if (userArea) {
 
 // Listen for auth token changes (e.g. after OAuth callback)
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (namespace === 'local' && (changes.authToken || changes.backendUrl)) {
-    if (changes.backendUrl) {
-      API_BASE_URL = normalizeApiBaseUrl(changes.backendUrl.newValue || API_BASE_URL);
-    }
-    handleExtensionAuthChanged({ syncAfterAuth: Boolean(changes.authToken?.newValue) });
+  if (namespace !== 'local') return;
+
+  if (changes.backendUrl?.newValue) {
+    API_BASE_URL = normalizeApiBaseUrl(changes.backendUrl.newValue);
+  }
+
+  if (changes.authToken) {
+    handleExtensionAuthChanged({ syncAfterAuth: Boolean(changes.authToken.newValue) });
   }
 });
 
@@ -935,6 +969,190 @@ function displaySearchResults(results) {
 
 // ==================== Chat Session Management ====================
 
+function normalizeChatMessages(messages) {
+  const rawMessages = (() => {
+    if (Array.isArray(messages)) return messages;
+    if (typeof messages === 'string') {
+      try {
+        const parsed = JSON.parse(messages);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    if (messages && typeof messages === 'object' && Array.isArray(messages.messages)) {
+      return messages.messages;
+    }
+    return [];
+  })();
+
+  return rawMessages
+    .filter((message) => message && typeof message === 'object' && message.content !== undefined)
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'assistant' : 'user',
+      content: String(message.content ?? ''),
+      sources: Array.isArray(message.sources) ? message.sources : undefined,
+      timestamp: typeof message.timestamp === 'string' ? message.timestamp : new Date().toISOString(),
+    }));
+}
+
+async function persistSessionMessages(sessionId, messages) {
+  if (!sessionId || sessionId.startsWith('local-')) return;
+
+  const apiBase = await getCurrentApiBaseUrl();
+  await fetchWithAuth(`${apiBase}/api/chat/sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ messages }),
+  });
+}
+
+function renderLoadedMessage(message) {
+  mountChatMessage({
+    role: message.role,
+    content: message.content,
+    sources: message.sources,
+    routing: message.routing,
+  });
+}
+
+function createMessageId() {
+  return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+}
+
+function scrollChatToBottom() {
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function applyCodeHighlight(container) {
+  const hljsRef = window.hljs;
+  if (!hljsRef || !container) return;
+  container.querySelectorAll('pre code').forEach((block) => {
+    hljsRef.highlightElement(block);
+  });
+}
+
+function getMessageText(messageEl) {
+  return messageEl?.dataset.rawContent ||
+    messageEl?.querySelector('.markdown-content')?.textContent ||
+    messageEl?.querySelector('.user-bubble-text')?.textContent ||
+    '';
+}
+
+function buildSourcesPanel(sources) {
+  if (!sources || sources.length === 0) return '';
+
+  const chips = sources.map((source) => {
+    const url = source.bookmark?.url || source.star?.url || source.url || source.document?.url || '#';
+    const title = source.bookmark?.title ||
+      (source.star ? `${source.star.owner}/${source.star.repo}` : '') ||
+      source.document?.title ||
+      source.title ||
+      url;
+
+    return `
+      <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="source-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        ${escapeHtml(title)}
+      </a>
+    `;
+  }).join('');
+
+  return `
+    <details class="message-sources-panel" open>
+      <summary>
+        <span>相关来源 - ${sources.length}</span>
+        <svg class="sources-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </summary>
+      <div class="message-sources-list">${chips}</div>
+    </details>
+  `;
+}
+
+function buildAssistantHeader(messageId, routing) {
+  const routingBadge = routing ? `
+    <span class="routing-badge">
+      ${routing.useKnowledge ? '已检索知识库' : '未检索知识库'}
+    </span>
+  ` : '';
+
+  return `
+    <div class="assistant-card-header">
+      <div class="assistant-card-label">
+        <span class="assistant-avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+          </svg>
+        </span>
+        <span>Smart Favorites</span>
+        ${routingBadge}
+      </div>
+      ${createMessageActions(messageId, true)}
+    </div>
+  `;
+}
+
+function mountChatMessage({
+  role,
+  content = '',
+  sources,
+  routing,
+  isLoading = false,
+  isHtml = false,
+  rawContent,
+  welcome = false,
+}) {
+  const id = createMessageId();
+  const row = document.createElement('div');
+  row.id = id;
+  row.className = `chat-message-row ${role}`;
+  row.dataset.rawContent = rawContent ?? content ?? '';
+
+  if (isLoading) {
+    row.className = 'chat-message-row assistant';
+    row.innerHTML = `
+      <div class="assistant-loading">
+        <div class="loading"></div>
+        <span>正在生成...</span>
+      </div>
+    `;
+    chatMessages.appendChild(row);
+    scrollChatToBottom();
+    return id;
+  }
+
+  if (role === 'user') {
+    row.innerHTML = `
+      <div class="user-bubble">
+        <p class="user-bubble-text">${isHtml ? content : escapeHtml(content)}</p>
+      </div>
+    `;
+  } else {
+    const markdownHtml = isHtml ? content : renderMarkdown(content);
+    if (welcome) {
+      row.classList.add('chat-welcome-card');
+    }
+    row.innerHTML = `
+      <div class="assistant-card">
+        ${welcome ? '' : buildAssistantHeader(id, routing)}
+        <div class="assistant-card-body">
+          <div class="markdown-content">${markdownHtml}</div>
+        </div>
+        ${buildSourcesPanel(sources)}
+      </div>
+    `;
+  }
+
+  chatMessages.appendChild(row);
+  applyCodeHighlight(row);
+  scrollChatToBottom();
+  return id;
+}
+
 const newChatBtn = document.getElementById('new-chat-btn');
 const chatSessionsList = document.getElementById('chat-sessions-list');
 const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
@@ -944,33 +1162,81 @@ const chatSidebar = document.getElementById('chat-sidebar');
 /**
  * Load all chat sessions from backend
  */
-async function loadChatSessions() {
+async function loadChatSessions(options = {}) {
+  const { silent = false } = options;
+  if (chatSessionsLoadPromise) {
+    return chatSessionsLoadPromise;
+  }
+
+  chatSessionsLoadPromise = loadChatSessionsInternal({ silent }).finally(() => {
+    chatSessionsLoadPromise = null;
+  });
+  return chatSessionsLoadPromise;
+}
+
+async function loadChatSessionsInternal({ silent = false } = {}) {
   try {
-    // First, try to restore last used session from storage
+    const apiBase = await getCurrentApiBaseUrl();
+    const { authToken } = await chrome.storage.local.get(['authToken']);
+    if (!authToken) {
+      chatSessions = [];
+      renderChatSessions();
+      clearChatMessages();
+      showWelcomeMessage();
+      return;
+    }
+
     const stored = await chrome.storage.local.get(['lastSessionId']);
     const lastSessionId = stored.lastSessionId;
-    
-    const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions`);
-    if (response.ok) {
-      const payload = await response.json();
-      chatSessions = payload.sessions || payload;
-      console.log('Loaded sessions:', chatSessions.length, 'Last session:', lastSessionId);
-      renderChatSessions();
-      
-      // Try to restore last session, or select first, or create new
-      if (lastSessionId && chatSessions.find(s => s.id === lastSessionId)) {
-        await selectSession(lastSessionId);
-      } else if (chatSessions.length > 0) {
-        await selectSession(chatSessions[0].id);
-      } else {
-        await createNewSession();
+
+    const response = await fetchWithAuth(`${apiBase}/api/chat/sessions`);
+    if (!response.ok) {
+      const errorMessage = await readApiError(response, '加载聊天记录失败');
+      console.error('Failed to load chat sessions:', response.status, errorMessage);
+      if (!silent) {
+        showToast(errorMessage, 'error');
       }
+      return;
+    }
+
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch (parseError) {
+      console.error('Failed to parse chat sessions response:', parseError);
+      if (!silent) {
+        showToast('加载聊天记录失败：服务器返回了无效数据', 'error');
+      }
+      return;
+    }
+
+    const rawSessions = Array.isArray(payload.sessions)
+      ? payload.sessions
+      : Array.isArray(payload)
+        ? payload
+        : [];
+
+    chatSessions = rawSessions
+      .slice()
+      .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
+    console.log('Loaded sessions:', chatSessions.length, 'Last session:', lastSessionId);
+    renderChatSessions();
+
+    if (lastSessionId && chatSessions.find((s) => s.id === lastSessionId)) {
+      await selectSession(lastSessionId);
+    } else if (chatSessions.length > 0) {
+      await selectSession(chatSessions[0].id);
+    } else {
+      clearChatMessages();
+      showWelcomeMessage();
     }
   } catch (error) {
     console.error('Failed to load chat sessions:', error);
-    // Create a local session if backend unavailable
-    if (!currentSessionId) {
-      currentSessionId = `local-${Date.now()}`;
+    if (!silent) {
+      const message = error?.message?.includes('Failed to fetch')
+        ? '加载聊天记录失败，请检查网络连接'
+        : `加载聊天记录失败：${error?.message || '未知错误'}`;
+      showToast(message, 'error');
     }
   }
 }
@@ -1123,9 +1389,11 @@ async function createNewSession() {
     });
     
     if (response.ok) {
-      const session = await response.json();
+      const payload = await response.json();
+      const session = payload.session || payload;
       chatSessions.unshift(session);
       currentSessionId = session.id;
+      currentSessionMessages = [];
       renderChatSessions();
       clearChatMessages();
       showWelcomeMessage();
@@ -1134,6 +1402,7 @@ async function createNewSession() {
     console.error('Failed to create session:', error);
     // Create local session
     currentSessionId = `local-${Date.now()}`;
+    currentSessionMessages = [];
     clearChatMessages();
     showWelcomeMessage();
   }
@@ -1144,43 +1413,58 @@ async function createNewSession() {
  */
 async function selectSession(sessionId) {
   currentSessionId = sessionId;
-  
-  // Save to storage for persistence across reloads
+
   await chrome.storage.local.set({ lastSessionId: sessionId });
-  
+
   renderChatSessions();
-  
-  // Load session messages
+
+  const apiBase = await getCurrentApiBaseUrl();
+  const listSession = chatSessions.find((s) => s.id === sessionId);
+  const fallbackMessages = normalizeChatMessages(listSession?.messages);
+  currentSessionMessages = fallbackMessages;
+  clearChatDisplay();
+
+  if (fallbackMessages.length > 0) {
+    fallbackMessages.forEach((msg) => {
+      renderLoadedMessage(msg);
+    });
+  }
+
   try {
-    console.log('Loading session:', sessionId);
-    const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}`);
-    console.log('Response status:', response.status);
-    
+    const response = await fetchWithAuth(`${apiBase}/api/chat/sessions/${sessionId}`);
     if (response.ok) {
       const data = await response.json();
-      console.log('Session data:', data);
-      console.log('Messages count:', data.messages ? data.messages.length : 0);
-      
-      clearChatMessages();
-      
-      if (data.messages && data.messages.length > 0) {
-        data.messages.forEach(msg => {
-          console.log('Rendering message:', msg.role, msg.content.substring(0, 50));
-          appendMessage(msg.content, msg.role, true);
+      const session = data.session || data;
+      const hydratedMessages = normalizeChatMessages(session.messages);
+      currentSessionMessages = hydratedMessages;
+
+      const listIndex = chatSessions.findIndex((s) => s.id === sessionId);
+      if (listIndex >= 0) {
+        chatSessions[listIndex] = { ...chatSessions[listIndex], ...session, messages: hydratedMessages };
+      }
+
+      clearChatDisplay();
+
+      if (hydratedMessages.length > 0) {
+        hydratedMessages.forEach((msg) => {
+          renderLoadedMessage(msg);
         });
       } else {
-        console.log('No messages, showing welcome');
         showWelcomeMessage();
       }
-    } else {
-      console.error('Failed to load session, status:', response.status);
-      clearChatMessages();
+      return;
+    }
+
+    console.error('Failed to load session, status:', response.status);
+    if (fallbackMessages.length === 0) {
       showWelcomeMessage();
     }
   } catch (error) {
     console.error('Failed to load session messages:', error);
-    clearChatMessages();
-    showWelcomeMessage();
+    if (fallbackMessages.length === 0) {
+      clearChatMessages();
+      showWelcomeMessage();
+    }
   }
 }
 
@@ -1214,25 +1498,32 @@ async function deleteSession(sessionId) {
 /**
  * Clear chat messages display
  */
-function clearChatMessages() {
+function clearChatDisplay() {
   chatMessages.innerHTML = '';
+}
+
+function clearChatMessages() {
+  clearChatDisplay();
+  currentSessionMessages = [];
 }
 
 /**
  * Show welcome message
  */
 function showWelcomeMessage() {
-  const welcomeDiv = document.createElement('div');
-  welcomeDiv.className = 'message assistant';
-  welcomeDiv.innerHTML = `
-    <p>👋 你好！我是您的智能收藏夹助手。您可以问我关于收藏夹内容的任何问题：</p>
-    <ul>
-      <li>「我收藏过哪些关于机器学习的网站？」</li>
-      <li>「帮我找一下编程相关的教程」</li>
-      <li>「整理一下我的技术类书签」</li>
-    </ul>
-  `;
-  chatMessages.appendChild(welcomeDiv);
+  mountChatMessage({
+    role: 'assistant',
+    welcome: true,
+    isHtml: true,
+    content: `
+      <p>👋 你好！我是您的智能收藏夹助手。您可以问我关于收藏夹内容的任何问题：</p>
+      <ul>
+        <li>「我收藏过哪些关于机器学习的网站？」</li>
+        <li>「帮我找一下编程相关的教程」</li>
+        <li>「整理一下我的技术类书签」</li>
+      </ul>
+    `,
+  });
 }
 
 /**
@@ -1267,19 +1558,22 @@ function expandChatSidebar() {
 
 // ==================== Chat Functions ====================
 
-async function sendChatMessage(message) {
+async function sendChatMessage(message, options = {}) {
+  const { skipUserAppend = false } = options;
   if (!message.trim() && attachments.length === 0) return;
   
   if (!isConnected) {
     const connected = await checkConnection();
     if (!connected) {
-      appendMessage('无法连接到后端服务。请确认后端服务正在运行 (http://localhost:8000)', 'assistant');
+      appendMessage('无法连接到 Smart Favorites 服务，请检查网络连接或重新登录。', 'assistant');
       return;
     }
   }
   
   // Store for regenerate feature
   lastUserMessage = message;
+  
+  const chatHistory = [...currentSessionMessages];
   
   // Ensure we have a valid backend session before sending message
   if (!currentSessionId || currentSessionId.startsWith('local-')) {
@@ -1294,6 +1588,7 @@ async function sendChatMessage(message) {
         const session = payload.session || payload;
         chatSessions.unshift(session);
         currentSessionId = session.id;
+        currentSessionMessages = [];
         renderChatSessions();
         console.log('Created new session for chat:', currentSessionId);
       }
@@ -1302,25 +1597,45 @@ async function sendChatMessage(message) {
     }
   }
   
-  // Display user message with attachments info
-  let userMessageDisplay = message;
-  if (attachments.length > 0) {
-    const attachmentNames = attachments.map(a => a.name).join(', ');
-    userMessageDisplay = message + (message ? '\n' : '') + `[附件: ${attachmentNames}]`;
+  let userMessage;
+  let nextMessages;
+
+  if (skipUserAppend) {
+    const lastMessage = currentSessionMessages[currentSessionMessages.length - 1];
+    if (!lastMessage || lastMessage.role !== 'user') {
+      showToast('无法重新生成', 'warning');
+      return;
+    }
+    userMessage = lastMessage;
+    nextMessages = [...currentSessionMessages];
+  } else {
+    let userMessageDisplay = message;
+    if (attachments.length > 0) {
+      const attachmentNames = attachments.map(a => a.name).join(', ');
+      userMessageDisplay = message + (message ? '\n' : '') + `[附件: ${attachmentNames}]`;
+    }
+
+    userMessage = {
+      role: 'user',
+      content: userMessageDisplay,
+      timestamp: new Date().toISOString(),
+    };
+    nextMessages = [...chatHistory, userMessage];
+    currentSessionMessages = nextMessages;
+
+    appendMessage(userMessage.content, 'user');
+    chatInput.value = '';
+    autoResizeTextarea(chatInput);
   }
   
-  appendMessage(userMessageDisplay, 'user');
-  chatInput.value = '';
-  autoResizeTextarea(chatInput);
-  
-  const loadingId = appendMessage('<div class="loading"></div>', 'assistant', true);
+  const loadingId = mountChatMessage({ role: 'assistant', isLoading: true });
   
   try {
     // Prepare request body
     const requestBody = { 
-      query: message,
+      query: skipUserAppend ? userMessage.content : message,
       sessionId: currentSessionId,
-      chatHistory: [],
+      chatHistory: skipUserAppend ? currentSessionMessages.slice(0, -1) : chatHistory,
       webSearch: webSearchEnabled,
       provider: currentProvider
     };
@@ -1361,51 +1676,29 @@ async function sendChatMessage(message) {
     }
     
     // Render response with Markdown
-    let responseContent = data.answer || data.response;
-    
-    // Add sources section if available
-    let sourcesHtml = '';
-    if (data.sources && data.sources.length > 0) {
-      sourcesHtml = `
-        <div class="message-sources">
-          <div class="message-sources-title">相关书签</div>
-          <div class="message-sources-list">
-            ${data.sources.map(source => `
-              <a href="${escapeHtml(source.url)}" target="_blank" class="source-link">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                </svg>
-                ${escapeHtml(source.title || source.url)}
-              </a>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-    
-    // Create message with Markdown content and sources
-    const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    const msgDiv = document.createElement('div');
-    msgDiv.id = msgId;
-    msgDiv.className = 'message assistant';
-    msgDiv.dataset.rawContent = responseContent;
-    
-    const renderedMarkdown = renderMarkdown(responseContent);
-    msgDiv.innerHTML = `
-      <div class="markdown-content">${renderedMarkdown}</div>
-      ${sourcesHtml}
-      ${createMessageActions(msgId, true)}
-    `;
-    
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    
-    // Apply syntax highlighting
-    if (typeof hljs !== 'undefined') {
-      msgDiv.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-      });
+    const responseContent = data.answer || data.response;
+
+    mountChatMessage({
+      role: 'assistant',
+      content: responseContent,
+      sources: data.sources,
+      routing: data.routing,
+      rawContent: responseContent,
+    });
+
+    const assistantMessage = {
+      role: 'assistant',
+      content: responseContent,
+      sources: data.sources && data.sources.length > 0 ? data.sources : undefined,
+      timestamp: new Date().toISOString(),
+    };
+    const savedMessages = [...nextMessages, assistantMessage];
+    currentSessionMessages = savedMessages;
+
+    try {
+      await persistSessionMessages(currentSessionId, savedMessages);
+    } catch (persistError) {
+      console.error('Failed to persist session messages:', persistError);
     }
     
     // Update session title if it's still "新会话"
@@ -1426,7 +1719,7 @@ async function sendChatMessage(message) {
     
     let errorMsg = '抱歉，发生了错误。';
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      errorMsg = '无法连接到后端服务。请确认：\n1. 后端服务正在运行 (http://localhost:8000)\n2. 没有防火墙阻止连接';
+      errorMsg = '无法连接到 Smart Favorites 服务，请检查网络连接或重新登录。';
     } else if (error.message.includes('HTTP')) {
       errorMsg = `后端服务返回错误: ${error.message}`;
     } else {
@@ -1438,47 +1731,16 @@ async function sendChatMessage(message) {
 }
 
 function appendMessage(content, type, isHtml = false, rawContent = null) {
-  const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-  const div = document.createElement('div');
-  div.id = id;
-  div.className = `message ${type}`;
-  
-  // Store raw content for copy/download
-  if (rawContent) {
-    div.dataset.rawContent = rawContent;
-  } else if (!isHtml) {
-    div.dataset.rawContent = content;
+  if (type === 'assistant' && isHtml && content.includes('loading')) {
+    return mountChatMessage({ role: 'assistant', isLoading: true });
   }
-  
-  if (type === 'assistant' && !isHtml) {
-    // Use Markdown rendering for assistant messages
-    const renderedContent = renderMarkdown(content);
-    div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
-    div.innerHTML += createMessageActions(id, true);
-  } else if (type === 'user') {
-    div.innerHTML = `<p>${escapeHtml(content)}</p>`;
-    div.innerHTML += createMessageActions(id, false);
-  } else if (isHtml) {
-    div.innerHTML = content;
-    // Add actions if it's an assistant message with HTML
-    if (type === 'assistant' && !content.includes('loading')) {
-      div.innerHTML += createMessageActions(id, true);
-    }
-  } else {
-    div.innerHTML = `<p>${escapeHtml(content)}</p>`;
-  }
-  
-  chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  
-  // Apply syntax highlighting to code blocks
-  if (typeof hljs !== 'undefined') {
-    div.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block);
-    });
-  }
-  
-  return id;
+
+  return mountChatMessage({
+    role: type === 'user' ? 'user' : 'assistant',
+    content,
+    isHtml,
+    rawContent: rawContent ?? content,
+  });
 }
 
 // ==================== AI Tools Functions ====================
@@ -1682,32 +1944,54 @@ function escapeHtml(text) {
  * Configure marked.js for rendering
  */
 function initMarkdownRenderer() {
-  if (typeof marked !== 'undefined') {
-    marked.setOptions({
-      highlight: function(code, lang) {
-        if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
-          try {
-            return hljs.highlight(code, { language: lang }).value;
-          } catch (e) {}
-        }
-        return code;
-      },
+  const parser = window.marked;
+  if (!parser) {
+    console.warn('marked.js is not available; markdown will render as plain text');
+    return;
+  }
+
+  if (typeof parser.use === 'function') {
+    parser.use({
       breaks: true,
-      gfm: true
+      gfm: true,
+    });
+  } else if (typeof parser.setOptions === 'function') {
+    parser.setOptions({
+      breaks: true,
+      gfm: true,
     });
   }
+}
+
+function parseMarkdown(text) {
+  const parser = window.marked;
+  if (!parser) return null;
+
+  if (typeof parser.parse === 'function') {
+    return parser.parse(text);
+  }
+
+  if (typeof parser === 'function') {
+    return parser(text);
+  }
+
+  return null;
 }
 
 /**
  * Render markdown content with code block enhancements
  */
 function renderMarkdown(text) {
-  if (typeof marked === 'undefined') {
-    return escapeHtml(text).replace(/\n/g, '<br>');
-  }
-  
+  const source = typeof text === 'string' ? text : String(text ?? '');
+  if (!source.trim()) return '';
+
   try {
-    let html = marked.parse(text);
+    const parsed = parseMarkdown(source);
+    if (!parsed) {
+      return escapeHtml(source).replace(/\n/g, '<br>');
+    }
+
+    let html = parsed;
     
     // Wrap code blocks with copy button
     html = html.replace(/<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g, (match, attrs, code) => {
@@ -1720,7 +2004,7 @@ function renderMarkdown(text) {
     return html;
   } catch (e) {
     console.error('Markdown render error:', e);
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    return escapeHtml(source).replace(/\n/g, '<br>');
   }
 }
 
@@ -1898,8 +2182,7 @@ window.quoteMessage = function(messageId) {
   const messageEl = document.getElementById(messageId);
   if (!messageEl) return;
   
-  const content = messageEl.querySelector('.markdown-content')?.textContent || 
-                  messageEl.querySelector('p')?.textContent || '';
+  const content = getMessageText(messageEl);
   
   if (chatInput) {
     const quotedText = content.split('\n').map(line => `> ${line}`).join('\n');
@@ -1925,13 +2208,8 @@ window.continueMessage = function() {
 window.copyMessage = function(messageId) {
   const messageEl = document.getElementById(messageId);
   if (!messageEl) return;
-  
-  // Get raw content from data attribute or text content
-  const rawContent = messageEl.dataset.rawContent || 
-                     messageEl.querySelector('.markdown-content')?.textContent ||
-                     messageEl.querySelector('p')?.textContent || '';
-  
-  navigator.clipboard.writeText(rawContent).then(() => {
+
+  navigator.clipboard.writeText(getMessageText(messageEl)).then(() => {
     showToast('已复制到剪贴板', 'success', 2000);
   });
 };
@@ -1943,11 +2221,23 @@ window.deleteMessage = async function(messageId) {
   if (!confirm('确定要删除这条消息吗？')) return;
   
   const messageEl = document.getElementById(messageId);
-  if (messageEl) {
-    messageEl.remove();
-    showToast('消息已删除', 'info', 2000);
-    
-    // TODO: Also delete from backend session
+  if (!messageEl) return;
+
+  const rawContent = getMessageText(messageEl);
+  const role = messageEl.classList.contains('user') ? 'user' : 'assistant';
+
+  currentSessionMessages = currentSessionMessages.filter((message) => {
+    if (message.role !== role) return true;
+    return message.content !== rawContent;
+  });
+
+  messageEl.remove();
+  showToast('消息已删除', 'info', 2000);
+
+  try {
+    await persistSessionMessages(currentSessionId, currentSessionMessages);
+  } catch (error) {
+    console.error('Failed to delete message from session:', error);
   }
 };
 
@@ -1960,14 +2250,17 @@ window.regenerateMessage = function(messageId) {
     return;
   }
   
-  // Remove the message to regenerate
   const messageEl = document.getElementById(messageId);
   if (messageEl) {
     messageEl.remove();
   }
+
+  if (currentSessionMessages.length > 0 &&
+      currentSessionMessages[currentSessionMessages.length - 1].role === 'assistant') {
+    currentSessionMessages = currentSessionMessages.slice(0, -1);
+  }
   
-  // Resend the last user message
-  sendChatMessage(lastUserMessage);
+  sendChatMessage(lastUserMessage, { skipUserAppend: true });
 };
 
 /**
@@ -1977,9 +2270,7 @@ window.downloadMessage = function(messageId) {
   const messageEl = document.getElementById(messageId);
   if (!messageEl) return;
   
-  const rawContent = messageEl.dataset.rawContent || 
-                     messageEl.querySelector('.markdown-content')?.textContent ||
-                     messageEl.querySelector('p')?.textContent || '';
+  const rawContent = getMessageText(messageEl);
   
   const blob = new Blob([rawContent], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -2660,8 +2951,10 @@ async function init() {
 
   // Load user AI provider settings before chat interactions.
   await loadExtensionRuntimeSettings();
-  
-  // Load chat sessions
+
+  extensionInitialized = true;
+
+  // Load chat sessions once after auth/settings are ready.
   await loadChatSessions();
   
   // Setup auto sync listeners

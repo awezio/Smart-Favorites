@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Smart Favorites",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "智能收藏夹管理 - 基于 AI 的收藏夹语义搜索和问答，支持侧边栏模式",
   "author": "Smart Favorites Team",
   "permissions": [
+    "alarms",
     "bookmarks",
     "storage",
     "activeTab",

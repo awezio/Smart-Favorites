@@ -10,10 +10,16 @@ type GitHubRepo = {
   stargazers_count: number;
   forks_count: number;
   updated_at: string;
+  topics?: string[];
   owner: {
     login: string;
   };
   name: string;
+};
+
+type GitHubStarredItem = {
+  starred_at?: string;
+  repo: GitHubRepo;
 };
 
 export async function fetchUserStars(
@@ -69,7 +75,7 @@ async function fetchStarPage(
   url.searchParams.set("page", String(page));
 
   const response = await fetch(url, {
-    headers: buildGitHubHeaders(token),
+    headers: buildGitHubHeaders(token, true),
   });
 
   if (!response.ok) {
@@ -77,19 +83,8 @@ async function fetchStarPage(
     throw new Error(`GitHub API error: ${response.status}${message ? ` - ${message}` : ""}`);
   }
 
-  const data = (await response.json()) as GitHubRepo[];
-  return data.map((repo) => ({
-    owner: repo.owner.login,
-    repo: repo.name,
-    url: repo.html_url,
-    description: repo.description || "",
-    language: repo.language || "",
-    stars: repo.stargazers_count || 0,
-    forks: repo.forks_count || 0,
-    updated: repo.updated_at,
-    embedding: undefined,
-    source_hash: undefined,
-  }));
+  const data = (await response.json()) as Array<GitHubStarredItem | GitHubRepo>;
+  return data.map((entry) => parseStarredEntry(entry));
 }
 
 export function diffStars(
@@ -117,8 +112,17 @@ export function diffStars(
     const languageChanged = (oldItem.language || "") !== (newItem.language || "");
     const starsChanged = oldItem.stars !== newItem.stars;
     const forksChanged = oldItem.forks !== newItem.forks;
+    const topicsChanged = !sameStringArray(oldItem.topics, newItem.topics);
+    const starredAtChanged = (oldItem.starred_at || "") !== (newItem.starred_at || "");
 
-    if (descriptionChanged || languageChanged || starsChanged || forksChanged) {
+    if (
+      descriptionChanged ||
+      languageChanged ||
+      starsChanged ||
+      forksChanged ||
+      topicsChanged ||
+      starredAtChanged
+    ) {
       modified.push({
         old: oldItem,
         new: newItem,
@@ -143,6 +147,34 @@ export function diffStars(
   };
 }
 
+function parseStarredEntry(entry: GitHubStarredItem | GitHubRepo): ParsedStar {
+  const repo: GitHubRepo = "repo" in entry ? entry.repo : entry;
+  const starredAt = "repo" in entry ? entry.starred_at : undefined;
+
+  return {
+    owner: repo.owner.login,
+    repo: repo.name,
+    url: repo.html_url,
+    description: repo.description || "",
+    language: repo.language || "",
+    stars: repo.stargazers_count || 0,
+    forks: repo.forks_count || 0,
+    updated: repo.updated_at,
+    topics: Array.isArray(repo.topics) ? repo.topics : [],
+    starred_at: starredAt || undefined,
+    index_status: "pending",
+    embedding: undefined,
+    source_hash: undefined,
+  };
+}
+
+function sameStringArray(left?: string[], right?: string[]): boolean {
+  const a = [...(left || [])].sort();
+  const b = [...(right || [])].sort();
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
 async function readGitHubErrorMessage(response: Response): Promise<string> {
   try {
     const data = await response.json();
@@ -158,9 +190,11 @@ async function readGitHubErrorMessage(response: Response): Promise<string> {
   return "";
 }
 
-function buildGitHubHeaders(token?: string): HeadersInit {
+function buildGitHubHeaders(token?: string, starred = false): HeadersInit {
   const headers: HeadersInit = {
-    "Accept": "application/vnd.github+json",
+    Accept: starred
+      ? "application/vnd.github.star+json"
+      : "application/vnd.github+json",
   };
 
   if (token) {
@@ -182,6 +216,10 @@ function toStar(item: ParsedStar): GitHubStar {
     stars: item.stars || 0,
     forks: item.forks || 0,
     updated: item.updated,
+    topics: item.topics || [],
+    tags: item.tags || [],
+    starred_at: item.starred_at,
+    index_status: item.index_status || "pending",
     embedding: item.embedding,
     source_hash: item.source_hash,
     created_at: new Date().toISOString(),

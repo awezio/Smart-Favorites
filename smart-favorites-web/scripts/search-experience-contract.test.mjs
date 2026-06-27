@@ -91,7 +91,7 @@ assert.match(
 );
 assert.match(
   searchLib,
-  /mergeSearchResults/,
+  /reciprocalRankFusion/,
   "Semantic and keyword results should be merged and deduplicated."
 );
 assert.match(

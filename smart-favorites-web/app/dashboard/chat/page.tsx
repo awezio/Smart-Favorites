@@ -33,14 +33,22 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { SourcesMobileSheet, SourcesPanel } from "@/components/chat/sources-panel";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/layout/resizable";
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
-import { isPlaceholderSessionTitle } from "@/lib/chat/session-title-utils";
+import { shouldRegenerateSessionTitle } from "@/lib/chat/session-title-utils";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { CHAT_PANEL_DEFAULTS, CHAT_PANELS_AUTO_SAVE_ID } from "@/lib/layout/chat-panel-layout";
 import { cn } from "@/lib/utils";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type {
   ChatMessage,
   ChatRoutingMetadata,
   ChatSession,
+  ChatTitleStatus,
   LLMProvider,
   SearchResult,
 } from "@/types";
@@ -115,6 +123,8 @@ const chatCopy = {
     sources: "引用来源",
     source: "来源",
     knowledgeBase: "语料库",
+    titleGenerating: "正在生成标题...",
+    titleFailed: "标题生成失败，已使用备用标题",
   },
   en: {
     openFailed: "Failed to open chat session",
@@ -167,6 +177,8 @@ const chatCopy = {
     sources: "Sources",
     source: "Source",
     knowledgeBase: "Knowledge Base",
+    titleGenerating: "Generating title...",
+    titleFailed: "Title generation failed, using a fallback label",
   },
 };
 
@@ -203,6 +215,8 @@ export default function ChatPage() {
   const sessionsRef = useRef(sessions);
   const currentSessionRef = useRef(currentSession);
   const hasInitializedRef = useRef(false);
+  const sessionSidebarInitializedRef = useRef(false);
+  const isLargeScreen = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -224,8 +238,38 @@ export default function ChatPage() {
     return list;
   }, []);
 
+  const applySessionTitleUpdate = useCallback(
+    (sessionId: string, title: string, titleStatus?: ChatTitleStatus) => {
+      setSessions((current) =>
+        current.map((item) =>
+          item.id === sessionId
+            ? {
+                ...item,
+                title,
+                title_status: titleStatus || item.title_status,
+              }
+            : item
+        )
+      );
+      setCurrentSession((current) =>
+        current?.id === sessionId
+          ? {
+              ...current,
+              title,
+              title_status: titleStatus || current.title_status,
+            }
+          : current
+      );
+    },
+    []
+  );
+
   const maybeGenerateSessionTitle = useCallback(
-    async (sessionId: string, sessionMessages: ChatMessage[]) => {
+    async (
+      sessionId: string,
+      sessionMessages: ChatMessage[],
+      options?: { force?: boolean }
+    ) => {
       const userCount = sessionMessages.filter((message) => message.role === "user").length;
       const assistantCount = sessionMessages.filter(
         (message) => message.role === "assistant"
@@ -237,9 +281,22 @@ export default function ChatPage() {
       const session =
         sessionsRef.current.find((item) => item.id === sessionId) ??
         (currentSessionRef.current?.id === sessionId ? currentSessionRef.current : null);
-      if (session && !isPlaceholderSessionTitle(session.title)) {
+      const firstUserContent = sessionMessages.find((message) => message.role === "user")?.content;
+
+      if (
+        session &&
+        !options?.force &&
+        !shouldRegenerateSessionTitle(
+          session.title,
+          session.title_status,
+          session.metadata,
+          firstUserContent
+        )
+      ) {
         return;
       }
+
+      applySessionTitleUpdate(sessionId, session?.title || t.emptyTitle, "generating");
 
       try {
         const response = await fetch(`/api/chat/sessions/${sessionId}/generate-title`, {
@@ -251,10 +308,12 @@ export default function ChatPage() {
               content: message.content,
             })),
             locale: language,
+            force: Boolean(options?.force),
           }),
         });
 
         if (!response.ok) {
+          toast.error(t.titleFailed);
           return;
         }
 
@@ -265,34 +324,20 @@ export default function ChatPage() {
 
         const nextTitle = typeof data.title === "string" ? data.title : "";
         if (!nextTitle) {
+          toast.error(t.titleFailed);
           return;
         }
 
-        setSessions((current) =>
-          current.map((item) =>
-            item.id === sessionId
-              ? {
-                  ...item,
-                  title: nextTitle,
-                  title_status: data.title_status || item.title_status,
-                }
-              : item
-          )
-        );
-        setCurrentSession((current) =>
-          current?.id === sessionId
-            ? {
-                ...current,
-                title: nextTitle,
-                title_status: data.title_status || current.title_status,
-              }
-            : current
-        );
+        applySessionTitleUpdate(sessionId, nextTitle, (data.title_status as ChatTitleStatus) || "ready");
+
+        if (data.title_source === "fallback" || data.needs_retry) {
+          toast.error(t.titleFailed);
+        }
       } catch {
-        // Title generation is best-effort.
+        toast.error(t.titleFailed);
       }
     },
-    [language]
+    [applySessionTitleUpdate, language, t.emptyTitle, t.titleFailed]
   );
 
   const openSession = useCallback(async (session: ChatSession) => {
@@ -319,7 +364,14 @@ export default function ChatPage() {
         current.map((item) => (item.id === hydratedSession.id ? hydratedSession : item))
       );
 
-      if (isPlaceholderSessionTitle(hydratedSession.title)) {
+      if (
+        shouldRegenerateSessionTitle(
+          hydratedSession.title,
+          hydratedSession.title_status,
+          hydratedSession.metadata,
+          hydratedSession.messages.find((message) => message.role === "user")?.content
+        )
+      ) {
         void maybeGenerateSessionTitle(hydratedSession.id, hydratedSession.messages);
       }
     } catch {
@@ -428,6 +480,13 @@ export default function ChatPage() {
     setPinnedSessionIds(readStoredSessionSet(PINNED_STORAGE_KEY));
     setArchivedSessionIds(readStoredSessionSet(ARCHIVED_STORAGE_KEY));
   }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen && !sessionSidebarInitializedRef.current) {
+      setSidebarCollapsed(true);
+      sessionSidebarInitializedRef.current = true;
+    }
+  }, [isLargeScreen]);
 
   useEffect(() => {
     if (hasInitializedRef.current) {
@@ -606,7 +665,12 @@ export default function ChatPage() {
         sessionId: targetSession.id,
         chatHistory: baseMessages,
         knowledgeMode,
+        locale: language,
       };
+
+      if (knowledgeMode !== "never") {
+        body.mode = "agent";
+      }
 
       if (selectedProvider) {
         body.provider = selectedProvider;
@@ -642,8 +706,24 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: savedMessages }),
       });
+
+      if (typeof data.generatedTitle === "string" && data.generatedTitle.trim()) {
+        applySessionTitleUpdate(
+          targetSession.id,
+          data.generatedTitle.trim(),
+          (typeof data.titleStatus === "string"
+            ? (data.titleStatus as ChatTitleStatus)
+            : "ready")
+        );
+      }
+
       await loadSessions();
-      void maybeGenerateSessionTitle(targetSession.id, savedMessages);
+
+      if (data.titleSource === "fallback") {
+        void maybeGenerateSessionTitle(targetSession.id, savedMessages, { force: true });
+      } else if (!data.generatedTitle) {
+        void maybeGenerateSessionTitle(targetSession.id, savedMessages);
+      }
     } catch (error: any) {
       toast.error(error.message || t.networkError);
     } finally {
@@ -696,123 +776,173 @@ export default function ChatPage() {
     );
   }
 
-  return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-muted/40 text-foreground">
-      <ChatSidebar
-        language={language}
-        collapsed={sidebarCollapsed}
-        sessions={groupedSessions}
-        currentSession={currentSession}
-        pinnedSessionIds={pinnedSessionIds}
-        archivedSessionIds={archivedSessionIds}
-        sessionSearch={sessionSearch}
-        showArchived={showArchived}
-        onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
-        onSearchChange={setSessionSearch}
-        onCreateSession={() => createNewSession()}
-        onOpenSession={openSession}
-        onRenameSession={renameSession}
-        onDeleteSession={deleteSession}
-        onTogglePinned={(sessionId) =>
-          toggleSessionSet(PINNED_STORAGE_KEY, sessionId, setPinnedSessionIds)
-        }
-        onArchiveSession={archiveSession}
-        onToggleShowArchived={() => setShowArchived((value) => !value)}
-      />
+  const sessionSidebar = (
+    <ChatSidebar
+      language={language}
+      collapsed={sidebarCollapsed}
+      sessions={groupedSessions}
+      currentSession={currentSession}
+      pinnedSessionIds={pinnedSessionIds}
+      archivedSessionIds={archivedSessionIds}
+      sessionSearch={sessionSearch}
+      showArchived={showArchived}
+      onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+      onSearchChange={setSessionSearch}
+      onCreateSession={() => createNewSession()}
+      onOpenSession={openSession}
+      onRenameSession={renameSession}
+      onDeleteSession={deleteSession}
+      onTogglePinned={(sessionId) =>
+        toggleSessionSet(PINNED_STORAGE_KEY, sessionId, setPinnedSessionIds)
+      }
+      onArchiveSession={archiveSession}
+      onToggleShowArchived={() => setShowArchived((value) => !value)}
+    />
+  );
 
-      <div className="flex min-h-0 min-w-0 flex-1">
-        <section className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center justify-end border-b border-border bg-muted/50 px-4 py-2 lg:hidden">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setSourcesMobileOpen(true)}
-            >
-              {t.sources}
-              {sessionSources.length > 0 ? ` (${sessionSources.length})` : ""}
-            </Button>
-          </div>
+  const chatMain = (
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex items-center justify-end border-b border-border bg-muted/50 px-4 py-2 lg:hidden">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setSourcesMobileOpen(true)}
+        >
+          {t.sources}
+          {sessionSources.length > 0 ? ` (${sessionSources.length})` : ""}
+        </Button>
+      </div>
 
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            <div className="flex-1 overflow-y-auto px-4 pb-40 pt-6 sm:px-6 lg:px-8">
-              {messages.length === 0 ? (
-                <NewSessionEmptyState language={language} />
-              ) : (
-                <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-                  {messages.map((message, index) => (
-                    <MessageBubble
-                      key={`${message.timestamp}-${index}`}
-                      language={language}
-                      message={message}
-                      onCopy={() => copyText(message.content, t.copied)}
-                      onRegenerate={() => regenerateFrom(index)}
-                      onBranch={() => branchFrom(index)}
-                      onCitationClick={(citationIndex) => {
-                        setHighlightedSourceIndex(citationIndex);
-                        setSourcesPanelCollapsed(false);
-                        setSourcesMobileOpen(true);
-                      }}
-                    />
-                  ))}
-                  {loading && (
-                    <div className="flex items-center gap-3 border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-none">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t.generating}
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto px-4 pb-40 pt-6 sm:px-6 lg:px-8">
+          {messages.length === 0 ? (
+            <NewSessionEmptyState language={language} />
+          ) : (
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+              {messages.map((message, index) => (
+                <MessageBubble
+                  key={`${message.timestamp}-${index}`}
+                  language={language}
+                  message={message}
+                  onCopy={() => copyText(message.content, t.copied)}
+                  onRegenerate={() => regenerateFrom(index)}
+                  onBranch={() => branchFrom(index)}
+                  onCitationClick={(citationIndex) => {
+                    setHighlightedSourceIndex(citationIndex);
+                    setSourcesPanelCollapsed(false);
+                    if (isLargeScreen) {
+                      return;
+                    }
+                    setSourcesMobileOpen(true);
+                  }}
+                />
+              ))}
+              {loading && (
+                <div className="flex items-center gap-3 border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-none">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t.generating}
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
+          )}
+        </div>
 
-            <Composer
-              language={language}
-              input={input}
-              loading={loading}
-              attachments={attachments}
-              knowledgeMode={knowledgeMode}
-              currentModelLabel={currentModelLabel}
-              providerOptions={providerOptions}
-              selectedProvider={selectedProvider}
-              selectedModelId={selectedModelId}
-              showModelMenu={showModelMenu}
-              supportsAttachments={supportsAttachments}
-              fileInputRef={fileInputRef}
-              onInputChange={setInput}
-              onSend={handleSend}
-              onKnowledgeModeChange={setKnowledgeMode}
-              onToggleModelMenu={() => setShowModelMenu((value) => !value)}
-              onSelectModel={(provider, modelId) => {
-                setSelectedProvider(provider);
-                setSelectedModelId(modelId);
-                setShowModelMenu(false);
-              }}
-              onSelectDefaultModel={() => {
-                setSelectedProvider("");
-                setSelectedModelId("");
-                setShowModelMenu(false);
-              }}
-              onAttachClick={() => fileInputRef.current?.click()}
-              onFilesSelected={attachFiles}
-              onRemoveAttachment={(index) =>
-                setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))
-              }
-            />
-          </div>
-        </section>
-
-        <SourcesPanel
+        <Composer
           language={language}
-          sessionId={currentSession?.id ?? null}
-          sources={sessionSources}
-          collapsed={sourcesPanelCollapsed}
-          highlightedIndex={highlightedSourceIndex}
-          onToggleCollapse={() => setSourcesPanelCollapsed((value) => !value)}
-          onHighlight={setHighlightedSourceIndex}
-          onAnalyze={(prompt) => void sendQuery(prompt)}
+          input={input}
+          loading={loading}
+          attachments={attachments}
+          knowledgeMode={knowledgeMode}
+          currentModelLabel={currentModelLabel}
+          providerOptions={providerOptions}
+          selectedProvider={selectedProvider}
+          selectedModelId={selectedModelId}
+          showModelMenu={showModelMenu}
+          supportsAttachments={supportsAttachments}
+          fileInputRef={fileInputRef}
+          onInputChange={setInput}
+          onSend={handleSend}
+          onKnowledgeModeChange={setKnowledgeMode}
+          onToggleModelMenu={() => setShowModelMenu((value) => !value)}
+          onSelectModel={(provider, modelId) => {
+            setSelectedProvider(provider);
+            setSelectedModelId(modelId);
+            setShowModelMenu(false);
+          }}
+          onSelectDefaultModel={() => {
+            setSelectedProvider("");
+            setSelectedModelId("");
+            setShowModelMenu(false);
+          }}
+          onAttachClick={() => fileInputRef.current?.click()}
+          onFilesSelected={attachFiles}
+          onRemoveAttachment={(index) =>
+            setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+          }
         />
       </div>
+    </section>
+  );
+
+  const sourcesPanel = (
+    <SourcesPanel
+      language={language}
+      sessionId={currentSession?.id ?? null}
+      sources={sessionSources}
+      collapsed={sourcesPanelCollapsed}
+      highlightedIndex={highlightedSourceIndex}
+      onToggleCollapse={() => setSourcesPanelCollapsed((value) => !value)}
+      onHighlight={setHighlightedSourceIndex}
+      onAnalyze={(prompt) => void sendQuery(prompt)}
+    />
+  );
+
+  return (
+    <div className="flex h-full min-h-0 overflow-hidden bg-muted/40 text-foreground">
+      {isLargeScreen ? (
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
+          panelIds={["chat-session", "chat-main", "chat-sources"]}
+          className="min-h-0 min-w-0 flex-1"
+        >
+          <ResizablePanel
+            id="chat-session"
+            defaultSize={CHAT_PANEL_DEFAULTS.session.defaultSize}
+            minSize={CHAT_PANEL_DEFAULTS.session.minSize}
+            maxSize={CHAT_PANEL_DEFAULTS.session.maxSize}
+            className="min-w-0"
+          >
+            {sessionSidebar}
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel
+            id="chat-main"
+            defaultSize={CHAT_PANEL_DEFAULTS.chat.defaultSize}
+            minSize={CHAT_PANEL_DEFAULTS.chat.minSize}
+            className="min-w-0"
+          >
+            {chatMain}
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel
+            id="chat-sources"
+            defaultSize={CHAT_PANEL_DEFAULTS.sources.defaultSize}
+            minSize={CHAT_PANEL_DEFAULTS.sources.minSize}
+            maxSize={CHAT_PANEL_DEFAULTS.sources.maxSize}
+            className="min-w-0"
+          >
+            {sourcesPanel}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <>
+          {sessionSidebar}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{chatMain}</div>
+        </>
+      )}
 
       <SourcesMobileSheet
         open={sourcesMobileOpen}
@@ -870,7 +1000,7 @@ function ChatSidebar({
 
   if (collapsed) {
     return (
-        <aside className="flex w-14 shrink-0 flex-col items-center border-r border-border bg-muted/50 py-4">
+      <aside className="flex h-full w-full shrink-0 flex-col items-center border-r border-border bg-muted/50 py-4">
         <button
           className="rounded-lg p-2 text-muted-foreground hover:bg-card"
           onClick={onToggleCollapse}
@@ -890,7 +1020,7 @@ function ChatSidebar({
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-r border-border bg-muted/50">
+    <aside className="flex h-full w-full min-w-0 shrink-0 flex-col border-r border-border bg-muted/50">
       <div className="flex items-center justify-between px-5 pb-4 pt-5">
         <div className="flex items-center gap-3">
           <div className="grid h-9 w-9 place-items-center border border-border bg-card text-primary shadow-none">
@@ -1017,7 +1147,14 @@ function SessionRow({
       onClick={onOpen}
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", pinned ? "bg-primary/50" : "bg-muted-foreground/30")} />
-      <span className="min-w-0 flex-1 truncate">{session.title || t.untitled}</span>
+      {session.title_status === "generating" ? (
+        <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+          {t.titleGenerating}
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1 truncate">{session.title || t.untitled}</span>
+      )}
       {archived && <Archive className="h-3.5 w-3.5 text-muted-foreground" />}
       <button
         className="rounded-md p-1 text-muted-foreground opacity-0 hover:bg-primary/5 hover:text-muted-foreground group-hover:opacity-100"
@@ -1142,7 +1279,7 @@ function Composer({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-4 sm:px-6 lg:px-8">
-      <div className="pointer-events-auto mx-auto max-w-5xl">
+      <div className="@container/composer pointer-events-auto mx-auto max-w-5xl">
         <div className="border border-border bg-card">
           <Textarea
             value={input}
@@ -1175,7 +1312,7 @@ function Composer({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 px-5 py-3">
+          <div className="flex flex-nowrap items-center gap-2 border-t border-border/60 px-5 py-3 sm:gap-3">
             <input
               ref={fileInputRef}
               type="file"
@@ -1197,22 +1334,28 @@ function Composer({
             </button>
             <button
               onClick={cycleKnowledgeMode}
-              className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+              title={knowledgeModeLabels[language][knowledgeMode]}
+              aria-label={knowledgeModeLabels[language][knowledgeMode]}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary/5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 @max-[480px]/composer:px-2"
             >
               <Zap className="h-4 w-4" />
-              {knowledgeModeLabels[language][knowledgeMode]}
-              <ChevronDown className="h-4 w-4" />
+              <span className="@max-[480px]/composer:hidden">
+                {knowledgeModeLabels[language][knowledgeMode]}
+              </span>
+              <ChevronDown className="h-4 w-4 @max-[480px]/composer:hidden" />
             </button>
 
-            <div className="ml-auto flex min-w-0 items-center gap-3">
-              <div className="relative">
+            <div className="ml-auto flex min-w-0 shrink items-center gap-2 sm:gap-3">
+              <div className="relative min-w-0">
                 <button
                   onClick={onToggleModelMenu}
-                  className="inline-flex max-w-xs items-center gap-2 rounded-full bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+                  title={currentModelLabel}
+                  aria-label={currentModelLabel}
+                  className="inline-flex max-w-xs min-w-0 items-center gap-2 rounded-full bg-primary/5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 @max-[480px]/composer:max-w-none @max-[480px]/composer:px-2"
                 >
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="truncate">{currentModelLabel}</span>
-                  <ChevronDown className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="truncate @max-[480px]/composer:hidden">{currentModelLabel}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 @max-[480px]/composer:hidden" />
                 </button>
 
                 {showModelMenu && (
@@ -1261,10 +1404,12 @@ function Composer({
               <button
                 onClick={onSend}
                 disabled={loading || !input.trim()}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                title={t.run}
+                aria-label={t.run}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 @max-[480px]/composer:px-2.5"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-                {t.run}
+                <span className="@max-[480px]/composer:hidden">{t.run}</span>
               </button>
             </div>
           </div>
@@ -1508,10 +1653,18 @@ function normalizeChatRouting(routing: unknown): ChatRoutingMetadata | undefined
 
   const item = routing as Partial<ChatRoutingMetadata>;
   const mode = item.mode === "knowledge" ? "knowledge" : "chat";
+  const scope =
+    item.scope === "stars" ||
+    item.scope === "bookmarks" ||
+    item.scope === "documents" ||
+    item.scope === "all"
+      ? item.scope
+      : "all";
   return {
     mode,
     useKnowledge: Boolean(item.useKnowledge),
     reason: typeof item.reason === "string" ? item.reason : "",
+    scope,
   };
 }
 

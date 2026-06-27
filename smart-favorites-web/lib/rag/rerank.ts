@@ -17,7 +17,7 @@ function searchResultToDocument(source: SearchResult): string {
     return `${source.bookmark.title}\n${source.bookmark.url}\n${source.bookmark.description_zh || source.bookmark.description || ""}`;
   }
   if (source.type === "star" && source.star) {
-    return `${source.star.owner}/${source.star.repo}\n${source.star.url}\n${source.star.description || ""}`;
+    return `${source.star.owner}/${source.star.repo}\n${source.star.url}\n${source.star.description_zh || source.star.description || ""}\n${source.star.description_en || ""}\n${source.star.language || ""}\nTopics: ${(source.star.topics || []).join(", ")}\nTags: ${(source.star.tags || []).join(", ")}\nREADME: ${source.star.readme_summary_zh || source.star.readme_summary || ""}`;
   }
   if (source.type === "document" && source.document) {
     return `${source.document.title}\n${source.document.content?.slice(0, 600) || ""}`;

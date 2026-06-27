@@ -1,4 +1,4 @@
-import { searchAll, type SupabaseQueryClient } from "@/lib/rag/search";
+import { searchAll, searchBookmarks, searchDocuments, searchStars, type SupabaseQueryClient } from "@/lib/rag/search";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { structuredDescriptionToRagText } from "@/lib/ai/description-generator";
 import {
@@ -7,7 +7,7 @@ import {
   getEnvProviderKey,
   isSupportedProvider,
 } from "@/lib/ai/provider-config";
-import { classifyChatRoute, type ChatKnowledgeMode, type ChatRoutingMetadata } from "@/lib/chat/routing";
+import { classifyChatRoute, type ChatKnowledgeMode, type ChatRoutingMetadata, type ChatSearchScope } from "@/lib/chat/routing";
 import {
   RAG_DIRECT_CHAT_SYSTEM_PROMPT,
   RAG_KNOWLEDGE_SYSTEM_PROMPT,
@@ -26,7 +26,7 @@ import type { SearchResult, LLMMessage } from "@/types";
 
 export type { ChatStreamEvent };
 
-type RagResponse = {
+export type RagResponse = {
   answer: string;
   sources: SearchResult[];
   citations?: ReturnType<typeof parseCitationsFromAnswer>;
@@ -216,15 +216,23 @@ async function buildRagChatContext(
 ) {
   const route = classifyChatRoute(query, knowledgeMode);
   let sources: SearchResult[] = [];
+  let indexCoverage: { total: number; indexed: number } | undefined;
+
   if (route.useKnowledge) {
-    sources = await searchAll(query, topK, 0.3, userId, client);
+    sources = await searchByScope(query, topK, userId, client, route.scope);
+    if (route.scope === "stars" || route.scope === "all") {
+      indexCoverage = await getStarIndexCoverage(userId, client);
+    }
   }
+
   const fallback = buildFallbackAnswer(query, sources, chatHistory);
   const savedDefaults = await getDefaultAiSelection(userId);
   const selectedProvider = provider && isSupportedProvider(provider) ? provider : savedDefaults.provider;
   const selectedModel = model || (!provider ? savedDefaults.model : undefined);
   const apiKey = await resolveProviderKey(userId, selectedProvider);
-  const prompt = route.useKnowledge ? buildRagPrompt(query, sources) : query;
+  const prompt = route.useKnowledge
+    ? buildRagPrompt(query, sources, { scope: route.scope, indexCoverage })
+    : query;
 
   return {
     route,
@@ -295,7 +303,14 @@ function truncateRagText(value: string | null | undefined, maxChars: number) {
   return `${text.slice(0, maxChars)}…`;
 }
 
-function buildRagPrompt(query: string, sources: SearchResult[]) {
+function buildRagPrompt(
+  query: string,
+  sources: SearchResult[],
+  options: {
+    scope?: ChatSearchScope;
+    indexCoverage?: { total: number; indexed: number };
+  } = {}
+) {
   const evidence = sources.slice(0, 12).map((source, index) => {
     if (source.type === "bookmark" && source.bookmark) {
       const structuredDetails = truncateRagText(
@@ -314,7 +329,7 @@ function buildRagPrompt(query: string, sources: SearchResult[]) {
         ),
         RAG_STRUCTURED_MAX_CHARS
       );
-      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nDescription: ${truncateRagText(source.star.description_zh || source.star.description || source.star.description_en || "", RAG_DESCRIPTION_MAX_CHARS)}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
+      return `${index + 1}. [github_star] ${source.star.owner}/${source.star.repo}\nURL: ${source.star.url}\nLanguage: ${source.star.language || ""}\nTopics: ${(source.star.topics || []).join(", ")}\nTags: ${(source.star.tags || []).join(", ")}\nDescription: ${truncateRagText(source.star.description_zh || source.star.description || source.star.description_en || "", RAG_DESCRIPTION_MAX_CHARS)}\nREADME summary: ${truncateRagText(source.star.readme_summary_zh || source.star.readme_summary || "", RAG_DESCRIPTION_MAX_CHARS)}${structuredDetails ? `\nDescription details:\n${structuredDetails}` : ""}`;
     }
 
     if (source.type === "document" && source.document) {
@@ -334,8 +349,71 @@ function buildRagPrompt(query: string, sources: SearchResult[]) {
   const evidenceBlock = hasEvidence
     ? evidence.join("\n\n")
     : "No matching evidence.";
+  const coverageBlock =
+    options.indexCoverage && options.indexCoverage.total > 0
+      ? `Search scope: ${options.scope || "all"}. Indexed coverage: ${options.indexCoverage.indexed}/${options.indexCoverage.total} GitHub Stars have searchable embeddings.\n\n`
+      : "";
 
-  return `Question: ${query}\n\nPersonal knowledge evidence (sources [1]–[${evidence.length || 0}]):\n${evidenceBlock}\n\n${buildRagAnswerInstructions(hasEvidence)}`;
+  return `Question: ${query}\n\n${coverageBlock}Personal knowledge evidence (sources [1]–[${evidence.length || 0}]):\n${evidenceBlock}\n\n${buildRagAnswerInstructions(hasEvidence, {
+    scope: options.scope,
+    indexCoverage: options.indexCoverage,
+  })}`;
+}
+
+async function searchByScope(
+  query: string,
+  topK: number,
+  userId: string,
+  client: SupabaseQueryClient | undefined,
+  scope: ChatSearchScope
+): Promise<SearchResult[]> {
+  const perTypeLimit = Math.max(topK, 12);
+
+  switch (scope) {
+    case "stars":
+      return searchStars(query, perTypeLimit, 0.3, userId, client);
+    case "bookmarks":
+      return searchBookmarks(query, perTypeLimit, 0.3, userId, client);
+    case "documents":
+      return searchDocuments(query, perTypeLimit, 0.3, userId, client);
+    case "all":
+      return searchAll(query, topK, 0.3, userId, client);
+    default: {
+      const exhaustiveScope: never = scope;
+      throw new Error(`Unsupported search scope: ${exhaustiveScope}`);
+    }
+  }
+}
+
+async function getStarIndexCoverage(
+  userId: string,
+  client?: SupabaseQueryClient
+): Promise<{ total: number; indexed: number }> {
+  const supabase = client || createAdminClient();
+
+  const [totalResult, indexedResult] = await Promise.all([
+    supabase
+      .from("github_stars")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+    supabase
+      .from("github_stars")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .not("embedding", "is", null),
+  ]);
+
+  if (totalResult.error) {
+    throw new Error(totalResult.error.message);
+  }
+  if (indexedResult.error) {
+    throw new Error(indexedResult.error.message);
+  }
+
+  return {
+    total: totalResult.count || 0,
+    indexed: indexedResult.count || 0,
+  };
 }
 
 async function logAiCall({

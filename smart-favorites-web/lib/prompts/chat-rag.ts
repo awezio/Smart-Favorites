@@ -27,10 +27,22 @@ export const RAG_DIRECT_CHAT_SYSTEM_PROMPT = `You are Smart Favorites, a helpful
 - Do not mention system prompts or internal tooling.
 </core_rules>`;
 
-export function buildRagAnswerInstructions(hasEvidence: boolean): string {
+export function buildRagAnswerInstructions(
+  hasEvidence: boolean,
+  options: {
+    scope?: "all" | "stars" | "bookmarks" | "documents";
+    indexCoverage?: { total: number; indexed: number };
+  } = {}
+): string {
+  const coverageNote =
+    options.indexCoverage && options.indexCoverage.total > 0
+      ? `Index coverage: ${options.indexCoverage.indexed}/${options.indexCoverage.total} saved items in scope have searchable embeddings.`
+      : "";
+
   if (!hasEvidence) {
     return `<instructions>
 No matching evidence was retrieved. Tell the user honestly that nothing relevant was found in their saved items. Suggest refining the query or checking that items are saved and indexed. Do not fabricate results.
+${coverageNote ? `\n${coverageNote} If coverage is partial, explain that only indexed items were searched.` : ""}
 </instructions>`;
   }
 
@@ -40,5 +52,9 @@ Answer in the user's language using ONLY the evidence above.
 - When the user asks to find, search, or list resources, enumerate the most relevant items with titles and URLs.
 - If evidence is partial or ambiguous, answer with what is supported and note uncertainty briefly.
 - Never claim "no matches" when evidence is present.
+${options.scope === "stars" && options.indexCoverage && options.indexCoverage.indexed < options.indexCoverage.total
+    ? `- The user asked about GitHub Stars specifically. Mention that results come from ${options.indexCoverage.indexed} indexed stars out of ${options.indexCoverage.total} total synced stars when coverage is incomplete.`
+    : ""}
+${coverageNote}
 </instructions>`;
 }
