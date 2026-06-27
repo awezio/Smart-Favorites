@@ -7,24 +7,22 @@ export type ChatPanelLayout = Record<ChatPanelId, number>;
 
 export const CHAT_PANEL_DEFAULTS = {
   session: {
-    defaultSize: 20,
-    minSize: 5,
-    maxSize: 45,
-    collapsedSize: 5,
+    defaultSize: "20%",
+    minSize: "5%",
+    maxSize: "45%",
   },
-  chat: { defaultSize: 55 },
+  chat: { defaultSize: "55%" },
   sources: {
-    defaultSize: 25,
-    minSize: 5,
-    maxSize: 45,
-    collapsedSize: 5,
+    defaultSize: "25%",
+    minSize: "5%",
+    maxSize: "45%",
   },
 } as const;
 
 export const DEFAULT_CHAT_PANEL_LAYOUT: ChatPanelLayout = {
-  "chat-session": CHAT_PANEL_DEFAULTS.session.defaultSize,
-  "chat-main": CHAT_PANEL_DEFAULTS.chat.defaultSize,
-  "chat-sources": CHAT_PANEL_DEFAULTS.sources.defaultSize,
+  "chat-session": 20,
+  "chat-main": 55,
+  "chat-sources": 25,
 };
 
 export function isChatPanelLayout(value: unknown): value is ChatPanelLayout {
@@ -60,10 +58,10 @@ export function normalizeChatPanelLayout(
   const sources = layout["chat-sources"];
 
   if (
-    session < CHAT_PANEL_DEFAULTS.session.minSize ||
-    session > CHAT_PANEL_DEFAULTS.session.maxSize ||
-    sources < CHAT_PANEL_DEFAULTS.sources.minSize ||
-    sources > CHAT_PANEL_DEFAULTS.sources.maxSize ||
+    session < 5 ||
+    session > 45 ||
+    sources < 5 ||
+    sources > 45 ||
     chat <= 0
   ) {
     return fallback;
@@ -78,9 +76,6 @@ export function clearChatPanelLayoutStorage(): void {
   }
 
   for (const key of Object.keys(localStorage)) {
-    if (key.startsWith(`react-resizable-panels:${CHAT_PANELS_AUTO_SAVE_ID}`)) {
-      localStorage.removeItem(key);
-    }
     if (key.startsWith("react-resizable-panels:chat-panels")) {
       localStorage.removeItem(key);
     }
