@@ -123,7 +123,7 @@ function ResizablePanel({
 }: ComponentProps<typeof Panel>) {
   return (
     <Panel className={className} {...props}>
-      <div className="h-full min-h-0 min-w-0 overflow-hidden">{children}</div>
+      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">{children}</div>
     </Panel>
   );
 }
