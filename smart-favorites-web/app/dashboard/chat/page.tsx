@@ -38,6 +38,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
   useGroupRef,
+  usePanelRef,
 } from "@/components/layout/resizable";
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
 import { shouldRegenerateSessionTitle } from "@/lib/chat/session-title-utils";
@@ -225,6 +226,8 @@ export default function ChatPage() {
   const sessionSidebarInitializedRef = useRef(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
   const chatPanelGroupRef = useGroupRef();
+  const sessionPanelRef = usePanelRef();
+  const sourcesPanelRef = usePanelRef();
   const [panelLayout, setPanelLayout] = useState<ChatPanelLayout>(() => {
     if (typeof window === "undefined") {
       return DEFAULT_CHAT_PANEL_LAYOUT;
@@ -251,12 +254,28 @@ export default function ChatPage() {
   });
 
   const toggleSessionSidebar = useCallback(() => {
-    setSidebarCollapsed((collapsed) => !collapsed);
-  }, []);
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      if (next) {
+        sessionPanelRef.current?.collapse();
+      } else {
+        sessionPanelRef.current?.expand();
+      }
+      return next;
+    });
+  }, [sessionPanelRef]);
 
   const toggleSourcesPanel = useCallback(() => {
-    setSourcesPanelCollapsed((collapsed) => !collapsed);
-  }, []);
+    setSourcesPanelCollapsed((collapsed) => {
+      const next = !collapsed;
+      if (next) {
+        sourcesPanelRef.current?.collapse();
+      } else {
+        sourcesPanelRef.current?.expand();
+      }
+      return next;
+    });
+  }, [sourcesPanelRef]);
 
   const sanitizeChatPanelLayout = useCallback(
     (layout: Record<string, number>) =>
@@ -543,6 +562,23 @@ export default function ChatPage() {
       sessionSidebarInitializedRef.current = true;
     }
   }, [isLargeScreen]);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      if (sidebarCollapsed) {
+        sessionPanelRef.current?.collapse();
+      }
+      if (sourcesPanelCollapsed) {
+        sourcesPanelRef.current?.collapse();
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isLargeScreen, sessionPanelRef, sourcesPanelRef, sidebarCollapsed, sourcesPanelCollapsed]);
 
   useEffect(() => {
     if (!isLargeScreen) {
@@ -901,8 +937,8 @@ export default function ChatPage() {
         </Button>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto px-4 pb-40 pt-6 sm:px-6 lg:px-8">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto px-4 pt-6 sm:px-6 lg:px-8">
           {messages.length === 0 ? (
             <NewSessionEmptyState language={language} />
           ) : (
@@ -1001,14 +1037,28 @@ export default function ChatPage() {
         >
           <ResizablePanel
             id="chat-session"
+            panelRef={sessionPanelRef}
+            collapsible
+            collapsedSize={CHAT_PANEL_DEFAULTS.session.collapsedSize}
             defaultSize={CHAT_PANEL_DEFAULTS.session.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.session.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.session.maxSize}
+            onResize={() => {
+              const collapsed = sessionPanelRef.current?.isCollapsed() ?? false;
+              setSidebarCollapsed(collapsed);
+            }}
             className="min-w-0"
           >
             {sessionSidebar}
           </ResizablePanel>
-          <ResizableHandle withHandle />
+          <ResizableHandle
+            withHandle={!sidebarCollapsed}
+            disabled={sidebarCollapsed}
+            className={cn(
+              sidebarCollapsed &&
+                "w-0 min-w-0 max-w-0 shrink-0 overflow-hidden border-0 bg-transparent opacity-0 pointer-events-none"
+            )}
+          />
           <ResizablePanel
             id="chat-main"
             defaultSize={CHAT_PANEL_DEFAULTS.chat.defaultSize}
@@ -1016,12 +1066,26 @@ export default function ChatPage() {
           >
             {chatMain}
           </ResizablePanel>
-          <ResizableHandle withHandle />
+          <ResizableHandle
+            withHandle={!sourcesPanelCollapsed}
+            disabled={sourcesPanelCollapsed}
+            className={cn(
+              sourcesPanelCollapsed &&
+                "w-0 min-w-0 max-w-0 shrink-0 overflow-hidden border-0 bg-transparent opacity-0 pointer-events-none"
+            )}
+          />
           <ResizablePanel
             id="chat-sources"
+            panelRef={sourcesPanelRef}
+            collapsible
+            collapsedSize={CHAT_PANEL_DEFAULTS.sources.collapsedSize}
             defaultSize={CHAT_PANEL_DEFAULTS.sources.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.sources.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.sources.maxSize}
+            onResize={() => {
+              const collapsed = sourcesPanelRef.current?.isCollapsed() ?? false;
+              setSourcesPanelCollapsed(collapsed);
+            }}
             className="min-w-0"
           >
             {sourcesPanel}
@@ -1368,8 +1432,8 @@ function Composer({
   };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-4 sm:px-6 lg:px-8">
-      <div className="@container/composer pointer-events-auto mx-auto max-w-5xl">
+    <div className="shrink-0 border-t border-border/60 bg-muted/40 px-4 pb-4 pt-3 sm:px-6 lg:px-8">
+      <div className="@container/composer mx-auto max-w-5xl">
         <div className="border border-border bg-card">
           <Textarea
             value={input}

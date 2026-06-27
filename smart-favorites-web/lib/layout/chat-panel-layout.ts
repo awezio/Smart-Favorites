@@ -5,17 +5,22 @@ export const CHAT_PANEL_IDS = ["chat-session", "chat-main", "chat-sources"] as c
 export type ChatPanelId = (typeof CHAT_PANEL_IDS)[number];
 export type ChatPanelLayout = Record<ChatPanelId, number>;
 
+/** Narrow icon-rail width when a side panel is collapsed (~48px on typical viewports). */
+export const CHAT_PANEL_COLLAPSED_SIZE = 3;
+
 export const CHAT_PANEL_DEFAULTS = {
   session: {
     defaultSize: "20%",
-    minSize: "5%",
+    minSize: "12%",
     maxSize: "45%",
+    collapsedSize: `${CHAT_PANEL_COLLAPSED_SIZE}%`,
   },
   chat: { defaultSize: "55%" },
   sources: {
     defaultSize: "25%",
-    minSize: "5%",
+    minSize: "12%",
     maxSize: "45%",
+    collapsedSize: `${CHAT_PANEL_COLLAPSED_SIZE}%`,
   },
 } as const;
 
@@ -58,9 +63,9 @@ export function normalizeChatPanelLayout(
   const sources = layout["chat-sources"];
 
   if (
-    session < 5 ||
+    session < CHAT_PANEL_COLLAPSED_SIZE ||
     session > 45 ||
-    sources < 5 ||
+    sources < CHAT_PANEL_COLLAPSED_SIZE ||
     sources > 45 ||
     chat <= 0
   ) {
