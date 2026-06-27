@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, type ComponentProps } from "react";
 import {
   Group,
   Panel,
   Separator,
   useDefaultLayout,
+  useGroupRef,
   usePanelRef,
   type Layout,
 } from "react-resizable-panels";
@@ -14,17 +15,26 @@ import { cn } from "@/lib/utils";
 type ResizablePanelGroupProps = Omit<ComponentProps<typeof Group>, "orientation"> & {
   direction?: "horizontal" | "vertical";
   autoSaveId?: string;
-  panelIds?: string[];
   fallbackLayout?: Layout;
   sanitizeLayout?: (layout: Layout) => Layout;
+  groupRef?: ComponentProps<typeof Group>["groupRef"];
 };
+
+function layoutsEqual(a: Layout, b: Layout): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+  return aKeys.every((key) => Math.abs((a[key] ?? 0) - (b[key] ?? 0)) < 0.01);
+}
 
 function ResizablePanelGroup({
   direction = "horizontal",
   autoSaveId,
-  panelIds,
   fallbackLayout,
   sanitizeLayout,
+  groupRef,
   className,
   defaultLayout,
   onLayoutChanged,
@@ -32,30 +42,32 @@ function ResizablePanelGroup({
 }: ResizablePanelGroupProps) {
   const persistedLayout = useDefaultLayout({
     id: autoSaveId ?? "resizable-panel-group",
-    panelIds: panelIds ?? [],
   });
 
-  const resolvedDefaultLayout = useMemo(() => {
+  const { resolvedDefaultLayout, invalidStoredLayout } = useMemo(() => {
     const candidate =
       (autoSaveId ? persistedLayout.defaultLayout : undefined) ??
       defaultLayout ??
       fallbackLayout;
 
     if (!candidate) {
-      return undefined;
+      return { resolvedDefaultLayout: undefined, invalidStoredLayout: false };
     }
 
     const sanitized = sanitizeLayout ? sanitizeLayout(candidate) : candidate;
+    const invalidStoredLayout = Boolean(
+      sanitizeLayout && autoSaveId && persistedLayout.defaultLayout && !layoutsEqual(sanitized, candidate)
+    );
 
     if (fallbackLayout) {
       const values = Object.values(sanitized);
       const sum = values.reduce((total, size) => total + size, 0);
       if (Math.abs(sum - 100) > 0.5 || values.some((size) => size <= 0)) {
-        return fallbackLayout;
+        return { resolvedDefaultLayout: fallbackLayout, invalidStoredLayout: true };
       }
     }
 
-    return sanitized;
+    return { resolvedDefaultLayout: sanitized, invalidStoredLayout };
   }, [
     autoSaveId,
     defaultLayout,
@@ -64,13 +76,41 @@ function ResizablePanelGroup({
     sanitizeLayout,
   ]);
 
+  useEffect(() => {
+    if (!invalidStoredLayout || !autoSaveId || typeof window === "undefined") {
+      return;
+    }
+
+    for (const key of Object.keys(localStorage)) {
+      if (key.includes(String(autoSaveId))) {
+        localStorage.removeItem(key);
+      }
+    }
+  }, [autoSaveId, invalidStoredLayout]);
+
+  const handleLayoutChanged = useCallback(
+    (layout: Layout) => {
+      const sanitized = sanitizeLayout ? sanitizeLayout(layout) : layout;
+      if (sanitizeLayout && !layoutsEqual(sanitized, layout)) {
+        return;
+      }
+      if (autoSaveId) {
+        persistedLayout.onLayoutChanged(sanitized);
+        return;
+      }
+      onLayoutChanged?.(sanitized);
+    },
+    [autoSaveId, onLayoutChanged, persistedLayout, sanitizeLayout]
+  );
+
   return (
     <Group
       id={autoSaveId}
+      groupRef={groupRef}
       orientation={direction}
       className={cn("h-full w-full", className)}
       defaultLayout={resolvedDefaultLayout}
-      onLayoutChanged={autoSaveId ? persistedLayout.onLayoutChanged : onLayoutChanged}
+      onLayoutChanged={autoSaveId || sanitizeLayout ? handleLayoutChanged : onLayoutChanged}
       resizeTargetMinimumSize={{ coarse: 32, fine: 12 }}
       {...props}
     />
@@ -118,6 +158,7 @@ export {
   ResizablePanel,
   ResizableHandle,
   useDefaultLayout,
+  useGroupRef,
   usePanelRef,
   type Layout,
 };

@@ -37,6 +37,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  useGroupRef,
   usePanelRef,
 } from "@/components/layout/resizable";
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
@@ -45,7 +46,9 @@ import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import {
   CHAT_PANEL_DEFAULTS,
   CHAT_PANELS_AUTO_SAVE_ID,
+  chatPanelLayoutsEqual,
   DEFAULT_CHAT_PANEL_LAYOUT,
+  isChatPanelLayout,
   normalizeChatPanelLayout,
 } from "@/lib/layout/chat-panel-layout";
 import { cn } from "@/lib/utils";
@@ -225,6 +228,7 @@ export default function ChatPage() {
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
   const sessionPanelRef = usePanelRef();
   const sourcesPanelRef = usePanelRef();
+  const chatPanelGroupRef = useGroupRef();
   const chatPanelFallbackLayout = useMemo(
     () => normalizeChatPanelLayout(DEFAULT_CHAT_PANEL_LAYOUT),
     []
@@ -523,6 +527,26 @@ export default function ChatPage() {
       sessionSidebarInitializedRef.current = true;
     }
   }, [isLargeScreen]);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      const current = chatPanelGroupRef.current?.getLayout();
+      if (!current) {
+        return;
+      }
+
+      const normalized = normalizeChatPanelLayout(current, chatPanelFallbackLayout);
+      if (isChatPanelLayout(current) && !chatPanelLayoutsEqual(normalized, current)) {
+        chatPanelGroupRef.current?.setLayout(normalized);
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [chatPanelFallbackLayout, chatPanelGroupRef, isLargeScreen]);
 
   useEffect(() => {
     if (hasInitializedRef.current) {
@@ -939,7 +963,7 @@ export default function ChatPage() {
         <ResizablePanelGroup
           direction="horizontal"
           autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
-          panelIds={["chat-session", "chat-main", "chat-sources"]}
+          groupRef={chatPanelGroupRef}
           fallbackLayout={chatPanelFallbackLayout}
           sanitizeLayout={sanitizeChatPanelLayout}
           className="min-h-0 min-w-0 flex-1"

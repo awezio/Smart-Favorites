@@ -27,31 +27,20 @@ function fetchJson(url) {
 
 function panelWidths(page) {
   return page.evaluate(() => {
-    const panels = Array.from(document.querySelectorAll("[data-panel]"));
-    return panels.map((panel) => ({
-      id: panel.getAttribute("data-panel"),
-      width: panel.getBoundingClientRect().width,
-    }));
+    const ids = ["chat-session", "chat-main", "chat-sources"];
+    return ids.map((id) => {
+      const panel = document.getElementById(id);
+      return {
+        id,
+        width: panel?.getBoundingClientRect().width ?? 0,
+      };
+    });
   });
 }
 
 async function dragHandle(page, handleIndex, deltaX) {
-  const handle = page.locator('[data-separator="active"]').nth(handleIndex);
-  if ((await handle.count()) === 0) {
-    const fallback = page.locator("[data-separator]").nth(handleIndex);
-    const box = await fallback.boundingBox();
-    if (!box) {
-      throw new Error(`Separator ${handleIndex} not found`);
-    }
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + deltaX, box.y + box.height / 2, {
-      steps: 12,
-    });
-    await page.mouse.up();
-    return;
-  }
-
+  const handle = page.locator("[data-separator]").nth(handleIndex);
+  await handle.waitFor({ state: "visible", timeout: 30_000 });
   const box = await handle.boundingBox();
   if (!box) {
     throw new Error(`Separator ${handleIndex} has no bounding box`);
@@ -59,7 +48,7 @@ async function dragHandle(page, handleIndex, deltaX) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + deltaX, box.y + box.height / 2, {
-    steps: 12,
+    steps: 16,
   });
   await page.mouse.up();
 }
@@ -76,22 +65,23 @@ let page = context
   .find((item) => item.url().includes("/dashboard/chat"));
 
 if (!page) {
-  page = await context.newPage();
+  throw new Error("Open /dashboard/chat in Edge (port 9222) while logged in, then rerun.");
 }
 
+await page.bringToFront();
 await page.setViewportSize({ width: 1440, height: 900 });
-await page.goto(TARGET_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
-await page.waitForTimeout(2000);
 
 await page.evaluate(() => {
-  localStorage.removeItem("react-resizable-panels:chat-panels");
-  localStorage.removeItem("react-resizable-panels:chat-panels-v2");
-  localStorage.removeItem("react-resizable-panels:chat-panels-v3");
+  for (const key of Object.keys(localStorage)) {
+    if (key.includes("chat-panels")) {
+      localStorage.removeItem(key);
+    }
+  }
 });
 
-await page.reload({ waitUntil: "domcontentloaded" });
-await page.waitForSelector("[data-panel='chat-session']", { timeout: 60_000 });
-await page.waitForTimeout(1000);
+await page.reload({ waitUntil: "domcontentloaded", timeout: 120_000 });
+await page.waitForSelector("#chat-session", { timeout: 60_000 });
+await page.waitForTimeout(1500);
 
 const before = await panelWidths(page);
 console.log("before", before);
