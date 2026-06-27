@@ -96,7 +96,6 @@ function ResizablePanelGroup({
       }
       if (autoSaveId) {
         persistedLayout.onLayoutChanged(sanitized);
-        return;
       }
       onLayoutChanged?.(sanitized);
     },
@@ -110,7 +109,7 @@ function ResizablePanelGroup({
       orientation={direction}
       className={cn("h-full w-full", className)}
       defaultLayout={resolvedDefaultLayout}
-      onLayoutChanged={autoSaveId || sanitizeLayout ? handleLayoutChanged : onLayoutChanged}
+      onLayoutChanged={handleLayoutChanged}
       resizeTargetMinimumSize={{ coarse: 32, fine: 12 }}
       {...props}
     />

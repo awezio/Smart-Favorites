@@ -47,6 +47,7 @@ import {
   CHAT_PANELS_AUTO_SAVE_ID,
   DEFAULT_CHAT_PANEL_LAYOUT,
   normalizeChatPanelLayout,
+  type ChatPanelLayout,
 } from "@/lib/layout/chat-panel-layout";
 import { cn } from "@/lib/utils";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
@@ -224,10 +225,30 @@ export default function ChatPage() {
   const sessionSidebarInitializedRef = useRef(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
   const chatPanelGroupRef = useGroupRef();
-  const chatPanelFallbackLayout = useMemo(
-    () => normalizeChatPanelLayout(DEFAULT_CHAT_PANEL_LAYOUT),
-    []
-  );
+  const [panelLayout, setPanelLayout] = useState<ChatPanelLayout>(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_CHAT_PANEL_LAYOUT;
+    }
+
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (!key.includes("chat-panels")) {
+          continue;
+        }
+
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+          continue;
+        }
+
+        return normalizeChatPanelLayout(JSON.parse(raw));
+      }
+    } catch {
+      // ignore invalid storage
+    }
+
+    return DEFAULT_CHAT_PANEL_LAYOUT;
+  });
 
   const toggleSessionSidebar = useCallback(() => {
     setSidebarCollapsed((collapsed) => !collapsed);
@@ -239,8 +260,20 @@ export default function ChatPage() {
 
   const sanitizeChatPanelLayout = useCallback(
     (layout: Record<string, number>) =>
-      normalizeChatPanelLayout(layout, chatPanelFallbackLayout),
-    [chatPanelFallbackLayout]
+      normalizeChatPanelLayout(layout, DEFAULT_CHAT_PANEL_LAYOUT),
+    []
+  );
+
+  const handlePanelLayoutChanged = useCallback(
+    (layout: Record<string, number>) => {
+      const normalized = normalizeChatPanelLayout(layout);
+      setPanelLayout(normalized);
+      localStorage.setItem(
+        `react-resizable-panels:${CHAT_PANELS_AUTO_SAVE_ID}`,
+        JSON.stringify(normalized)
+      );
+    },
+    []
   );
 
   useEffect(() => {
@@ -522,9 +555,10 @@ export default function ChatPage() {
         return false;
       }
 
-      const normalized = normalizeChatPanelLayout(current, chatPanelFallbackLayout);
+      const normalized = normalizeChatPanelLayout(current);
       if (JSON.stringify(normalized) !== JSON.stringify(current)) {
         chatPanelGroupRef.current?.setLayout(normalized);
+        setPanelLayout(normalized);
       }
       return true;
     };
@@ -541,7 +575,7 @@ export default function ChatPage() {
       cancelAnimationFrame(frame);
       window.clearTimeout(timeout);
     };
-  }, [chatPanelFallbackLayout, chatPanelGroupRef, isLargeScreen]);
+  }, [chatPanelGroupRef, isLargeScreen]);
 
   useEffect(() => {
     if (hasInitializedRef.current) {
@@ -956,13 +990,13 @@ export default function ChatPage() {
     <div className="flex h-full min-h-0 overflow-hidden bg-muted/40 text-foreground">
       {isLargeScreen ? (
         <ResizablePanelGroup
-          key={isLargeScreen ? "chat-panels-desktop" : "chat-panels-mobile"}
+          key="chat-panels-desktop"
           direction="horizontal"
-          autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
           groupRef={chatPanelGroupRef}
-          defaultLayout={chatPanelFallbackLayout}
-          fallbackLayout={chatPanelFallbackLayout}
+          defaultLayout={panelLayout}
+          fallbackLayout={DEFAULT_CHAT_PANEL_LAYOUT}
           sanitizeLayout={sanitizeChatPanelLayout}
+          onLayoutChanged={handlePanelLayoutChanged}
           className="min-h-0 min-w-0 flex-1"
         >
           <ResizablePanel
