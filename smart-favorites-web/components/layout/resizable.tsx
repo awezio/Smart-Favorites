@@ -1,11 +1,12 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useMemo, type ComponentProps } from "react";
 import {
   Group,
   Panel,
   Separator,
   useDefaultLayout,
+  usePanelRef,
   type Layout,
 } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ type ResizablePanelGroupProps = Omit<ComponentProps<typeof Group>, "orientation"
   autoSaveId?: string;
   panelIds?: string[];
   fallbackLayout?: Layout;
+  sanitizeLayout?: (layout: Layout) => Layout;
 };
 
 function ResizablePanelGroup({
@@ -22,6 +24,7 @@ function ResizablePanelGroup({
   autoSaveId,
   panelIds,
   fallbackLayout,
+  sanitizeLayout,
   className,
   defaultLayout,
   onLayoutChanged,
@@ -32,10 +35,34 @@ function ResizablePanelGroup({
     panelIds: panelIds ?? [],
   });
 
-  const resolvedDefaultLayout =
-    (autoSaveId ? persistedLayout.defaultLayout : undefined) ??
-    defaultLayout ??
-    fallbackLayout;
+  const resolvedDefaultLayout = useMemo(() => {
+    const candidate =
+      (autoSaveId ? persistedLayout.defaultLayout : undefined) ??
+      defaultLayout ??
+      fallbackLayout;
+
+    if (!candidate) {
+      return undefined;
+    }
+
+    const sanitized = sanitizeLayout ? sanitizeLayout(candidate) : candidate;
+
+    if (fallbackLayout) {
+      const values = Object.values(sanitized);
+      const sum = values.reduce((total, size) => total + size, 0);
+      if (Math.abs(sum - 100) > 0.5 || values.some((size) => size <= 0)) {
+        return fallbackLayout;
+      }
+    }
+
+    return sanitized;
+  }, [
+    autoSaveId,
+    defaultLayout,
+    fallbackLayout,
+    persistedLayout.defaultLayout,
+    sanitizeLayout,
+  ]);
 
   return (
     <Group
@@ -72,7 +99,7 @@ function ResizableHandle({
   return (
     <Separator
       className={cn(
-        "relative z-20 mx-[-4px] flex w-2 shrink-0 cursor-col-resize items-center justify-center bg-border/80 transition-colors hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring data-[panel-group-direction=vertical]:mx-0 data-[panel-group-direction=vertical]:my-[-4px] data-[panel-group-direction=vertical]:h-2 data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:cursor-row-resize",
+        "relative z-30 flex w-3 shrink-0 cursor-col-resize touch-none items-center justify-center bg-border/60 transition-colors hover:bg-primary/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring data-[panel-group-direction=vertical]:h-3 data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:cursor-row-resize",
         className
       )}
       {...props}
@@ -86,4 +113,11 @@ function ResizableHandle({
   );
 }
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle, useDefaultLayout, type Layout };
+export {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+  useDefaultLayout,
+  usePanelRef,
+  type Layout,
+};

@@ -37,11 +37,17 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  usePanelRef,
 } from "@/components/layout/resizable";
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
 import { shouldRegenerateSessionTitle } from "@/lib/chat/session-title-utils";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
-import { CHAT_PANEL_DEFAULTS, CHAT_PANELS_AUTO_SAVE_ID, DEFAULT_CHAT_PANEL_LAYOUT } from "@/lib/layout/chat-panel-layout";
+import {
+  CHAT_PANEL_DEFAULTS,
+  CHAT_PANELS_AUTO_SAVE_ID,
+  DEFAULT_CHAT_PANEL_LAYOUT,
+  normalizeChatPanelLayout,
+} from "@/lib/layout/chat-panel-layout";
 import { cn } from "@/lib/utils";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type {
@@ -217,6 +223,36 @@ export default function ChatPage() {
   const hasInitializedRef = useRef(false);
   const sessionSidebarInitializedRef = useRef(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
+  const sessionPanelRef = usePanelRef();
+  const sourcesPanelRef = usePanelRef();
+  const chatPanelFallbackLayout = useMemo(
+    () => normalizeChatPanelLayout(DEFAULT_CHAT_PANEL_LAYOUT),
+    []
+  );
+
+  const toggleSessionSidebar = useCallback(() => {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      if (next) {
+        sessionPanelRef.current?.collapse();
+      } else {
+        sessionPanelRef.current?.expand();
+      }
+      return next;
+    });
+  }, [sessionPanelRef]);
+
+  const toggleSourcesPanel = useCallback(() => {
+    setSourcesPanelCollapsed((collapsed) => {
+      const next = !collapsed;
+      if (next) {
+        sourcesPanelRef.current?.collapse();
+      } else {
+        sourcesPanelRef.current?.expand();
+      }
+      return next;
+    });
+  }, [sourcesPanelRef]);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -485,6 +521,28 @@ export default function ChatPage() {
       sessionSidebarInitializedRef.current = true;
     }
   }, [isLargeScreen]);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      if (sidebarCollapsed) {
+        sessionPanelRef.current?.collapse();
+      } else {
+        sessionPanelRef.current?.expand();
+      }
+
+      if (sourcesPanelCollapsed) {
+        sourcesPanelRef.current?.collapse();
+      } else {
+        sourcesPanelRef.current?.expand();
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isLargeScreen, sidebarCollapsed, sourcesPanelCollapsed, sessionPanelRef, sourcesPanelRef]);
 
   useEffect(() => {
     if (hasInitializedRef.current) {
@@ -782,7 +840,7 @@ export default function ChatPage() {
       archivedSessionIds={archivedSessionIds}
       sessionSearch={sessionSearch}
       showArchived={showArchived}
-      onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+      onToggleCollapse={toggleSessionSidebar}
       onSearchChange={setSessionSearch}
       onCreateSession={() => createNewSession()}
       onOpenSession={openSession}
@@ -889,7 +947,7 @@ export default function ChatPage() {
       sources={sessionSources}
       collapsed={sourcesPanelCollapsed}
       highlightedIndex={highlightedSourceIndex}
-      onToggleCollapse={() => setSourcesPanelCollapsed((value) => !value)}
+      onToggleCollapse={toggleSourcesPanel}
       onHighlight={setHighlightedSourceIndex}
       onAnalyze={(prompt) => void sendQuery(prompt)}
     />
@@ -902,15 +960,23 @@ export default function ChatPage() {
           direction="horizontal"
           autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
           panelIds={["chat-session", "chat-main", "chat-sources"]}
-          fallbackLayout={DEFAULT_CHAT_PANEL_LAYOUT}
+          fallbackLayout={chatPanelFallbackLayout}
+          sanitizeLayout={(layout) => normalizeChatPanelLayout(layout, chatPanelFallbackLayout)}
           className="min-h-0 min-w-0 flex-1"
         >
           <ResizablePanel
             id="chat-session"
+            panelRef={sessionPanelRef}
             defaultSize={CHAT_PANEL_DEFAULTS.session.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.session.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.session.maxSize}
+            collapsedSize={CHAT_PANEL_DEFAULTS.session.collapsedSize}
+            collapsible
             className="min-w-0"
+            onResize={() => {
+              const collapsed = sessionPanelRef.current?.isCollapsed() ?? false;
+              setSidebarCollapsed((current) => (current === collapsed ? current : collapsed));
+            }}
           >
             {sessionSidebar}
           </ResizablePanel>
@@ -926,10 +992,17 @@ export default function ChatPage() {
           <ResizableHandle withHandle />
           <ResizablePanel
             id="chat-sources"
+            panelRef={sourcesPanelRef}
             defaultSize={CHAT_PANEL_DEFAULTS.sources.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.sources.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.sources.maxSize}
+            collapsedSize={CHAT_PANEL_DEFAULTS.sources.collapsedSize}
+            collapsible
             className="min-w-0"
+            onResize={() => {
+              const collapsed = sourcesPanelRef.current?.isCollapsed() ?? false;
+              setSourcesPanelCollapsed((current) => (current === collapsed ? current : collapsed));
+            }}
           >
             {sourcesPanel}
           </ResizablePanel>
