@@ -38,7 +38,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
   useGroupRef,
-  usePanelRef,
 } from "@/components/layout/resizable";
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
 import { shouldRegenerateSessionTitle } from "@/lib/chat/session-title-utils";
@@ -46,9 +45,7 @@ import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import {
   CHAT_PANEL_DEFAULTS,
   CHAT_PANELS_AUTO_SAVE_ID,
-  chatPanelLayoutsEqual,
   DEFAULT_CHAT_PANEL_LAYOUT,
-  isChatPanelLayout,
   normalizeChatPanelLayout,
 } from "@/lib/layout/chat-panel-layout";
 import { cn } from "@/lib/utils";
@@ -226,8 +223,6 @@ export default function ChatPage() {
   const hasInitializedRef = useRef(false);
   const sessionSidebarInitializedRef = useRef(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
-  const sessionPanelRef = usePanelRef();
-  const sourcesPanelRef = usePanelRef();
   const chatPanelGroupRef = useGroupRef();
   const chatPanelFallbackLayout = useMemo(
     () => normalizeChatPanelLayout(DEFAULT_CHAT_PANEL_LAYOUT),
@@ -235,24 +230,12 @@ export default function ChatPage() {
   );
 
   const toggleSessionSidebar = useCallback(() => {
-    setSidebarCollapsed((collapsed) => {
-      const next = !collapsed;
-      sessionPanelRef.current?.resize(
-        next ? CHAT_PANEL_DEFAULTS.session.collapsedSize : CHAT_PANEL_DEFAULTS.session.defaultSize
-      );
-      return next;
-    });
-  }, [sessionPanelRef]);
+    setSidebarCollapsed((collapsed) => !collapsed);
+  }, []);
 
   const toggleSourcesPanel = useCallback(() => {
-    setSourcesPanelCollapsed((collapsed) => {
-      const next = !collapsed;
-      sourcesPanelRef.current?.resize(
-        next ? CHAT_PANEL_DEFAULTS.sources.collapsedSize : CHAT_PANEL_DEFAULTS.sources.defaultSize
-      );
-      return next;
-    });
-  }, [sourcesPanelRef]);
+    setSourcesPanelCollapsed((collapsed) => !collapsed);
+  }, []);
 
   const sanitizeChatPanelLayout = useCallback(
     (layout: Record<string, number>) =>
@@ -533,19 +516,31 @@ export default function ChatPage() {
       return;
     }
 
-    const frame = requestAnimationFrame(() => {
+    const repairLayout = () => {
       const current = chatPanelGroupRef.current?.getLayout();
       if (!current) {
-        return;
+        return false;
       }
 
       const normalized = normalizeChatPanelLayout(current, chatPanelFallbackLayout);
-      if (isChatPanelLayout(current) && !chatPanelLayoutsEqual(normalized, current)) {
+      if (JSON.stringify(normalized) !== JSON.stringify(current)) {
         chatPanelGroupRef.current?.setLayout(normalized);
       }
-    });
+      return true;
+    };
 
-    return () => cancelAnimationFrame(frame);
+    let frame = 0;
+    let timeout = 0;
+
+    if (!repairLayout()) {
+      frame = requestAnimationFrame(repairLayout);
+      timeout = window.setTimeout(repairLayout, 150);
+    }
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
   }, [chatPanelFallbackLayout, chatPanelGroupRef, isLargeScreen]);
 
   useEffect(() => {
@@ -961,16 +956,17 @@ export default function ChatPage() {
     <div className="flex h-full min-h-0 overflow-hidden bg-muted/40 text-foreground">
       {isLargeScreen ? (
         <ResizablePanelGroup
+          key={isLargeScreen ? "chat-panels-desktop" : "chat-panels-mobile"}
           direction="horizontal"
           autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
           groupRef={chatPanelGroupRef}
+          defaultLayout={chatPanelFallbackLayout}
           fallbackLayout={chatPanelFallbackLayout}
           sanitizeLayout={sanitizeChatPanelLayout}
           className="min-h-0 min-w-0 flex-1"
         >
           <ResizablePanel
             id="chat-session"
-            panelRef={sessionPanelRef}
             defaultSize={CHAT_PANEL_DEFAULTS.session.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.session.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.session.maxSize}
@@ -989,7 +985,6 @@ export default function ChatPage() {
           <ResizableHandle withHandle />
           <ResizablePanel
             id="chat-sources"
-            panelRef={sourcesPanelRef}
             defaultSize={CHAT_PANEL_DEFAULTS.sources.defaultSize}
             minSize={CHAT_PANEL_DEFAULTS.sources.minSize}
             maxSize={CHAT_PANEL_DEFAULTS.sources.maxSize}
