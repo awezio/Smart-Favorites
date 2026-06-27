@@ -54,26 +54,9 @@ export function isFallbackSessionTitle(
 
 export function shouldRegenerateSessionTitle(
   title: string,
-  titleStatus: string | null | undefined,
-  metadata: unknown,
-  firstUserContent: string | undefined
+  _titleStatus: string | null | undefined,
+  _metadata: unknown,
+  _firstUserContent: string | undefined
 ): boolean {
-  if (isPlaceholderSessionTitle(title)) {
-    return true;
-  }
-
-  const meta =
-    metadata && typeof metadata === "object" && !Array.isArray(metadata)
-      ? (metadata as Record<string, unknown>)
-      : null;
-
-  if (meta?.title_source === "fallback" || meta?.needs_retry === true) {
-    return true;
-  }
-
-  if (titleStatus === "failed") {
-    return true;
-  }
-
-  return isFallbackSessionTitle(title, firstUserContent);
+  return isPlaceholderSessionTitle(title);
 }

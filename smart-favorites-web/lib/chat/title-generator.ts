@@ -23,6 +23,11 @@ export type SessionTitleResult = {
   source: SessionTitleSource;
 };
 
+export type SessionTitleOptions = {
+  provider?: string;
+  model?: string;
+};
+
 const ZH_STOP_WORDS = new Set([
   "的",
   "了",
@@ -171,7 +176,8 @@ export async function generateSessionTitle(
 export async function generateSessionTitleWithSource(
   userId: string,
   messages: Pick<ChatMessage, "role" | "content">[],
-  locale: "zh" | "en" = "zh"
+  locale: "zh" | "en" = "zh",
+  options: SessionTitleOptions = {}
 ): Promise<SessionTitleResult> {
   const relevant = messages
     .filter((message) => message.role === "user" || message.role === "assistant")
@@ -181,18 +187,22 @@ export async function generateSessionTitleWithSource(
     return { title: fallbackSessionTitle(messages, locale), source: "fallback" };
   }
 
-  const { provider, model, enabled } = await getTitleModelSelection(userId);
+  const { provider, model, enabled } = await getTitleModelSelection(userId, options);
   if (!enabled) {
     return { title: fallbackSessionTitle(messages, locale), source: "fallback" };
   }
 
   try {
     const apiKey = await resolveProviderKey(userId, provider);
+    if (!apiKey?.trim()) {
+      throw new ProviderApiError(401, "Missing provider API key for session title generation");
+    }
+
     const response = await callProviderChat({
       provider,
       apiKey,
       model,
-      maxTokens: 32,
+      maxTokens: 64,
       timeoutMs: 20_000,
       messages: [
         { role: "system", content: SESSION_TITLE_SYSTEM_PROMPT },
@@ -219,7 +229,8 @@ export async function maybeGenerateSessionTitleOnServer(
   userId: string,
   sessionId: string,
   messages: Pick<ChatMessage, "role" | "content">[],
-  locale: "zh" | "en" = "zh"
+  locale: "zh" | "en" = "zh",
+  options: SessionTitleOptions = {}
 ): Promise<SessionTitleResult | null> {
   const userCount = messages.filter((message) => message.role === "user").length;
   const assistantCount = messages.filter((message) => message.role === "assistant").length;
@@ -258,7 +269,7 @@ export async function maybeGenerateSessionTitleOnServer(
     .eq("id", sessionId)
     .eq("user_id", userId);
 
-  const result = await generateSessionTitleWithSource(userId, messages, locale);
+  const result = await generateSessionTitleWithSource(userId, messages, locale, options);
 
   const existingMetadata =
     session.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata)
@@ -269,7 +280,7 @@ export async function maybeGenerateSessionTitleOnServer(
     .from("chat_sessions")
     .update({
       title: result.title,
-      title_status: result.source === "ai" ? "ready" : "failed",
+      title_status: "ready",
       title_generated_at: new Date().toISOString(),
       metadata: {
         ...existingMetadata,
@@ -284,14 +295,16 @@ export async function maybeGenerateSessionTitleOnServer(
 }
 
 function sanitizeTitle(raw: string): string {
-  return raw
+  const withoutThinking = raw.replace(/[\s\S]*?<\/think>/gi, "").trim();
+  const firstLine = withoutThinking.split(/\r?\n/)[0]?.trim() || withoutThinking;
+  return firstLine
     .trim()
     .replace(/^["'「『]|["'」』]$/g, "")
     .replace(/\s+/g, " ")
     .slice(0, 80);
 }
 
-async function getTitleModelSelection(userId: string) {
+async function getTitleModelSelection(userId: string, options: SessionTitleOptions = {}) {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("user_settings")
@@ -303,9 +316,14 @@ async function getTitleModelSelection(userId: string) {
 
   const enabled = data?.auto_title_enabled !== false;
   const providerRaw =
-    data?.title_llm_provider || data?.default_llm_provider || process.env.DEFAULT_LLM_PROVIDER || "deepseek";
+    options.provider ||
+    data?.title_llm_provider ||
+    data?.default_llm_provider ||
+    process.env.DEFAULT_LLM_PROVIDER ||
+    "deepseek";
   const provider = isSupportedProvider(providerRaw) ? providerRaw : "deepseek";
   const model =
+    options.model ||
     (typeof data?.title_llm_model === "string" && data.title_llm_model.trim()) ||
     (typeof data?.default_llm_model === "string" && data.default_llm_model.trim()) ||
     undefined;

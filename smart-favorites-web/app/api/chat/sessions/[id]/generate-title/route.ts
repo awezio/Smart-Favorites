@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAuthenticatedSupabaseClient, getAuthUser } from "@/lib/auth/get-user";
+import { isSupportedProvider } from "@/lib/ai/provider-config";
 import {
   fallbackSessionTitle,
   generateSessionTitleWithSource,
@@ -21,6 +22,12 @@ export async function POST(
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const locale = body.locale === "en" ? "en" : "zh";
+    const titleProvider =
+      typeof body.provider === "string" && isSupportedProvider(body.provider)
+        ? body.provider
+        : undefined;
+    const titleModel =
+      typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
 
     const supabase = await createAuthenticatedSupabaseClient(user);
     const { data: session, error: fetchError } = await supabase
@@ -70,7 +77,10 @@ export async function POST(
 
     let result: SessionTitleResult;
     try {
-      result = await generateSessionTitleWithSource(userId, messages, locale);
+      result = await generateSessionTitleWithSource(userId, messages, locale, {
+        provider: titleProvider,
+        model: titleModel,
+      });
     } catch (error) {
       console.error("Generate-title route error:", error);
       result = {
@@ -84,7 +94,7 @@ export async function POST(
         ? (session.metadata as Record<string, unknown>)
         : {};
 
-    const titleStatus = result.source === "ai" ? "ready" : "failed";
+    const titleStatus = "ready";
 
     const { data: updated, error: updateError } = await supabase
       .from("chat_sessions")

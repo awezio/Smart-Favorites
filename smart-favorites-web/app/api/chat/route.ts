@@ -122,11 +122,15 @@ export async function POST(request: NextRequest) {
           userId,
           sessionId.trim(),
           exchangeMessages,
-          locale === "en" ? "en" : "zh"
+          locale === "en" ? "en" : "zh",
+          {
+            provider: providerOverride,
+            model: modelOverride,
+          }
         );
         if (titleResult) {
           generatedTitle = titleResult.title;
-          titleStatus = titleResult.source === "ai" ? "ready" : "failed";
+          titleStatus = "ready";
           titleSource = titleResult.source;
         }
       } catch (titleError) {

@@ -41,7 +41,7 @@ import {
 import { aggregateSessionSources } from "@/lib/chat/session-sources";
 import { shouldRegenerateSessionTitle } from "@/lib/chat/session-title-utils";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
-import { CHAT_PANEL_DEFAULTS, CHAT_PANELS_AUTO_SAVE_ID } from "@/lib/layout/chat-panel-layout";
+import { CHAT_PANEL_DEFAULTS, CHAT_PANELS_AUTO_SAVE_ID, DEFAULT_CHAT_PANEL_LAYOUT } from "@/lib/layout/chat-panel-layout";
 import { cn } from "@/lib/utils";
 import { type DashboardLanguage, pickLanguage, useDashboardLanguage } from "@/lib/dashboard-language";
 import type {
@@ -309,6 +309,8 @@ export default function ChatPage() {
             })),
             locale: language,
             force: Boolean(options?.force),
+            provider: selectedProvider || undefined,
+            model: selectedModelId || undefined,
           }),
         });
 
@@ -329,15 +331,11 @@ export default function ChatPage() {
         }
 
         applySessionTitleUpdate(sessionId, nextTitle, (data.title_status as ChatTitleStatus) || "ready");
-
-        if (data.title_source === "fallback" || data.needs_retry) {
-          toast.error(t.titleFailed);
-        }
       } catch {
         toast.error(t.titleFailed);
       }
     },
-    [applySessionTitleUpdate, language, t.emptyTitle, t.titleFailed]
+    [applySessionTitleUpdate, language, selectedModelId, selectedProvider, t.emptyTitle, t.titleFailed]
   );
 
   const openSession = useCallback(async (session: ChatSession) => {
@@ -719,9 +717,7 @@ export default function ChatPage() {
 
       await loadSessions();
 
-      if (data.titleSource === "fallback") {
-        void maybeGenerateSessionTitle(targetSession.id, savedMessages, { force: true });
-      } else if (!data.generatedTitle) {
+      if (!data.generatedTitle && data.titleSource !== "ai") {
         void maybeGenerateSessionTitle(targetSession.id, savedMessages);
       }
     } catch (error: any) {
@@ -906,6 +902,7 @@ export default function ChatPage() {
           direction="horizontal"
           autoSaveId={CHAT_PANELS_AUTO_SAVE_ID}
           panelIds={["chat-session", "chat-main", "chat-sources"]}
+          fallbackLayout={DEFAULT_CHAT_PANEL_LAYOUT}
           className="min-h-0 min-w-0 flex-1"
         >
           <ResizablePanel

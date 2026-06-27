@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import {
   Group,
   Panel,
@@ -14,12 +14,14 @@ type ResizablePanelGroupProps = Omit<ComponentProps<typeof Group>, "orientation"
   direction?: "horizontal" | "vertical";
   autoSaveId?: string;
   panelIds?: string[];
+  fallbackLayout?: Layout;
 };
 
 function ResizablePanelGroup({
   direction = "horizontal",
   autoSaveId,
   panelIds,
+  fallbackLayout,
   className,
   defaultLayout,
   onLayoutChanged,
@@ -30,19 +32,35 @@ function ResizablePanelGroup({
     panelIds: panelIds ?? [],
   });
 
+  const resolvedDefaultLayout =
+    (autoSaveId ? persistedLayout.defaultLayout : undefined) ??
+    defaultLayout ??
+    fallbackLayout;
+
   return (
     <Group
       id={autoSaveId}
       orientation={direction}
-      className={cn("flex h-full w-full", className)}
-      defaultLayout={autoSaveId ? persistedLayout.defaultLayout : defaultLayout}
+      className={cn("h-full w-full", className)}
+      defaultLayout={resolvedDefaultLayout}
       onLayoutChanged={autoSaveId ? persistedLayout.onLayoutChanged : onLayoutChanged}
+      resizeTargetMinimumSize={{ coarse: 32, fine: 12 }}
       {...props}
     />
   );
 }
 
-const ResizablePanel = Panel;
+function ResizablePanel({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof Panel>) {
+  return (
+    <Panel className={className} {...props}>
+      <div className="h-full min-h-0 min-w-0 overflow-hidden">{children}</div>
+    </Panel>
+  );
+}
 
 function ResizableHandle({
   withHandle,
@@ -54,24 +72,18 @@ function ResizableHandle({
   return (
     <Separator
       className={cn(
-        "relative flex w-px items-center justify-center bg-border transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full",
+        "relative z-20 mx-[-4px] flex w-2 shrink-0 cursor-col-resize items-center justify-center bg-border/80 transition-colors hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring data-[panel-group-direction=vertical]:mx-0 data-[panel-group-direction=vertical]:my-[-4px] data-[panel-group-direction=vertical]:h-2 data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:cursor-row-resize",
         className
       )}
       {...props}
     >
       {withHandle ? (
-        <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border border-border bg-background">
-          <div className="h-2.5 w-0.5 rounded-full bg-border" />
+        <div className="pointer-events-none z-10 flex h-8 w-3 items-center justify-center rounded-sm border border-border bg-background shadow-sm">
+          <div className="h-4 w-0.5 rounded-full bg-muted-foreground/50" />
         </div>
       ) : null}
     </Separator>
   );
 }
 
-export {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-  useDefaultLayout,
-  type Layout,
-};
+export { ResizablePanelGroup, ResizablePanel, ResizableHandle, useDefaultLayout, type Layout };
