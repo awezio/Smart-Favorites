@@ -938,7 +938,7 @@ export default function ChatPage() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-6 pb-6 sm:px-6 lg:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-6 pb-6 sm:px-6 lg:px-8">
           {messages.length === 0 ? (
             <NewSessionEmptyState language={language} />
           ) : (

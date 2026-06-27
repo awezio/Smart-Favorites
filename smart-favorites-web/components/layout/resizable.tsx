@@ -119,11 +119,16 @@ function ResizablePanelGroup({
 function ResizablePanel({
   className,
   children,
+  style,
   ...props
 }: ComponentProps<typeof Panel>) {
   return (
-    <Panel className={className} {...props}>
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">{children}</div>
+    <Panel
+      className={cn("flex min-h-0 min-w-0 flex-col", className)}
+      style={{ overflow: "hidden", ...style }}
+      {...props}
+    >
+      {children}
     </Panel>
   );
 }
